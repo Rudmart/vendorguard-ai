@@ -1,0 +1,106 @@
+{
+  "frameworkId": "nist-800-161",
+  "frameworkName": "NIST SP 800-161r1 (Cyber Supply Chain Risk Management)",
+  "version": "Rev. 1",
+  "sourceUrl": "https://csrc.nist.gov/pubs/sp/800/161/r1/final",
+  "licenseNote": "Public domain (U.S. Government publication). Summaries below are original, written for this application - they are not reproductions of NIST publication text.",
+  "demonstrationSubsetDisclaimer": "This is an illustrative subset for portfolio demonstration purposes, not full framework coverage.",
+  "controls": [
+    {
+      "controlId": "C-SCRM-1",
+      "title": "Supply chain risk management strategy",
+      "domain": "Governance",
+      "summary": "The organization maintains a documented strategy for identifying and managing risk introduced by suppliers, including this vendor's tier in the supply chain.",
+      "expectedEvidenceTypes": ["Security policy", "Architecture document"],
+      "validationGuidance": "Look for a named owner, review cadence, and explicit criteria for classifying supplier criticality."
+    },
+    {
+      "controlId": "C-SCRM-2",
+      "title": "Supplier due diligence prior to engagement",
+      "domain": "Governance",
+      "summary": "Vendors perform documented security and risk due diligence on their own critical suppliers before engaging them.",
+      "expectedEvidenceTypes": ["SOC 2 report", "Security policy"],
+      "validationGuidance": "Evidence should show a repeatable pre-engagement review process, not a one-time or informal check."
+    },
+    {
+      "controlId": "C-SCRM-3",
+      "title": "Contractual flow-down of security requirements",
+      "domain": "Contracts",
+      "summary": "Security and privacy requirements are contractually flowed down to the vendor's own subprocessors and subcontractors.",
+      "expectedEvidenceTypes": ["Data processing agreement"],
+      "validationGuidance": "Check that the DPA or MSA explicitly requires downstream parties to meet equivalent security obligations."
+    },
+    {
+      "controlId": "C-SCRM-4",
+      "title": "Fourth-party (subprocessor) visibility",
+      "domain": "Transparency",
+      "summary": "The vendor maintains and discloses a current list of subprocessors that can access customer data or systems.",
+      "expectedEvidenceTypes": ["Data processing agreement", "Architecture document"],
+      "validationGuidance": "Confirm the list is dated, includes purpose and data access scope per subprocessor, and has a defined update/notification process."
+    },
+    {
+      "controlId": "C-SCRM-5",
+      "title": "Component and dependency provenance",
+      "domain": "Technical",
+      "summary": "The vendor can identify the origin and integrity of critical software components (e.g. via SBOM) used in the delivered product.",
+      "expectedEvidenceTypes": ["Architecture document", "Penetration test summary"],
+      "validationGuidance": "Presence of an SBOM or equivalent dependency inventory is strong evidence; absence is a gap, not an automatic fail for lower-criticality vendors."
+    },
+    {
+      "controlId": "C-SCRM-6",
+      "title": "Supply chain incident notification",
+      "domain": "Incident Response",
+      "summary": "The vendor commits, contractually or in policy, to timely notification of security incidents that could affect the customer through the supply chain.",
+      "expectedEvidenceTypes": ["Data processing agreement", "Security policy"],
+      "validationGuidance": "Look for a specific notification timeframe (e.g. 72 hours) rather than vague 'reasonable time' language."
+    },
+    {
+      "controlId": "C-SCRM-7",
+      "title": "Vendor personnel security for privileged access",
+      "domain": "Personnel",
+      "summary": "Personnel with privileged access to customer systems or data undergo background screening and access review appropriate to their access level.",
+      "expectedEvidenceTypes": ["Security policy", "SOC 2 report"],
+      "validationGuidance": "Evidence should distinguish general employee screening from screening specific to privileged-access roles."
+    },
+    {
+      "controlId": "C-SCRM-8",
+      "title": "Counterfeit and integrity controls for hardware/firmware",
+      "domain": "Technical",
+      "summary": "Where the vendor supplies hardware or firmware, controls exist to verify authenticity and detect tampering before deployment.",
+      "expectedEvidenceTypes": ["Architecture document"],
+      "validationGuidance": "Not applicable to pure SaaS vendors - mark NOT_APPLICABLE with justification rather than treating as a gap."
+    },
+    {
+      "controlId": "C-SCRM-9",
+      "title": "Business continuity and resilience of the supply chain",
+      "domain": "Resilience",
+      "summary": "The vendor has tested continuity plans that account for disruption to its own critical suppliers, not just its own infrastructure.",
+      "expectedEvidenceTypes": ["Security policy", "Architecture document"],
+      "validationGuidance": "Look for evidence of an actual test or exercise, not only a written plan."
+    },
+    {
+      "controlId": "C-SCRM-10",
+      "title": "Supply chain risk reassessment on material change",
+      "domain": "Governance",
+      "summary": "Supplier risk is reassessed when a material change occurs - ownership change, new subprocessor, geographic change - rather than only on a fixed annual cycle.",
+      "expectedEvidenceTypes": ["Security policy"],
+      "validationGuidance": "This is a common gap even in vendors with mature annual review programs; check specifically for an event-driven trigger, not just cadence."
+    },
+    {
+      "controlId": "C-SCRM-11",
+      "title": "Right-to-audit or independent assurance",
+      "domain": "Contracts",
+      "summary": "The contract grants a right to audit, or accepts independent third-party assurance (e.g. SOC 2 Type II) in lieu of direct audit rights.",
+      "expectedEvidenceTypes": ["Data processing agreement", "SOC 2 report"],
+      "validationGuidance": "A current, unqualified SOC 2 Type II opinion is generally sufficient in place of a direct audit right for most criticality tiers."
+    },
+    {
+      "controlId": "C-SCRM-12",
+      "title": "Secure offboarding and data return/destruction",
+      "domain": "Lifecycle",
+      "summary": "The vendor has a documented process for returning or destroying customer data at contract termination, with confirmation provided to the customer.",
+      "expectedEvidenceTypes": ["Data processing agreement", "Security policy"],
+      "validationGuidance": "Look for a defined timeframe and a written confirmation/attestation step, not just a general destruction clause."
+    }
+  ]
+}

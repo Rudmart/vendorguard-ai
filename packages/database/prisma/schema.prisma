@@ -1,0 +1,682 @@
+// VendorGuard AI — Prisma schema
+// Implements every entity from spec §5. Every tenant-owned model carries an
+// explicit tenantId column with an index; application code must resolve
+// tenantId from authenticated context (see packages/auth) and NEVER trust a
+// tenantId supplied in a request body — this schema alone does not enforce
+// that, the service/repository layer must (see packages/auth/tenant-context.ts).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Enums (mirror @vendorguard/shared/domain.ts — keep in sync)
+// ---------------------------------------------------------------------------
+
+enum Role {
+  ADMIN
+  ANALYST
+  REVIEWER
+  AUDITOR
+  READ_ONLY
+}
+
+enum IndustryVertical {
+  GENERAL
+  BANKING_FINANCIAL
+  HEALTHCARE
+}
+
+enum RiskBand {
+  LOW
+  MODERATE
+  HIGH
+  CRITICAL
+}
+
+enum EvidenceState {
+  UPLOADED
+  QUARANTINED
+  SCANNING
+  CLEAN
+  REJECTED
+  EXTRACTING
+  INDEXED
+  FAILED
+  EXPIRED
+}
+
+enum FindingStatus {
+  PASS
+  PARTIAL
+  FAIL
+  INSUFFICIENT_EVIDENCE
+  CONFLICTING_EVIDENCE
+  NOT_APPLICABLE
+}
+
+enum ReviewDecisionType {
+  ACCEPT
+  REJECT
+  OVERRIDE
+  REQUEST_MORE_EVIDENCE
+  NOT_APPLICABLE
+}
+
+enum MappingStrength {
+  EXACT
+  PARTIAL
+  RELATED
+}
+
+enum RemediationStatus {
+  OPEN
+  IN_PROGRESS
+  OVERDUE
+  CLOSED
+}
+
+enum AssessmentStatus {
+  DRAFT
+  IN_REVIEW
+  APPROVED
+  ARCHIVED
+}
+
+// ---------------------------------------------------------------------------
+// Tenant & identity
+// ---------------------------------------------------------------------------
+
+model Tenant {
+  id               String           @id @default(uuid())
+  name             String
+  industry         IndustryVertical @default(GENERAL)
+  nydfsRegulated   Boolean          @default(false)
+  baselTier        String           @default("NONE")
+  isPubliclyTraded Boolean          @default(false)
+  operatesInEu     Boolean          @default(false)
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  memberships          TenantMembership[]
+  vendors              Vendor[]
+  frameworks           Framework[]
+  assessments          Assessment[]
+  auditEvents          AuditEvent[]
+  assistantConversations AssistantConversation[]
+  mcpInvocations       MCPInvocation[]
+
+  @@map("tenants")
+}
+
+model User {
+  id          String   @id @default(uuid())
+  // Entra ID object id in production; a stable synthetic id for the dev
+  // persona adapter (see packages/shared env.ts fail-closed rules — the
+  // dev adapter itself is blocked in production regardless of this field).
+  externalId  String   @unique
+  email       String   @unique
+  displayName String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  memberships           TenantMembership[]
+  reviewDecisions        ReviewDecision[]
+  riskAcceptances         RiskAcceptance[]
+  assistantConversations  AssistantConversation[]
+  auditEvents             AuditEvent[]
+
+  @@map("users")
+}
+
+// Join model: a user's role within a specific tenant. A user may belong to
+// multiple tenants with different roles in each - the role used for any
+// given request MUST be resolved from this table via the tenant context
+// in the request's authenticated claims, never from a client-supplied role.
+model TenantMembership {
+  id        String   @id @default(uuid())
+  tenantId  String
+  userId    String
+  role      Role
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, userId])
+  @@index([tenantId])
+  @@map("tenant_memberships")
+}
+
+// ---------------------------------------------------------------------------
+// Vendor
+// ---------------------------------------------------------------------------
+
+model Vendor {
+  id                       String    @id @default(uuid())
+  tenantId                 String
+  legalName                String
+  tradingName              String?
+  serviceDescription       String
+  serviceCategory          String
+  category                 String? // e.g. MEDICAL_DEVICE — drives conditional framework triggers
+  criticality              String // LOW | MODERATE | HIGH | CRITICAL (intake-selected, distinct from computed risk band)
+  dataClassifications      String[] // e.g. PII, PHI, PAYMENT_CARD, SUBSTANCE_USE_RECORDS
+  privilegedAccess         Boolean   @default(false)
+  networkConnectivity      Boolean   @default(false)
+  productionAccess         Boolean   @default(false)
+  processingLocations      String[] // ISO country codes
+  businessContinuityDep    Boolean   @default(false)
+  aiFunctionality          Boolean   @default(false)
+  aiProductType            String    @default("NONE") // NONE | GENERATIVE_AI | PREDICTIVE_ML
+  aiProviders               String[]
+  customerDataTrainingPolicy Boolean @default(false)
+  humanOversightDocumented Boolean   @default(false)
+  servesGovernmentCustomers Boolean  @default(false)
+  processesSwiftMessaging  Boolean   @default(false)
+  affectsFinancialReporting Boolean  @default(false)
+  processesMedicareMedicaidClaims Boolean @default(false)
+  contractStartDate        DateTime?
+  contractReviewDate       DateTime?
+  businessOwnerUserId      String?
+  securityOwnerUserId      String?
+  deletedAt                DateTime? // soft delete: preserves audit/assessment history after offboarding
+  createdAt                DateTime  @default(now())
+  updatedAt                DateTime  @updatedAt
+
+  tenant       Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  contacts     VendorContact[]
+  services     VendorService[]
+  subprocessors Subprocessor[]
+  assessments  Assessment[]
+  evidence     EvidenceDocument[]
+  findings     ControlFinding[]
+  remediations RemediationAction[]
+  riskAcceptances RiskAcceptance[]
+
+  @@index([tenantId])
+  @@index([tenantId, criticality])
+  @@map("vendors")
+}
+
+model VendorContact {
+  id        String   @id @default(uuid())
+  tenantId  String
+  vendorId  String
+  name      String
+  email     String
+  role      String // e.g. "Security contact", "Account manager"
+  createdAt DateTime @default(now())
+
+  vendor Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([vendorId])
+  @@map("vendor_contacts")
+}
+
+model VendorService {
+  id          String   @id @default(uuid())
+  tenantId    String
+  vendorId    String
+  name        String
+  description String
+  createdAt   DateTime @default(now())
+
+  vendor Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([vendorId])
+  @@map("vendor_services")
+}
+
+model Subprocessor {
+  id          String   @id @default(uuid())
+  tenantId    String
+  vendorId    String
+  name        String
+  purpose     String
+  dataAccessScope String
+  location    String?
+  disclosedAt DateTime @default(now())
+  createdAt   DateTime @default(now())
+
+  vendor Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([vendorId])
+  @@map("subprocessors")
+}
+
+// ---------------------------------------------------------------------------
+// Assessment & questionnaire
+// ---------------------------------------------------------------------------
+
+model Assessment {
+  id                    String            @id @default(uuid())
+  tenantId              String
+  vendorId              String
+  status                AssessmentStatus  @default(DRAFT)
+  scoringModelVersion   String // e.g. "risk-model-2025.1" — see @vendorguard/risk-engine
+  inherentScore         Float?
+  residualScore         Float?
+  riskBand              RiskBand?
+  controlEffectiveness  Float?
+  factorInputsJson      Json? // raw factor inputs used, for reproducibility/audit
+  startedByUserId       String
+  reviewerUserId        String?
+  dueDate               DateTime?
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
+
+  tenant              Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  vendor              Vendor                @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  frameworks          AssessmentFramework[]
+  questionnaires      Questionnaire[]
+  findings            ControlFinding[]
+  assistantConversations AssistantConversation[]
+
+  @@index([tenantId])
+  @@index([tenantId, vendorId])
+  @@index([tenantId, status])
+  @@map("assessments")
+}
+
+// Join model: which framework version(s) apply to this assessment, and why
+// (always-active / industry-active / trigger-matched) — see
+// packages/framework-engine's ApplicableFrameworkResult.reason.
+model AssessmentFramework {
+  id             String   @id @default(uuid())
+  tenantId       String
+  assessmentId   String
+  frameworkId    String
+  frameworkVersion String
+  applicabilityReason String // "always-active" | "industry-active" | "trigger-matched"
+  createdAt      DateTime @default(now())
+
+  assessment Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  framework  Framework  @relation(fields: [frameworkId], references: [id], onDelete: Restrict)
+
+  @@unique([assessmentId, frameworkId])
+  @@index([tenantId])
+  @@map("assessment_frameworks")
+}
+
+model Questionnaire {
+  id           String   @id @default(uuid())
+  tenantId     String
+  assessmentId String
+  name         String // e.g. "Inherent Risk Questionnaire v3"
+  version      String
+  createdAt    DateTime @default(now())
+
+  assessment Assessment            @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  responses  QuestionnaireResponse[]
+
+  @@index([tenantId])
+  @@index([assessmentId])
+  @@map("questionnaires")
+}
+
+model QuestionnaireResponse {
+  id              String   @id @default(uuid())
+  tenantId        String
+  questionnaireId String
+  questionKey     String // e.g. "dataSensitivity", "aiFunctionality"
+  answerJson      Json
+  answeredByUserId String
+  createdAt       DateTime @default(now())
+
+  questionnaire Questionnaire @relation(fields: [questionnaireId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([questionnaireId])
+  @@map("questionnaire_responses")
+}
+
+// ---------------------------------------------------------------------------
+// Evidence
+// ---------------------------------------------------------------------------
+
+model EvidenceDocument {
+  id             String        @id @default(uuid())
+  tenantId       String
+  vendorId       String
+  displayFilename String
+  storageKey     String // generated, non-guessable storage name — never the original filename
+  mimeType       String
+  sizeBytes      Int
+  sha256Hash     String
+  version        Int           @default(1)
+  documentType   String // e.g. "SOC 2 report", "ISO 27001 certificate"
+  state          EvidenceState @default(UPLOADED)
+  expirationDate DateTime?
+  uploadedByUserId String
+  deletedAt      DateTime? // soft delete: audit trail requires the record to persist
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  vendor Vendor          @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  chunks EvidenceChunk[]
+  findingEvidence FindingEvidence[]
+
+  @@index([tenantId])
+  @@index([tenantId, vendorId])
+  @@index([tenantId, state])
+  @@index([sha256Hash]) // duplicate detection
+  @@map("evidence_documents")
+}
+
+model EvidenceChunk {
+  id            String   @id @default(uuid())
+  tenantId      String
+  documentId    String
+  chunkIndex    Int
+  page          Int?
+  section       String?
+  text          String // treated as UNTRUSTED at retrieval/prompt-assembly time — see docs/mcp-security.md
+  contentHash   String
+  embeddingRef  String? // pointer into the search index (Azure AI Search doc id, or local pgvector row)
+  createdAt     DateTime @default(now())
+
+  document EvidenceDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([documentId])
+  @@map("evidence_chunks")
+}
+
+// ---------------------------------------------------------------------------
+// Framework engine (persisted mirror of packages/framework-engine's catalog
+// + seeded frameworks/*/controls.json — the TS catalog is source of truth
+// for what SHOULD be seeded; these tables hold what actually IS seeded)
+// ---------------------------------------------------------------------------
+
+model Framework {
+  id           String   @id @default(uuid())
+  // catalogId matches packages/framework-engine's FrameworkCatalogEntry.id
+  // (e.g. "nist-800-161", "ffiec-outsourcing") - NOT the same as this row's
+  // uuid `id`, which is the DB primary key.
+  catalogId    String   @unique
+  tenantId     String?  // null for globally-seeded frameworks available to all tenants
+  name         String
+  scope        String // "VENDOR_ASSESSMENT" | "PLATFORM_SECURITY"
+  industries   String[]
+  createdAt    DateTime @default(now())
+
+  tenant  Tenant?               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  versions FrameworkVersion[]
+  assessmentFrameworks AssessmentFramework[]
+
+  @@index([tenantId])
+  @@map("frameworks")
+}
+
+model FrameworkVersion {
+  id          String   @id @default(uuid())
+  frameworkId String
+  version     String
+  sourceUrl   String?
+  licenseNote String?
+  isCurrent   Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  framework Framework @relation(fields: [frameworkId], references: [id], onDelete: Cascade)
+  controls  Control[]
+
+  @@unique([frameworkId, version])
+  @@map("framework_versions")
+}
+
+model Control {
+  id                  String   @id @default(uuid())
+  frameworkVersionId  String
+  controlId           String // e.g. "GV.SC-05", "C-SCRM-4"
+  title               String
+  summary             String
+  domain              String
+  parentControlId     String?
+  expectedEvidenceTypes String[]
+  validationGuidance  String
+  createdAt           DateTime @default(now())
+
+  frameworkVersion FrameworkVersion @relation(fields: [frameworkVersionId], references: [id], onDelete: Cascade)
+  findings         ControlFinding[]
+  mappingsFrom     ControlMapping[] @relation("MappingFrom")
+  mappingsTo       ControlMapping[] @relation("MappingTo")
+
+  @@unique([frameworkVersionId, controlId])
+  @@map("controls")
+}
+
+model ControlMapping {
+  id             String           @id @default(uuid())
+  fromControlId  String
+  toControlId    String
+  strength       MappingStrength
+  rationale      String
+  createdAt      DateTime         @default(now())
+
+  fromControl Control @relation("MappingFrom", fields: [fromControlId], references: [id], onDelete: Cascade)
+  toControl   Control @relation("MappingTo", fields: [toControlId], references: [id], onDelete: Cascade)
+
+  @@unique([fromControlId, toControlId])
+  @@map("control_mappings")
+}
+
+// ---------------------------------------------------------------------------
+// Findings, remediation, and review (human-in-the-loop workflow)
+// ---------------------------------------------------------------------------
+
+model ControlFinding {
+  id                String        @id @default(uuid())
+  tenantId          String
+  vendorId          String
+  assessmentId      String
+  controlId         String
+  status            FindingStatus
+  confidence        Float? // 0-1, only set for AI/MCP-proposed findings
+  gaps              String[]
+  recommendations   String[]
+  requiresHumanReview Boolean     @default(true)
+  proposedByMcpInvocationId String? // set when this finding originated from an MCP validate_control call
+  // The original machine-proposed status/confidence/gaps are NEVER
+  // overwritten - see ReviewDecision, which records changes as a separate,
+  // additive record referencing this finding.
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  vendor       Vendor            @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  assessment   Assessment        @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  control      Control           @relation(fields: [controlId], references: [id], onDelete: Restrict)
+  mcpInvocation MCPInvocation?   @relation(fields: [proposedByMcpInvocationId], references: [id])
+  evidence     FindingEvidence[]
+  reviewDecisions ReviewDecision[]
+  remediations RemediationAction[]
+
+  @@index([tenantId])
+  @@index([tenantId, vendorId])
+  @@index([tenantId, assessmentId])
+  @@index([tenantId, status])
+  @@map("control_findings")
+}
+
+model FindingEvidence {
+  id              String   @id @default(uuid())
+  tenantId        String
+  findingId       String
+  evidenceDocumentId String
+  page            Int?
+  section         String?
+  chunkId         String?
+  excerpt         String // short excerpt only, never the full document - see docs/mcp-security.md
+  retrievalScore  Float?
+  contentHash     String
+  createdAt       DateTime @default(now())
+
+  finding  ControlFinding    @relation(fields: [findingId], references: [id], onDelete: Cascade)
+  document EvidenceDocument  @relation(fields: [evidenceDocumentId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId])
+  @@index([findingId])
+  @@map("finding_evidence")
+}
+
+model ReviewDecision {
+  id                String              @id @default(uuid())
+  tenantId          String
+  findingId         String
+  reviewerUserId    String
+  decision          ReviewDecisionType
+  rationale         String
+  changedValuesJson Json? // diff between the machine proposal and the reviewer's accepted values, if any
+  modelVersion      String?
+  frameworkVersion  String?
+  promptTemplateVersion String?
+  correlationId     String?
+  createdAt         DateTime            @default(now())
+
+  finding  ControlFinding @relation(fields: [findingId], references: [id], onDelete: Cascade)
+  reviewer User           @relation(fields: [reviewerUserId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId])
+  @@index([findingId])
+  @@map("review_decisions")
+}
+
+model RemediationAction {
+  id           String             @id @default(uuid())
+  tenantId     String
+  vendorId     String
+  findingId    String?
+  title        String
+  description  String
+  ownerUserId  String?
+  status       RemediationStatus  @default(OPEN)
+  dueDate      DateTime?
+  closedAt     DateTime?
+  closedByUserId String? // closing an AI/MCP-originated remediation always requires a human actor here
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+
+  vendor  Vendor          @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  finding ControlFinding? @relation(fields: [findingId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId])
+  @@index([tenantId, vendorId])
+  @@index([tenantId, status])
+  @@map("remediation_actions")
+}
+
+model RiskAcceptance {
+  id             String   @id @default(uuid())
+  tenantId       String
+  vendorId       String
+  assessmentId   String?
+  approvedByUserId String // must hold REVIEWER or ADMIN role at approval time - enforced in packages/auth, not just here
+  justification  String
+  expiresAt      DateTime?
+  createdAt      DateTime @default(now())
+
+  vendor   Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  approver User   @relation(fields: [approvedByUserId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId])
+  @@index([tenantId, vendorId])
+  @@map("risk_acceptances")
+}
+
+// ---------------------------------------------------------------------------
+// AI assistant & MCP
+// ---------------------------------------------------------------------------
+
+model AssistantConversation {
+  id           String   @id @default(uuid())
+  tenantId     String
+  vendorId     String?
+  assessmentId String?
+  userId       String
+  modelVersion String
+  promptTemplateVersion String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  tenant     Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  assessment Assessment?  @relation(fields: [assessmentId], references: [id], onDelete: SetNull)
+  user       User         @relation(fields: [userId], references: [id], onDelete: Restrict)
+  messages   AssistantMessage[]
+
+  @@index([tenantId])
+  @@map("assistant_conversations")
+}
+
+model AssistantMessage {
+  id             String   @id @default(uuid())
+  tenantId       String
+  conversationId String
+  role           String // "user" | "assistant"
+  content        String
+  citationsJson  Json? // array of citation objects: documentId, version, page, chunkId, excerpt, score, contentHash
+  promptInjectionFlagged Boolean @default(false)
+  correlationId  String?
+  createdAt      DateTime @default(now())
+
+  conversation AssistantConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([conversationId])
+  @@map("assistant_messages")
+}
+
+model MCPInvocation {
+  id            String   @id @default(uuid())
+  tenantId      String
+  toolName      String
+  actorUserId   String?
+  inputJson     Json // sanitized inputs only - secrets/PII redacted before persisting, see docs/mcp-security.md
+  outcome       String // "SUCCESS" | "DENIED" | "ERROR"
+  durationMs    Int
+  correlationId String
+  createdAt     DateTime @default(now())
+
+  tenant   Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  findings ControlFinding[]
+
+  @@index([tenantId])
+  @@index([correlationId])
+  @@map("mcp_invocations")
+}
+
+// ---------------------------------------------------------------------------
+// Audit (append-only — application code must never issue UPDATE/DELETE
+// against this table; enforce via DB role grants in production, see
+// infrastructure/policies)
+// ---------------------------------------------------------------------------
+
+model AuditEvent {
+  id            String   @id @default(uuid())
+  tenantId      String
+  actorUserId   String?
+  actorSystem   String? // e.g. "mcp-server", "system" for non-user actors
+  action        String // e.g. "vendor.created", "finding.reviewed", "evidence.deleted"
+  targetType    String? // e.g. "Vendor", "ControlFinding"
+  targetId      String?
+  outcome       String // "SUCCESS" | "DENIED" | "ERROR"
+  metadataJson  Json? // redacted structured detail — never secrets, tokens, full prompts, or full documents
+  correlationId String?
+  createdAt     DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  actor  User?  @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId])
+  @@index([tenantId, action])
+  @@index([tenantId, createdAt])
+  @@map("audit_events")
+}

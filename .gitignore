@@ -1,0 +1,13 @@
+node_modules
+dist
+.next
+coverage
+*.log
+.env
+.env.local
+.turbo
+.DS_Store
+/apps/web/.next
+/reports
+playwright-report
+test-results

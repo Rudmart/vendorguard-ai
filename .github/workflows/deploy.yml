@@ -1,0 +1,86 @@
+name: Deploy
+
+# Deploys images built from a single, immutable commit SHA to Azure Container
+# Apps using GitHub OIDC federation (no stored Azure client secret). This
+# workflow is wired but requires:
+#   1. apps/web, apps/api, apps/mcp-server Dockerfiles (Phase 8)
+#   2. infrastructure/environments/{dev,prod} Bicep (Phase 8)
+#   3. Federated credential + GitHub environment setup - see docs/deployment.md
+#
+# It is committed now, disabled via `if: false` guards, so the repository
+# shows the intended production deployment shape without claiming a
+# deployment target that does not exist yet.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+permissions:
+  id-token: write # required for OIDC federation to Azure
+  contents: read
+
+env:
+  AZURE_CONTAINER_REGISTRY: ${{ vars.AZURE_CONTAINER_REGISTRY }}
+  RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
+
+jobs:
+  build-and-push:
+    name: Build once, tag with commit SHA
+    runs-on: ubuntu-latest
+    if: false # enable once Dockerfiles + registry exist (Phase 8)
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Azure login (OIDC, no client secret)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Build and push images (immutable SHA tag)
+        run: |
+          IMAGE_TAG="${{ github.sha }}"
+          for app in web api mcp-server; do
+            az acr build \
+              --registry "$AZURE_CONTAINER_REGISTRY" \
+              --image "vendorguard/$app:$IMAGE_TAG" \
+              --file "apps/$app/Dockerfile" .
+          done
+
+  deploy-dev:
+    name: Deploy to development
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    if: false # enable once infra + Dockerfiles exist (Phase 8)
+    environment: development
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Run database migrations
+        run: echo "az containerapp job start (migration job) - implemented in Phase 8"
+      - name: Deploy container apps (image digest from build step)
+        run: echo "az deployment group create ... - implemented in Phase 8"
+      - name: Smoke test
+        run: echo "curl health/readiness endpoints - implemented in Phase 8"
+
+  deploy-prod:
+    name: Deploy to production (same image digest)
+    needs: deploy-dev
+    runs-on: ubuntu-latest
+    if: false # enable once infra + Dockerfiles exist (Phase 8)
+    environment: production # requires manual approval via GitHub Environments
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Promote the exact image digest validated in development
+        run: echo "az containerapp update --image <digest-from-dev> - implemented in Phase 8"
