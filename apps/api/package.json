@@ -1,4 +1,4 @@
-﻿{
+{
   "name": "@vendorguard/api",
   "version": "0.1.0",
   "private": true,
@@ -12,14 +12,15 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "fastify": "4.28.1",
+    "@fastify/cors": "8",
+    "@vendorguard/database": "workspace:*",
     "@vendorguard/shared": "workspace:*",
-    "@vendorguard/database": "workspace:*"
+    "fastify": "4.28.1"
   },
   "devDependencies": {
-    "typescript": "5.6.3",
+    "@types/node": "22.7.5",
     "tsx": "4.19.1",
-    "vitest": "2.1.3",
-    "@types/node": "22.7.5"
+    "typescript": "5.6.3",
+    "vitest": "2.1.3"
   }
 }
