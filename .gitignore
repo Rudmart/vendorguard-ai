@@ -11,3 +11,5 @@ coverage
 /reports
 playwright-report
 test-results
+
+apps/api/api-deploy.zip

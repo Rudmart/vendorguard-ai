@@ -8,7 +8,7 @@ import { registerAuthRoutes, getSessionFromCookie, COOKIE_NAME } from "./auth-ro
 const server = Fastify({ logger: true });
 
 server.register(cors, {
-  origin: "http://localhost:3000",
+  origin: process.env.WEB_ORIGIN || "http://localhost:3000",
   credentials: true,
 });
 
@@ -109,8 +109,9 @@ server.get("/vendors/:id/risk-score", async (request, reply) => {
 
 const start = async () => {
   try {
-    await server.listen({ port: 4000, host: "0.0.0.0" });
-    console.log("VendorGuard API running at http://localhost:4000");
+    const port = process.env.PORT ? parseInt(process.env.PORT) : 4000;
+    await server.listen({ port, host: "0.0.0.0" });
+    console.log(`VendorGuard API running on port ${port}`);
   } catch (err) {
     server.log.error(err);
     process.exit(1);

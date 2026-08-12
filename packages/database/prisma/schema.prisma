@@ -1,12 +1,13 @@
-// VendorGuard AI â€” Prisma schema
-// Implements every entity from spec Â§5. Every tenant-owned model carries an
+// VendorGuard AI ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â Prisma schema
+// Implements every entity from spec Ãƒâ€šÃ‚Â§5. Every tenant-owned model carries an
 // explicit tenantId column with an index; application code must resolve
 // tenantId from authenticated context (see packages/auth) and NEVER trust a
-// tenantId supplied in a request body â€” this schema alone does not enforce
+// tenantId supplied in a request body ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â this schema alone does not enforce
 // that, the service/repository layer must (see packages/auth/tenant-context.ts).
 
 generator client {
   provider = "prisma-client-js"
+    binaryTargets = ["native", "debian-openssl-3.0.x"]
 }
 
 datasource db {
@@ -15,7 +16,7 @@ datasource db {
 }
 
 // ---------------------------------------------------------------------------
-// Enums (mirror @vendorguard/shared/domain.ts â€” keep in sync)
+// Enums (mirror @vendorguard/shared/domain.ts ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â keep in sync)
 // ---------------------------------------------------------------------------
 
 enum Role {
@@ -117,7 +118,7 @@ model Tenant {
 model User {
   id          String   @id @default(uuid())
   // Entra ID object id in production; a stable synthetic id for the dev
-  // persona adapter (see packages/shared env.ts fail-closed rules â€” the
+  // persona adapter (see packages/shared env.ts fail-closed rules ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â the
   // dev adapter itself is blocked in production regardless of this field).
   externalId  String   @unique
   email       String   @unique
@@ -165,7 +166,7 @@ model Vendor {
   tradingName              String?
   serviceDescription       String
   serviceCategory          String
-  category                 String? // e.g. MEDICAL_DEVICE â€” drives conditional framework triggers
+  category                 String? // e.g. MEDICAL_DEVICE ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â drives conditional framework triggers
   criticality              String // LOW | MODERATE | HIGH | CRITICAL (intake-selected, distinct from computed risk band)
   dataSensitivity          Int? // 0-100, used by risk-engine
   businessCriticality      Int? // 0-100, used by risk-engine
@@ -269,7 +270,7 @@ model Assessment {
   tenantId              String
   vendorId              String
   status                AssessmentStatus  @default(DRAFT)
-  scoringModelVersion   String // e.g. "risk-model-2025.1" â€” see @vendorguard/risk-engine
+  scoringModelVersion   String // e.g. "risk-model-2025.1" ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â see @vendorguard/risk-engine
   inherentScore         Float?
   residualScore         Float?
   riskBand              RiskBand?
@@ -295,7 +296,7 @@ model Assessment {
 }
 
 // Join model: which framework version(s) apply to this assessment, and why
-// (always-active / industry-active / trigger-matched) â€” see
+// (always-active / industry-active / trigger-matched) ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â see
 // packages/framework-engine's ApplicableFrameworkResult.reason.
 model AssessmentFramework {
   id             String   @id @default(uuid())
@@ -355,7 +356,7 @@ model EvidenceDocument {
   tenantId       String
   vendorId       String
   displayFilename String
-  storageKey     String // generated, non-guessable storage name â€” never the original filename
+  storageKey     String // generated, non-guessable storage name ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â never the original filename
   mimeType       String
   sizeBytes      Int
   sha256Hash     String
@@ -386,7 +387,7 @@ model EvidenceChunk {
   chunkIndex    Int
   page          Int?
   section       String?
-  text          String // treated as UNTRUSTED at retrieval/prompt-assembly time â€” see docs/mcp-security.md
+  text          String // treated as UNTRUSTED at retrieval/prompt-assembly time ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â see docs/mcp-security.md
   contentHash   String
   embeddingRef  String? // pointer into the search index (Azure AI Search doc id, or local pgvector row)
   createdAt     DateTime @default(now())
@@ -400,7 +401,7 @@ model EvidenceChunk {
 
 // ---------------------------------------------------------------------------
 // Framework engine (persisted mirror of packages/framework-engine's catalog
-// + seeded frameworks/*/controls.json â€” the TS catalog is source of truth
+// + seeded frameworks/*/controls.json ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â the TS catalog is source of truth
 // for what SHOULD be seeded; these tables hold what actually IS seeded)
 // ---------------------------------------------------------------------------
 
@@ -660,7 +661,7 @@ model MCPInvocation {
 }
 
 // ---------------------------------------------------------------------------
-// Audit (append-only â€” application code must never issue UPDATE/DELETE
+// Audit (append-only ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â application code must never issue UPDATE/DELETE
 // against this table; enforce via DB role grants in production, see
 // infrastructure/policies)
 // ---------------------------------------------------------------------------
@@ -674,7 +675,7 @@ model AuditEvent {
   targetType    String? // e.g. "Vendor", "ControlFinding"
   targetId      String?
   outcome       String // "SUCCESS" | "DENIED" | "ERROR"
-  metadataJson  Json? // redacted structured detail â€” never secrets, tokens, full prompts, or full documents
+  metadataJson  Json? // redacted structured detail ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â never secrets, tokens, full prompts, or full documents
   correlationId String?
   createdAt     DateTime @default(now())
 
