@@ -52,3 +52,9 @@ NEXT SESSION, try in this order:
 1. Wait a few hours, retry deploying to existing vendorguard-api-2026 with the existing api-deploy.zip
 2. If it deploys but wont start, check logs immediately with: az webapp log tail --resource-group vendorguard-prod-rg --name vendorguard-api-2026
 3. Consider requesting an Azure VM quota increase in the Azure Portal Quotas page as a backup, since approval can take time
+
+IMPORTANT DISCOVERY (session 2, later): The QuotaExceeded state is tracked at the whole-subscription level, not per App Service Plan or per region. Creating a brand new plan (vendorguard-plan-2) in a completely different region (centralus) hit the identical QuotaExceeded state almost immediately - confirming this cant be routed around within the same Azure account. A second Web App (vendorguard-api-2026b) was also created on this new plan and has DATABASE_URL and WEB_ORIGIN already set, ready to redeploy once quota clears.
+
+NEXT SESSION: Just retry az webapp deploy against vendorguard-api-2026b using the existing apps/api/api-deploy.zip - no need to recreate any Azure resources. Check quota state first with:
+az webapp show --resource-group vendorguard-prod-rg --name vendorguard-api-2026b --query "{state:state}" -o json
+If it still says QuotaExceeded, wait longer before retrying - repeated attempts while blocked dont help and may extend the reset window.
