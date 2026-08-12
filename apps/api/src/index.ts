@@ -1,4 +1,5 @@
 ﻿import Fastify from "fastify";
+import { prisma } from "@vendorguard/database";
 
 const server = Fastify({ logger: true });
 
@@ -6,22 +7,16 @@ server.get("/health", async () => {
   return { status: "ok", service: "vendorguard-api" };
 });
 
-// Temporary fake data - will be replaced by real database queries once
-// Docker + Postgres + Prisma are wired up in a future step.
-const fakeVendors = [
-  { id: "1", name: "Nimbus Cloud Sync", category: "Infrastructure", riskBand: "CRITICAL", residualScore: 88 },
-  { id: "2", name: "Helios Payments", category: "Fintech", riskBand: "HIGH", residualScore: 67 },
-  { id: "3", name: "Northwind Analytics", category: "Data/Analytics", riskBand: "MODERATE", residualScore: 41 },
-  { id: "4", name: "Cedar HR Suite", category: "Human Resources", riskBand: "LOW", residualScore: 18 },
-];
-
 server.get("/vendors", async () => {
-  return { vendors: fakeVendors };
+  const vendors = await prisma.vendor.findMany({
+    orderBy: { createdAt: "desc" },
+  });
+  return { vendors };
 });
 
 server.get("/vendors/:id", async (request, reply) => {
   const { id } = request.params as { id: string };
-  const vendor = fakeVendors.find((v) => v.id === id);
+  const vendor = await prisma.vendor.findUnique({ where: { id } });
   if (!vendor) {
     return reply.status(404).send({ error: "Vendor not found" });
   }

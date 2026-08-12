@@ -29,6 +29,9 @@ importers:
 
   apps/api:
     dependencies:
+      '@vendorguard/database':
+        specifier: workspace:*
+        version: link:../../packages/database
       '@vendorguard/shared':
         specifier: workspace:*
         version: link:../../packages/shared
