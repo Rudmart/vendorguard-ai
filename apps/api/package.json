@@ -12,7 +12,9 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@fastify/cookie": "9",
     "@fastify/cors": "8",
+    "@vendorguard/auth": "workspace:*",
     "@vendorguard/database": "workspace:*",
     "@vendorguard/risk-engine": "workspace:*",
     "@vendorguard/shared": "workspace:*",

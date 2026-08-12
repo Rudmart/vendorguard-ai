@@ -1,7 +1,18 @@
 import AddVendorForm from "./add-vendor-form";
+import SignOutButton from "./sign-out-button";
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 
 async function getVendors() {
-  const res = await fetch("http://localhost:4000/vendors", { cache: "no-store" });
+  const cookieStore = cookies();
+  const sessionCookie = cookieStore.get("vg_session");
+  const res = await fetch("http://localhost:4000/vendors", {
+    cache: "no-store",
+    headers: sessionCookie ? { Cookie: `vg_session=${sessionCookie.value}` } : {},
+  });
+  if (res.status === 401) {
+    return null;
+  }
   if (!res.ok) {
     throw new Error("Failed to fetch vendors");
   }
@@ -9,7 +20,12 @@ async function getVendors() {
 }
 
 async function getRiskScore(vendorId: string) {
-  const res = await fetch(`http://localhost:4000/vendors/${vendorId}/risk-score`, { cache: "no-store" });
+  const cookieStore = cookies();
+  const sessionCookie = cookieStore.get("vg_session");
+  const res = await fetch(`http://localhost:4000/vendors/${vendorId}/risk-score`, {
+    cache: "no-store",
+    headers: sessionCookie ? { Cookie: `vg_session=${sessionCookie.value}` } : {},
+  });
   if (!res.ok) {
     return null;
   }
@@ -18,6 +34,12 @@ async function getRiskScore(vendorId: string) {
 
 export default async function HomePage() {
   const data = await getVendors();
+  if (data === null) {
+    redirect("/login");
+  }
+  if (data === null) {
+    redirect("/login");
+  }
   const vendorsWithScores = await Promise.all(
     data.vendors.map(async (vendor: any) => {
       const risk = await getRiskScore(vendor.id);
@@ -27,7 +49,10 @@ export default async function HomePage() {
 
   return (
     <main style={{ maxWidth: 800, margin: "0 auto", padding: "40px 20px" }}>
-      <h1 style={{ fontSize: 28, marginBottom: 4 }}>VendorGuard AI</h1>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+        <h1 style={{ fontSize: 28, marginBottom: 4 }}>VendorGuard AI</h1>
+        <SignOutButton />
+      </div>
       <p style={{ color: "#8b96ac", marginBottom: 32 }}>Vendor Inventory</p>
 
       <AddVendorForm />

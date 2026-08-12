@@ -1,19 +1,30 @@
-﻿import Fastify from "fastify";
+import Fastify from "fastify";
 import cors from "@fastify/cors";
 import { prisma } from "@vendorguard/database";
 import { calculateInherentRisk } from "@vendorguard/risk-engine";
+import cookie from "@fastify/cookie";
+import { registerAuthRoutes, getSessionFromCookie, COOKIE_NAME } from "./auth-routes.js";
 
 const server = Fastify({ logger: true });
 
 server.register(cors, {
   origin: "http://localhost:3000",
+  credentials: true,
 });
+
+server.register(cookie);
+
+server.register(registerAuthRoutes);
 
 server.get("/health", async () => {
   return { status: "ok", service: "vendorguard-api" };
 });
 
-server.get("/vendors", async () => {
+server.get("/vendors", async (request, reply) => {
+  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  if (!session) {
+    return reply.status(401).send({ error: "Not logged in" });
+  }
   const vendors = await prisma.vendor.findMany({
     orderBy: { createdAt: "desc" },
   });
@@ -30,6 +41,11 @@ server.get("/vendors/:id", async (request, reply) => {
 });
 
 server.post("/vendors", async (request, reply) => {
+  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  if (!session) {
+    return reply.status(401).send({ error: "Not logged in" });
+  }
+
   const body = request.body as {
     legalName?: string;
     serviceDescription?: string;

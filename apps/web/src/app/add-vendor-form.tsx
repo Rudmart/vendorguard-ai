@@ -26,6 +26,7 @@ export default function AddVendorForm() {
     try {
       const res = await fetch("http://localhost:4000/vendors", {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           legalName,
