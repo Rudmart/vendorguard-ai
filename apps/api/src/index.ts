@@ -1,6 +1,7 @@
 ﻿import Fastify from "fastify";
 import cors from "@fastify/cors";
 import { prisma } from "@vendorguard/database";
+import { calculateInherentRisk } from "@vendorguard/risk-engine";
 
 const server = Fastify({ logger: true });
 
@@ -34,6 +35,12 @@ server.post("/vendors", async (request, reply) => {
     serviceDescription?: string;
     serviceCategory?: string;
     criticality?: string;
+    dataSensitivity?: number;
+    businessCriticality?: number;
+    accessPrivilege?: number;
+    operationalDependency?: number;
+    fourthPartyConcentration?: number;
+    geographicRegulatoryExposure?: number;
   };
 
   if (!body.legalName) {
@@ -52,10 +59,36 @@ server.post("/vendors", async (request, reply) => {
       serviceDescription: body.serviceDescription || "",
       serviceCategory: body.serviceCategory || "",
       criticality: body.criticality || "",
+      dataSensitivity: body.dataSensitivity ?? null,
+      businessCriticality: body.businessCriticality ?? null,
+      accessPrivilege: body.accessPrivilege ?? null,
+      operationalDependency: body.operationalDependency ?? null,
+      fourthPartyConcentration: body.fourthPartyConcentration ?? null,
+      geographicRegulatoryExposure: body.geographicRegulatoryExposure ?? null,
     },
   });
 
   return reply.status(201).send(vendor);
+});
+
+server.get("/vendors/:id/risk-score", async (request, reply) => {
+  const { id } = request.params as { id: string };
+  const vendor = await prisma.vendor.findUnique({ where: { id } });
+
+  if (!vendor) {
+    return reply.status(404).send({ error: "Vendor not found" });
+  }
+
+  const result = calculateInherentRisk({
+    dataSensitivity: vendor.dataSensitivity ?? undefined,
+    businessCriticality: vendor.businessCriticality ?? undefined,
+    accessPrivilege: vendor.accessPrivilege ?? undefined,
+    operationalDependency: vendor.operationalDependency ?? undefined,
+    fourthPartyConcentration: vendor.fourthPartyConcentration ?? undefined,
+    geographicRegulatoryExposure: vendor.geographicRegulatoryExposure ?? undefined,
+  });
+
+  return result;
 });
 
 const start = async () => {

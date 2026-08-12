@@ -14,6 +14,7 @@
   "dependencies": {
     "@fastify/cors": "8",
     "@vendorguard/database": "workspace:*",
+    "@vendorguard/risk-engine": "workspace:*",
     "@vendorguard/shared": "workspace:*",
     "fastify": "4.28.1"
   },

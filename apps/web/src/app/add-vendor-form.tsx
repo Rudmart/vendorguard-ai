@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -9,6 +9,12 @@ export default function AddVendorForm() {
   const [serviceDescription, setServiceDescription] = useState("");
   const [serviceCategory, setServiceCategory] = useState("");
   const [criticality, setCriticality] = useState("");
+  const [dataSensitivity, setDataSensitivity] = useState("");
+  const [businessCriticality, setBusinessCriticality] = useState("");
+  const [accessPrivilege, setAccessPrivilege] = useState("");
+  const [operationalDependency, setOperationalDependency] = useState("");
+  const [fourthPartyConcentration, setFourthPartyConcentration] = useState("");
+  const [geographicRegulatoryExposure, setGeographicRegulatoryExposure] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
@@ -26,6 +32,12 @@ export default function AddVendorForm() {
           serviceDescription,
           serviceCategory,
           criticality,
+          dataSensitivity: dataSensitivity === "" ? undefined : Number(dataSensitivity),
+          businessCriticality: businessCriticality === "" ? undefined : Number(businessCriticality),
+          accessPrivilege: accessPrivilege === "" ? undefined : Number(accessPrivilege),
+          operationalDependency: operationalDependency === "" ? undefined : Number(operationalDependency),
+          fourthPartyConcentration: fourthPartyConcentration === "" ? undefined : Number(fourthPartyConcentration),
+          geographicRegulatoryExposure: geographicRegulatoryExposure === "" ? undefined : Number(geographicRegulatoryExposure),
         }),
       });
 
@@ -37,6 +49,12 @@ export default function AddVendorForm() {
       setServiceDescription("");
       setServiceCategory("");
       setCriticality("");
+      setDataSensitivity("");
+      setBusinessCriticality("");
+      setAccessPrivilege("");
+      setOperationalDependency("");
+      setFourthPartyConcentration("");
+      setGeographicRegulatoryExposure("");
       router.refresh();
     } catch (err) {
       setError("Something went wrong. Please try again.");
@@ -117,6 +135,39 @@ export default function AddVendorForm() {
           <option value="CRITICAL">CRITICAL</option>
         </select>
       </label>
+
+      <h3 style={{ fontSize: 15, color: "#8b96ac", marginBottom: 4, marginTop: 24 }}>
+        Risk Factors (optional, 0-100)
+      </h3>
+      <p style={{ fontSize: 12, color: "#5c6780", marginTop: 0, marginBottom: 16 }}>
+        Leave blank if unknown.
+      </p>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+        <label style={labelStyle}>
+          Data Sensitivity
+          <input type="number" min="0" max="100" style={inputStyle} value={dataSensitivity} onChange={(e) => setDataSensitivity(e.target.value)} />
+        </label>
+        <label style={labelStyle}>
+          Business Criticality
+          <input type="number" min="0" max="100" style={inputStyle} value={businessCriticality} onChange={(e) => setBusinessCriticality(e.target.value)} />
+        </label>
+        <label style={labelStyle}>
+          Access Privilege
+          <input type="number" min="0" max="100" style={inputStyle} value={accessPrivilege} onChange={(e) => setAccessPrivilege(e.target.value)} />
+        </label>
+        <label style={labelStyle}>
+          Operational Dependency
+          <input type="number" min="0" max="100" style={inputStyle} value={operationalDependency} onChange={(e) => setOperationalDependency(e.target.value)} />
+        </label>
+        <label style={labelStyle}>
+          Fourth-Party Concentration
+          <input type="number" min="0" max="100" style={inputStyle} value={fourthPartyConcentration} onChange={(e) => setFourthPartyConcentration(e.target.value)} />
+        </label>
+        <label style={labelStyle}>
+          Geographic/Regulatory Exposure
+          <input type="number" min="0" max="100" style={inputStyle} value={geographicRegulatoryExposure} onChange={(e) => setGeographicRegulatoryExposure(e.target.value)} />
+        </label>
+      </div>
 
       {error && <p style={{ color: "#f87171", fontSize: 13 }}>{error}</p>}
 
