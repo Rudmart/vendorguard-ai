@@ -7,6 +7,7 @@ on:
 permissions:
   contents: read
   security-events: write
+  pull-requests: read
 
 concurrency:
   group: pr-validation-${{ github.ref }}
@@ -92,3 +93,4 @@ jobs:
   # container-build, container-scan, and SBOM generation are added once
   # apps/web, apps/api, and apps/mcp-server have committed Dockerfiles.
   # Tracked in ROADMAP.md Phase 8.
+
