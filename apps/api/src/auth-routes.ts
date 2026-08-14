@@ -1,5 +1,6 @@
-import type { FastifyInstance } from "fastify";
+﻿import type { FastifyInstance } from "fastify";
 import { prisma } from "@vendorguard/database";
+import type { Role } from "@vendorguard/shared";
 
 const COOKIE_NAME = "vg_session";
 
@@ -52,8 +53,8 @@ export async function registerAuthRoutes(server: FastifyInstance) {
       path: "/",
       httpOnly: true,
       sameSite: "none",
-      secure: true,
-      domain: ".delightfulforest-d2fb8ed2.eastus2.azurecontainerapps.io",
+      secure: process.env.NODE_ENV === "production",
+      domain: process.env.COOKIE_DOMAIN || undefined,
       maxAge: 60 * 60 * 24 * 7,
     });
 
@@ -87,7 +88,7 @@ export function getSessionFromCookie(cookieValue: string | undefined) {
       tenantId: string;
       email: string;
       displayName: string;
-      role: string;
+      role: Role;
     };
   } catch {
     return null;
@@ -95,4 +96,8 @@ export function getSessionFromCookie(cookieValue: string | undefined) {
 }
 
 export { COOKIE_NAME };
+
+
+
+
 
