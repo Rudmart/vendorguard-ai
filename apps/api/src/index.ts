@@ -4,6 +4,7 @@ import { prisma } from "@vendorguard/database";
 import { calculateInherentRisk } from "@vendorguard/risk-engine";
 import cookie from "@fastify/cookie";
 import { registerAuthRoutes, getSessionFromCookie, COOKIE_NAME } from "./auth-routes.js";
+import { requirePermission, AuthorizationError } from "@vendorguard/auth";
 
 const server = Fastify({ logger: true });
 
@@ -45,6 +46,14 @@ server.post("/vendors", async (request, reply) => {
   const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
   if (!session) {
     return reply.status(401).send({ error: "Not logged in" });
+  }
+  try {
+    requirePermission({ userId: session.userId, tenantId: session.tenantId, role: session.role, correlationId: request.id }, "vendor:create");
+  } catch (err) {
+    if (err instanceof AuthorizationError) {
+      return reply.status(403).send({ error: err.message });
+    }
+    throw err;
   }
 
   const body = request.body as {
@@ -113,6 +122,14 @@ server.patch("/vendors/:id", async (request, reply) => {
   if (!session) {
     return reply.status(401).send({ error: "Not logged in" });
   }
+  try {
+    requirePermission({ userId: session.userId, tenantId: session.tenantId, role: session.role, correlationId: request.id }, "vendor:update");
+  } catch (err) {
+    if (err instanceof AuthorizationError) {
+      return reply.status(403).send({ error: err.message });
+    }
+    throw err;
+  }
   const { id } = request.params as { id: string };
   const existing = await prisma.vendor.findUnique({ where: { id } });
   if (!existing) {
@@ -152,6 +169,14 @@ server.delete("/vendors/:id", async (request, reply) => {
   if (!session) {
     return reply.status(401).send({ error: "Not logged in" });
   }
+  try {
+    requirePermission({ userId: session.userId, tenantId: session.tenantId, role: session.role, correlationId: request.id }, "vendor:delete");
+  } catch (err) {
+    if (err instanceof AuthorizationError) {
+      return reply.status(403).send({ error: err.message });
+    }
+    throw err;
+  }
   const { id } = request.params as { id: string };
   const existing = await prisma.vendor.findUnique({ where: { id } });
   if (!existing) {
@@ -172,6 +197,10 @@ const start = async () => {
 };
 
 start();
+
+
+
+
 
 
 
