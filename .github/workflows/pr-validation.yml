@@ -2,11 +2,12 @@ name: PR Validation
 
 on:
   pull_request:
-    branches: [main]
+    branches: [master]
 
 permissions:
   contents: read
   security-events: write
+  pull-requests: read
 
 concurrency:
   group: pr-validation-${{ github.ref }}
@@ -62,6 +63,7 @@ jobs:
     permissions:
       contents: read
       security-events: write
+      actions: read
     steps:
       - uses: actions/checkout@v4
       - uses: github/codeql-action/init@v3
@@ -92,3 +94,5 @@ jobs:
   # container-build, container-scan, and SBOM generation are added once
   # apps/web, apps/api, and apps/mcp-server have committed Dockerfiles.
   # Tracked in ROADMAP.md Phase 8.
+
+
