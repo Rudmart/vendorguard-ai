@@ -1,4 +1,4 @@
-﻿import type { FastifyInstance } from "fastify";
+import type { FastifyInstance } from "fastify";
 import { prisma } from "@vendorguard/database";
 
 const COOKIE_NAME = "vg_session";
@@ -51,7 +51,9 @@ export async function registerAuthRoutes(server: FastifyInstance) {
     reply.setCookie(COOKIE_NAME, JSON.stringify(session), {
       path: "/",
       httpOnly: true,
-      sameSite: "lax",
+      sameSite: "none",
+      secure: true,
+      domain: ".delightfulforest-d2fb8ed2.eastus2.azurecontainerapps.io",
       maxAge: 60 * 60 * 24 * 7,
     });
 
@@ -93,3 +95,4 @@ export function getSessionFromCookie(cookieValue: string | undefined) {
 }
 
 export { COOKIE_NAME };
+

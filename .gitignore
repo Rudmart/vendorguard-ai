@@ -13,3 +13,7 @@ playwright-report
 test-results
 
 apps/api/api-deploy.zip
+
+.env.local.backup
+.env.production
+.env.*

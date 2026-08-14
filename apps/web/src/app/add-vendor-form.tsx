@@ -24,7 +24,7 @@ export default function AddVendorForm() {
     setError("");
 
     try {
-      const res = await fetch("http://localhost:4000/vendors", {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/vendors`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },

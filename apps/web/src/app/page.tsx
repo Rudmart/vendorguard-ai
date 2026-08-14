@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 async function getVendors() {
   const cookieStore = cookies();
   const sessionCookie = cookieStore.get("vg_session");
-  const res = await fetch("http://localhost:4000/vendors", {
+  const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/vendors`, {
     cache: "no-store",
     headers: sessionCookie ? { Cookie: `vg_session=${sessionCookie.value}` } : {},
   });
@@ -22,7 +22,7 @@ async function getVendors() {
 async function getRiskScore(vendorId: string) {
   const cookieStore = cookies();
   const sessionCookie = cookieStore.get("vg_session");
-  const res = await fetch(`http://localhost:4000/vendors/${vendorId}/risk-score`, {
+  const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/vendors/${vendorId}/risk-score`, {
     cache: "no-store",
     headers: sessionCookie ? { Cookie: `vg_session=${sessionCookie.value}` } : {},
   });

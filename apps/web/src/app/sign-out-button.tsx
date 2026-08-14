@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useRouter } from "next/navigation";
 
@@ -6,7 +6,7 @@ export default function SignOutButton() {
   const router = useRouter();
 
   async function handleSignOut() {
-    await fetch("http://localhost:4000/auth/logout", {
+    await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/logout`, {
       method: "POST",
       credentials: "include",
     });
