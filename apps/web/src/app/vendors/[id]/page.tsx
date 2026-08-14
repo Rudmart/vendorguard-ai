@@ -65,6 +65,9 @@ export default async function VendorDetailPage({ params }: { params: { id: strin
       <Link href="/" style={{ color: "#8b96ac", fontSize: 13, textDecoration: "none" }}>
         Back to vendors
       </Link>
+      <Link href={`/vendors/${vendor.id}/edit`} style={{ float: "right", color: "#3b82f6", fontSize: 13, textDecoration: "none" }}>
+        Edit
+      </Link>
 
       <div style={{ marginTop: 16 }}>
         <h1 style={{ fontSize: 26, marginBottom: 4 }}>{vendor.legalName}</h1>
@@ -111,3 +114,6 @@ export default async function VendorDetailPage({ params }: { params: { id: strin
     </main>
   );
 }
+
+
+
