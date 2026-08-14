@@ -1,6 +1,7 @@
 ﻿import { cookies } from "next/headers";
 import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
+import DeleteVendorButton from "../delete-vendor-button";
 
 type VendorRisk = {
   band: string;
@@ -72,6 +73,9 @@ export default async function VendorDetailPage({ params }: { params: { id: strin
       <div style={{ marginTop: 16 }}>
         <h1 style={{ fontSize: 26, marginBottom: 4 }}>{vendor.legalName}</h1>
       </div>
+      <div style={{ marginTop: 12 }}>
+        <DeleteVendorButton id={vendor.id} />
+      </div>
 
       {risk && (
         <div style={{ marginTop: 8, marginBottom: 24, display: "flex", alignItems: "center", gap: 8 }}>
@@ -114,6 +118,8 @@ export default async function VendorDetailPage({ params }: { params: { id: strin
     </main>
   );
 }
+
+
 
 
 
