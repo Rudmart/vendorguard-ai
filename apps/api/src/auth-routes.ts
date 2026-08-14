@@ -1,5 +1,6 @@
 ﻿import type { FastifyInstance } from "fastify";
 import { prisma } from "@vendorguard/database";
+import type { Role } from "@vendorguard/shared";
 
 const COOKIE_NAME = "vg_session";
 
@@ -87,7 +88,7 @@ export function getSessionFromCookie(cookieValue: string | undefined) {
       tenantId: string;
       email: string;
       displayName: string;
-      role: string;
+      role: Role;
     };
   } catch {
     return null;
@@ -95,6 +96,8 @@ export function getSessionFromCookie(cookieValue: string | undefined) {
 }
 
 export { COOKIE_NAME };
+
+
 
 
 
