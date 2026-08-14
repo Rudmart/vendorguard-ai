@@ -1,4 +1,5 @@
-import AddVendorForm from "./add-vendor-form";
+﻿import AddVendorForm from "./add-vendor-form";
+import Link from "next/link";
 import SignOutButton from "./sign-out-button";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
@@ -76,8 +77,8 @@ export default async function HomePage() {
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           {vendorsWithScores.map((vendor: Vendor) => (
-            <div
-              key={vendor.id}
+            <Link key={vendor.id} href={`/vendors/${vendor.id}`} style={{ textDecoration: "none", color: "inherit" }}>
+              <div
               style={{
                 background: "#111a2b",
                 border: "1px solid #233150",
@@ -118,12 +119,16 @@ export default async function HomePage() {
                 </div>
               )}
             </div>
+          </Link>
           ))}
         </div>
       )}
     </main>
   );
 }
+
+
+
 
 
 
