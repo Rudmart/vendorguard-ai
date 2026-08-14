@@ -3,6 +3,20 @@ import SignOutButton from "./sign-out-button";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
+type VendorRisk = {
+  band: string;
+  score: number;
+};
+
+type Vendor = {
+  id: string;
+  legalName: string;
+  serviceDescription: string;
+  serviceCategory: string;
+  criticality: string | null;
+  risk: VendorRisk | null;
+};
+
 async function getVendors() {
   const cookieStore = cookies();
   const sessionCookie = cookieStore.get("vg_session");
@@ -41,7 +55,7 @@ export default async function HomePage() {
     redirect("/login");
   }
   const vendorsWithScores = await Promise.all(
-    data.vendors.map(async (vendor: any) => {
+    data.vendors.map(async (vendor: Vendor) => {
       const risk = await getRiskScore(vendor.id);
       return { ...vendor, risk };
     })
@@ -61,7 +75,7 @@ export default async function HomePage() {
         <p>No vendors yet.</p>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          {vendorsWithScores.map((vendor: any) => (
+          {vendorsWithScores.map((vendor: Vendor) => (
             <div
               key={vendor.id}
               style={{
@@ -110,3 +124,6 @@ export default async function HomePage() {
     </main>
   );
 }
+
+
+
