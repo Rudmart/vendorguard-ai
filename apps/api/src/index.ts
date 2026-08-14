@@ -1,4 +1,4 @@
-import Fastify from "fastify";
+﻿import Fastify from "fastify";
 import cors from "@fastify/cors";
 import { prisma } from "@vendorguard/database";
 import { calculateInherentRisk } from "@vendorguard/risk-engine";
@@ -26,6 +26,7 @@ server.get("/vendors", async (request, reply) => {
     return reply.status(401).send({ error: "Not logged in" });
   }
   const vendors = await prisma.vendor.findMany({
+    where: { deletedAt: null },
     orderBy: { createdAt: "desc" },
   });
   return { vendors };
@@ -107,6 +108,58 @@ server.get("/vendors/:id/risk-score", async (request, reply) => {
   return result;
 });
 
+server.patch("/vendors/:id", async (request, reply) => {
+  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  if (!session) {
+    return reply.status(401).send({ error: "Not logged in" });
+  }
+  const { id } = request.params as { id: string };
+  const existing = await prisma.vendor.findUnique({ where: { id } });
+  if (!existing) {
+    return reply.status(404).send({ error: "Vendor not found" });
+  }
+  const body = request.body as {
+    legalName?: string;
+    serviceDescription?: string;
+    serviceCategory?: string;
+    criticality?: string;
+    dataSensitivity?: number;
+    businessCriticality?: number;
+    accessPrivilege?: number;
+    operationalDependency?: number;
+    fourthPartyConcentration?: number;
+    geographicRegulatoryExposure?: number;
+  };
+  const vendor = await prisma.vendor.update({
+    where: { id },
+    data: {
+      ...(body.legalName !== undefined && { legalName: body.legalName }),
+      ...(body.serviceDescription !== undefined && { serviceDescription: body.serviceDescription }),
+      ...(body.serviceCategory !== undefined && { serviceCategory: body.serviceCategory }),
+      ...(body.criticality !== undefined && { criticality: body.criticality }),
+      ...(body.dataSensitivity !== undefined && { dataSensitivity: body.dataSensitivity }),
+      ...(body.businessCriticality !== undefined && { businessCriticality: body.businessCriticality }),
+      ...(body.accessPrivilege !== undefined && { accessPrivilege: body.accessPrivilege }),
+      ...(body.operationalDependency !== undefined && { operationalDependency: body.operationalDependency }),
+      ...(body.fourthPartyConcentration !== undefined && { fourthPartyConcentration: body.fourthPartyConcentration }),
+      ...(body.geographicRegulatoryExposure !== undefined && { geographicRegulatoryExposure: body.geographicRegulatoryExposure }),
+    },
+  });
+  return vendor;
+});
+server.delete("/vendors/:id", async (request, reply) => {
+  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  if (!session) {
+    return reply.status(401).send({ error: "Not logged in" });
+  }
+  const { id } = request.params as { id: string };
+  const existing = await prisma.vendor.findUnique({ where: { id } });
+  if (!existing) {
+    return reply.status(404).send({ error: "Vendor not found" });
+  }
+  await prisma.vendor.update({ where: { id }, data: { deletedAt: new Date() } });
+  return reply.status(204).send();
+});
 const start = async () => {
   try {
     const port = process.env.PORT ? parseInt(process.env.PORT) : 4000;
@@ -119,3 +172,6 @@ const start = async () => {
 };
 
 start();
+
+
+
