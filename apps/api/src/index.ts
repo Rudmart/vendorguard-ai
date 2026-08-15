@@ -1,9 +1,16 @@
-﻿import Fastify from "fastify";
+import Fastify from "fastify";
 import cors from "@fastify/cors";
 import { prisma } from "@vendorguard/database";
 import { calculateInherentRisk } from "@vendorguard/risk-engine";
 import cookie from "@fastify/cookie";
+import rateLimit from "@fastify/rate-limit";
 import { registerAuthRoutes, getSessionFromCookie, COOKIE_NAME } from "./auth-routes.js";
+import { readdirSync, readFileSync } from "fs";
+import { join, dirname, resolve, sep } from "path";
+import { fileURLToPath } from "url";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const FRAMEWORKS_DIR = join(__dirname, "..", "..", "..", "frameworks");
 
 const server = Fastify({ logger: true });
 
@@ -14,10 +21,67 @@ server.register(cors, {
 
 server.register(cookie);
 
+server.register(rateLimit, {
+  max: 100,
+  timeWindow: "1 minute",
+});
+
 server.register(registerAuthRoutes);
 
 server.get("/health", async () => {
   return { status: "ok", service: "vendorguard-api" };
+});
+
+server.get("/frameworks", async (request, reply) => {
+  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  if (!session) {
+    return reply.status(401).send({ error: "Not logged in" });
+  }
+  const frameworkDirs = readdirSync(FRAMEWORKS_DIR, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name);
+
+  const frameworks = frameworkDirs
+    .map((dir) => {
+      try {
+        const raw = readFileSync(join(FRAMEWORKS_DIR, dir, "controls.json"), "utf-8");
+        const data = JSON.parse(raw);
+        return {
+          frameworkId: data.frameworkId,
+          frameworkName: data.frameworkName,
+          version: data.version,
+          controlCount: data.controls?.length ?? 0,
+        };
+      } catch {
+        return null;
+      }
+    })
+    .filter((f) => f !== null);
+
+  return { frameworks };
+});
+
+server.get("/frameworks/:frameworkId/controls", async (request, reply) => {
+  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  if (!session) {
+    return reply.status(401).send({ error: "Not logged in" });
+  }
+  const { frameworkId } = request.params as { frameworkId: string };
+  if (!/^[a-zA-Z0-9.-]+$/.test(frameworkId)) {
+    return reply.status(400).send({ error: "Invalid framework id" });
+  }
+  const resolvedFrameworksDir = resolve(FRAMEWORKS_DIR);
+  const resolvedPath = resolve(join(resolvedFrameworksDir, frameworkId, "controls.json"));
+  if (!resolvedPath.startsWith(resolvedFrameworksDir + sep)) {
+    return reply.status(400).send({ error: "Invalid framework id" });
+  }
+  try {
+    const raw = readFileSync(resolvedPath, "utf-8");
+    const data = JSON.parse(raw);
+    return data;
+  } catch {
+    return reply.status(404).send({ error: "Framework not found" });
+  }
 });
 
 server.get("/vendors", async (request, reply) => {
@@ -172,6 +236,14 @@ const start = async () => {
 };
 
 start();
+
+
+
+
+
+
+
+
 
 
 
