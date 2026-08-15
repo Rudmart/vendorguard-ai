@@ -1,0 +1,90 @@
+{
+  "frameworkId": "owasp-llm-top10",
+  "frameworkName": "OWASP Top 10 for Large Language Model Applications",
+  "version": "2025",
+  "sourceUrl": "https://owasp.org/www-project-top-10-for-large-language-model-applications/",
+  "licenseNote": "OWASP content is available under Creative Commons licensing. Summaries below are original interpretive content written for this application, not reproductions of OWASP's text.",
+  "demonstrationSubsetDisclaimer": "This is an illustrative subset for portfolio demonstration purposes, not full framework coverage.",
+  "controls": [
+    {
+      "controlId": "LLM-01",
+      "title": "Prompt injection defenses",
+      "domain": "Input Security",
+      "summary": "The vendor has controls to detect or mitigate prompt injection attacks, where crafted input causes the LLM to ignore its intended instructions.",
+      "expectedEvidenceTypes": ["Penetration test summary", "Architecture document"],
+      "validationGuidance": "Ask for evidence of actual adversarial testing against prompt injection, not just a general statement of input validation."
+    },
+    {
+      "controlId": "LLM-02",
+      "title": "Insecure output handling",
+      "domain": "Output Security",
+      "summary": "LLM outputs are treated as untrusted input when passed to downstream systems (e.g. not directly executed as code or rendered unsanitized in a browser).",
+      "expectedEvidenceTypes": ["Architecture document"],
+      "validationGuidance": "This is especially important for agentic systems where the LLM's output can trigger actions - confirm outputs are validated before use."
+    },
+    {
+      "controlId": "LLM-03",
+      "title": "Training data poisoning controls",
+      "domain": "Data Security",
+      "summary": "The vendor has controls to verify the integrity and provenance of data used to train or fine-tune models, reducing risk of intentional poisoning.",
+      "expectedEvidenceTypes": ["Architecture document"],
+      "validationGuidance": "Most relevant for vendors that fine-tune models on customer or third-party data - lower priority for vendors using unmodified foundation models."
+    },
+    {
+      "controlId": "LLM-04",
+      "title": "Model denial of service protections",
+      "domain": "Availability",
+      "summary": "The vendor has rate limiting or resource controls to prevent resource-exhaustion attacks against LLM inference endpoints.",
+      "expectedEvidenceTypes": ["Architecture document"],
+      "validationGuidance": "Look for evidence of actual rate limiting configuration, not just a stated intention to have it."
+    },
+    {
+      "controlId": "LLM-05",
+      "title": "Supply chain security for models and plugins",
+      "domain": "Supply Chain",
+      "summary": "The vendor verifies the provenance and integrity of third-party models, embeddings, or plugins integrated into its AI system.",
+      "expectedEvidenceTypes": ["Architecture document", "Penetration test summary"],
+      "validationGuidance": "Ask specifically about how third-party model weights or plugin code are vetted before integration."
+    },
+    {
+      "controlId": "LLM-06",
+      "title": "Sensitive information disclosure prevention",
+      "domain": "Data Security",
+      "summary": "Controls exist to prevent the LLM from revealing sensitive information it may have been exposed to during training or in context, such as PII or proprietary data.",
+      "expectedEvidenceTypes": ["Architecture document", "Data processing agreement"],
+      "validationGuidance": "Look for output filtering or redaction mechanisms specifically, since this is a known and common failure mode for LLMs."
+    },
+    {
+      "controlId": "LLM-07",
+      "title": "Excessive agency limitations",
+      "domain": "Access Control",
+      "summary": "Where the LLM can take autonomous actions (e.g. calling tools or APIs), its permissions are scoped to the minimum necessary rather than broad system access.",
+      "expectedEvidenceTypes": ["Architecture document"],
+      "validationGuidance": "This is critical for agentic AI systems - confirm the LLM cannot take high-impact actions (e.g. financial transactions, data deletion) without human confirmation."
+    },
+    {
+      "controlId": "LLM-08",
+      "title": "System prompt leakage protections",
+      "domain": "Input Security",
+      "summary": "The vendor has controls to reduce the risk of the system prompt or internal instructions being extracted by an end user.",
+      "expectedEvidenceTypes": ["Penetration test summary"],
+      "validationGuidance": "Ask whether the system prompt contains sensitive logic or secrets that would matter if exposed - if not, this control is lower priority."
+    },
+    {
+      "controlId": "LLM-09",
+      "title": "Overreliance and output validation guidance for end users",
+      "domain": "Output Security",
+      "summary": "The vendor provides guidance or interface cues that discourage end users from treating LLM outputs as authoritative without verification.",
+      "expectedEvidenceTypes": ["Data processing agreement"],
+      "validationGuidance": "Look for this especially in high-stakes use cases (medical, legal, financial guidance) where overreliance carries real consequences."
+    },
+    {
+      "controlId": "LLM-10",
+      "title": "Model theft and extraction protections",
+      "domain": "Supply Chain",
+      "summary": "The vendor has controls to reduce the risk of model weights or proprietary fine-tuning being extracted through repeated querying or direct access.",
+      "expectedEvidenceTypes": ["Architecture document"],
+      "validationGuidance": "More relevant for vendors who have invested in proprietary fine-tuning - lower priority for those using unmodified third-party APIs."
+    }
+  ]
+}

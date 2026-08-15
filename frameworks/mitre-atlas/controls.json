@@ -1,0 +1,66 @@
+{
+  "frameworkId": "mitre-atlas",
+  "frameworkName": "MITRE ATLAS (Adversarial Threat Landscape for AI Systems)",
+  "version": "4.5.2",
+  "sourceUrl": "https://atlas.mitre.org/",
+  "licenseNote": "MITRE ATLAS content is publicly available. Summaries below are original interpretive content written for this application, not reproductions of ATLAS's text.",
+  "demonstrationSubsetDisclaimer": "This is an illustrative subset for portfolio demonstration purposes, not full framework coverage.",
+  "controls": [
+    {
+      "controlId": "ATLAS-1",
+      "title": "Reconnaissance resistance for model and system details",
+      "domain": "Reconnaissance",
+      "summary": "The vendor limits the information an attacker could gather about its AI system's architecture, model type, or training data through public sources or system responses.",
+      "expectedEvidenceTypes": ["Architecture document"],
+      "validationGuidance": "Look at whether error messages or API responses reveal internal model details unnecessarily."
+    },
+    {
+      "controlId": "ATLAS-2",
+      "title": "Resource development and access control to training pipeline",
+      "domain": "Resource Development",
+      "summary": "Access to model training infrastructure, datasets, and pipelines is restricted and monitored to prevent unauthorized use or tampering.",
+      "expectedEvidenceTypes": ["Architecture document", "Security policy"],
+      "validationGuidance": "Confirm the training pipeline has access controls equivalent to production systems, not treated as a lower-security internal tool."
+    },
+    {
+      "controlId": "ATLAS-3",
+      "title": "Adversarial example / evasion attack resilience",
+      "domain": "Evasion",
+      "summary": "The vendor has tested the model's resilience to adversarial inputs specifically crafted to cause misclassification or evasion of intended controls.",
+      "expectedEvidenceTypes": ["Penetration test summary"],
+      "validationGuidance": "Relevant primarily for classification or detection models (e.g. fraud, content moderation) where evasion has direct security impact."
+    },
+    {
+      "controlId": "ATLAS-4",
+      "title": "Model inference API abuse protections",
+      "domain": "Exfiltration",
+      "summary": "Rate limiting, query monitoring, or anomaly detection is in place on inference endpoints to detect model extraction or membership inference attempts.",
+      "expectedEvidenceTypes": ["Architecture document"],
+      "validationGuidance": "Look for monitoring of unusual query patterns (e.g. systematic probing), not just standard rate limiting for cost control."
+    },
+    {
+      "controlId": "ATLAS-5",
+      "title": "Data poisoning detection in training pipelines",
+      "domain": "Initial Access",
+      "summary": "The vendor has controls to detect anomalous or manipulated data entering the training or fine-tuning pipeline, particularly from external or user-generated sources.",
+      "expectedEvidenceTypes": ["Architecture document"],
+      "validationGuidance": "Especially relevant for systems that incorporate user feedback or interactions into ongoing model updates."
+    },
+    {
+      "controlId": "ATLAS-6",
+      "title": "Supply chain integrity for pretrained models and dependencies",
+      "domain": "Supply Chain Compromise",
+      "summary": "The vendor verifies the integrity of pretrained models, libraries, and ML frameworks used, reducing risk of a compromised upstream component.",
+      "expectedEvidenceTypes": ["Architecture document"],
+      "validationGuidance": "Ask whether model checksums or signed sources are verified before use, similar to software supply chain practices."
+    },
+    {
+      "controlId": "ATLAS-7",
+      "title": "Detection and response plan for AI-specific attacks",
+      "domain": "Impact",
+      "summary": "The vendor's incident response plan explicitly addresses AI-specific attack scenarios (model theft, poisoning, adversarial evasion), not only conventional IT incidents.",
+      "expectedEvidenceTypes": ["Security policy"],
+      "validationGuidance": "This overlaps with AI-MAN-2 in NIST AI RMF - a single well-built incident response plan can satisfy both if it genuinely covers AI-specific scenarios."
+    }
+  ]
+}

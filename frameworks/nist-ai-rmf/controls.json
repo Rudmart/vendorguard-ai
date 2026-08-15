@@ -1,0 +1,90 @@
+{
+  "frameworkId": "nist-ai-rmf",
+  "frameworkName": "NIST AI Risk Management Framework (AI RMF 1.0)",
+  "version": "1.0",
+  "sourceUrl": "https://www.nist.gov/itl/ai-risk-management-framework",
+  "licenseNote": "Public domain (U.S. Government publication). Summaries below are original, written for this application - they are not reproductions of NIST publication text.",
+  "demonstrationSubsetDisclaimer": "This is an illustrative subset for portfolio demonstration purposes, not full framework coverage.",
+  "controls": [
+    {
+      "controlId": "AI-GOV-1",
+      "title": "AI governance policy and accountability structure",
+      "domain": "Govern",
+      "summary": "The vendor maintains a documented governance structure with clear accountability for AI system risks, including named roles responsible for oversight.",
+      "expectedEvidenceTypes": ["Security policy", "Architecture document"],
+      "validationGuidance": "Look for named owners (not just a policy document) and evidence the structure is actually followed, not just written."
+    },
+    {
+      "controlId": "AI-GOV-2",
+      "title": "Legal and regulatory compliance mapping for AI use",
+      "domain": "Govern",
+      "summary": "The vendor tracks applicable AI-specific legal and regulatory obligations relevant to the jurisdictions and industries it serves.",
+      "expectedEvidenceTypes": ["Security policy"],
+      "validationGuidance": "Evidence should reference specific regulations (e.g. EU AI Act, sector rules) rather than a generic compliance statement."
+    },
+    {
+      "controlId": "AI-MAP-1",
+      "title": "AI system inventory and use-case documentation",
+      "domain": "Map",
+      "summary": "The vendor maintains an inventory of AI/ML systems in use, including their purpose, intended use cases, and known limitations.",
+      "expectedEvidenceTypes": ["Architecture document"],
+      "validationGuidance": "Confirm the inventory includes third-party or embedded AI models, not just internally built systems."
+    },
+    {
+      "controlId": "AI-MAP-2",
+      "title": "Context and impact assessment for AI use cases",
+      "domain": "Map",
+      "summary": "The vendor documents the operational context and potential impact (including on individuals) of each AI system before deployment.",
+      "expectedEvidenceTypes": ["Architecture document", "Security policy"],
+      "validationGuidance": "Look for evidence the assessment happens before deployment, not retroactively."
+    },
+    {
+      "controlId": "AI-MEAS-1",
+      "title": "Model performance and bias testing",
+      "domain": "Measure",
+      "summary": "AI systems are tested for accuracy, reliability, and bias/fairness issues appropriate to their use case prior to and during deployment.",
+      "expectedEvidenceTypes": ["Penetration test summary", "Architecture document"],
+      "validationGuidance": "Bias testing evidence should be specific to the model and use case, not a generic statement of fairness commitment."
+    },
+    {
+      "controlId": "AI-MEAS-2",
+      "title": "Ongoing monitoring for model drift and degradation",
+      "domain": "Measure",
+      "summary": "The vendor monitors deployed AI systems over time for performance degradation, data drift, or unexpected behavior.",
+      "expectedEvidenceTypes": ["Architecture document"],
+      "validationGuidance": "Look for a defined monitoring cadence and a process for what happens when drift is detected, not just passive logging."
+    },
+    {
+      "controlId": "AI-MEAS-3",
+      "title": "Explainability and transparency documentation",
+      "domain": "Measure",
+      "summary": "The vendor can provide documentation explaining how AI system outputs are generated, appropriate to the risk level of the use case.",
+      "expectedEvidenceTypes": ["Architecture document"],
+      "validationGuidance": "Higher-risk use cases (e.g. those affecting eligibility decisions) should have more detailed explainability documentation than low-risk ones."
+    },
+    {
+      "controlId": "AI-MAN-1",
+      "title": "Human oversight and override mechanisms",
+      "domain": "Manage",
+      "summary": "AI systems that inform consequential decisions include a mechanism for human review or override of automated outputs.",
+      "expectedEvidenceTypes": ["Architecture document", "Security policy"],
+      "validationGuidance": "Confirm the override mechanism is actually usable in practice, not merely theoretical or buried in an approval chain."
+    },
+    {
+      "controlId": "AI-MAN-2",
+      "title": "Incident response process for AI-specific failures",
+      "domain": "Manage",
+      "summary": "The vendor has a defined process for responding to AI-specific incidents, such as harmful outputs, data leakage through model behavior, or bias-driven harm.",
+      "expectedEvidenceTypes": ["Security policy", "Data processing agreement"],
+      "validationGuidance": "Distinguish this from generic security incident response - look for AI-specific triggers and escalation paths."
+    },
+    {
+      "controlId": "AI-MAN-3",
+      "title": "Third-party and foundation model risk management",
+      "domain": "Manage",
+      "summary": "Where the vendor relies on third-party or foundation AI models, it assesses and documents the risk this dependency introduces.",
+      "expectedEvidenceTypes": ["Architecture document", "SOC 2 report"],
+      "validationGuidance": "This is a common gap - many vendors build on top of third-party models without formally assessing that dependency's risk."
+    }
+  ]
+}

@@ -1,0 +1,66 @@
+{
+  "frameworkId": "iso-23894",
+  "frameworkName": "ISO/IEC 23894:2023 (AI Risk Management)",
+  "version": "2023",
+  "sourceUrl": "https://www.iso.org/standard/77304.html",
+  "licenseNote": "ISO standards are copyrighted. Summaries below are original interpretive content written for this application, not reproductions of the standard's text.",
+  "demonstrationSubsetDisclaimer": "This is an illustrative subset for portfolio demonstration purposes, not full framework coverage.",
+  "controls": [
+    {
+      "controlId": "AIRM-1",
+      "title": "AI risk identification process",
+      "domain": "Risk Identification",
+      "summary": "The vendor has a structured process for identifying risks specific to AI systems, including technical, ethical, legal, and reputational risk categories.",
+      "expectedEvidenceTypes": ["Security policy", "Architecture document"],
+      "validationGuidance": "Look for risk identification that goes beyond technical failure modes to include misuse, bias, and societal impact."
+    },
+    {
+      "controlId": "AIRM-2",
+      "title": "Stakeholder identification for AI risk analysis",
+      "domain": "Risk Identification",
+      "summary": "The vendor identifies all relevant stakeholders potentially affected by an AI system's decisions or outputs, not only the direct customer.",
+      "expectedEvidenceTypes": ["Architecture document"],
+      "validationGuidance": "Check whether end users or affected third parties (not just the paying customer) are considered in the analysis."
+    },
+    {
+      "controlId": "AIRM-3",
+      "title": "Likelihood and severity risk analysis methodology",
+      "domain": "Risk Analysis",
+      "summary": "Identified AI risks are analyzed using a consistent methodology to estimate likelihood and severity of potential harm.",
+      "expectedEvidenceTypes": ["Security policy"],
+      "validationGuidance": "A documented scoring or rating method is stronger evidence than qualitative-only judgment calls."
+    },
+    {
+      "controlId": "AIRM-4",
+      "title": "Risk evaluation against defined acceptance criteria",
+      "domain": "Risk Evaluation",
+      "summary": "The organization has predefined risk acceptance criteria for AI systems and evaluates identified risks against them before deployment.",
+      "expectedEvidenceTypes": ["Security policy"],
+      "validationGuidance": "Criteria should be defined in advance, not decided ad hoc per project after risks are already found."
+    },
+    {
+      "controlId": "AIRM-5",
+      "title": "Risk treatment plan and residual risk documentation",
+      "domain": "Risk Treatment",
+      "summary": "For risks that exceed acceptance criteria, the vendor documents a treatment plan and tracks residual risk after mitigation.",
+      "expectedEvidenceTypes": ["Security policy", "Architecture document"],
+      "validationGuidance": "Ask specifically for an example of residual risk being formally accepted by an accountable owner, not just mitigated silently."
+    },
+    {
+      "controlId": "AIRM-6",
+      "title": "Monitoring and review of AI risk over the system lifecycle",
+      "domain": "Monitoring and Review",
+      "summary": "AI risk assessments are revisited periodically and when material changes occur (model updates, new use cases, new data sources).",
+      "expectedEvidenceTypes": ["Architecture document"],
+      "validationGuidance": "This mirrors a common gap in other frameworks - check for an event-driven trigger, not only a fixed annual review cycle."
+    },
+    {
+      "controlId": "AIRM-7",
+      "title": "Communication and consultation on AI risk with affected parties",
+      "domain": "Communication",
+      "summary": "The vendor has a process for communicating relevant AI risk information to customers or affected stakeholders where appropriate.",
+      "expectedEvidenceTypes": ["Data processing agreement", "Security policy"],
+      "validationGuidance": "Look for proactive disclosure of known limitations, not only disclosure in response to an incident."
+    }
+  ]
+}

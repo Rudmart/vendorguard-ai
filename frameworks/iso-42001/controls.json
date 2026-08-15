@@ -1,0 +1,90 @@
+{
+  "frameworkId": "iso-42001",
+  "frameworkName": "ISO/IEC 42001:2023 (AI Management System)",
+  "version": "2023",
+  "sourceUrl": "https://www.iso.org/standard/81230.html",
+  "licenseNote": "ISO standards are copyrighted. Summaries below are original interpretive content written for this application, not reproductions of the standard's text.",
+  "demonstrationSubsetDisclaimer": "This is an illustrative subset for portfolio demonstration purposes, not full framework coverage.",
+  "controls": [
+    {
+      "controlId": "AIMS-1",
+      "title": "AI management system scope and leadership commitment",
+      "domain": "Organizational Context",
+      "summary": "Leadership has defined the scope of the AI management system and demonstrates visible commitment to responsible AI practices.",
+      "expectedEvidenceTypes": ["Security policy", "Architecture document"],
+      "validationGuidance": "Look for a documented scope statement and evidence of leadership involvement (e.g. steering committee), not just a policy PDF."
+    },
+    {
+      "controlId": "AIMS-2",
+      "title": "AI risk assessment methodology",
+      "domain": "Planning",
+      "summary": "The vendor has a documented, repeatable methodology for identifying and assessing risks specific to AI systems, distinct from general IT risk assessment.",
+      "expectedEvidenceTypes": ["Security policy"],
+      "validationGuidance": "The methodology should address AI-specific risks (bias, hallucination, misuse) rather than reusing a generic IT risk framework unmodified."
+    },
+    {
+      "controlId": "AIMS-3",
+      "title": "AI objectives and roles",
+      "domain": "Planning",
+      "summary": "The organization has defined measurable AI management objectives and assigned clear roles and responsibilities for achieving them.",
+      "expectedEvidenceTypes": ["Security policy"],
+      "validationGuidance": "Objectives should be specific and measurable, not aspirational statements like 'use AI responsibly.'"
+    },
+    {
+      "controlId": "AIMS-4",
+      "title": "Competence and awareness of personnel working with AI",
+      "domain": "Support",
+      "summary": "Personnel involved in developing, deploying, or overseeing AI systems have appropriate training on responsible AI practices and system limitations.",
+      "expectedEvidenceTypes": ["Security policy"],
+      "validationGuidance": "Look for role-specific training (e.g. for ML engineers vs. business users), not a single generic awareness module."
+    },
+    {
+      "controlId": "AIMS-5",
+      "title": "Documented information and version control for AI systems",
+      "domain": "Support",
+      "summary": "The vendor maintains version-controlled documentation of AI system design, training data provenance, and configuration changes over time.",
+      "expectedEvidenceTypes": ["Architecture document"],
+      "validationGuidance": "Confirm documentation is kept current with deployed versions, not just accurate for an initial release."
+    },
+    {
+      "controlId": "AIMS-6",
+      "title": "AI system lifecycle controls (design through decommissioning)",
+      "domain": "Operation",
+      "summary": "The vendor applies defined controls at each stage of the AI system lifecycle, including design, development, validation, deployment, and eventual decommissioning.",
+      "expectedEvidenceTypes": ["Architecture document"],
+      "validationGuidance": "Decommissioning is a commonly overlooked stage - check whether retired models and their training data are handled with the same care as active ones."
+    },
+    {
+      "controlId": "AIMS-7",
+      "title": "Data quality and provenance controls for training data",
+      "domain": "Operation",
+      "summary": "The vendor has controls to ensure training and fine-tuning data is fit for purpose, appropriately sourced, and free of known contamination or bias issues where feasible.",
+      "expectedEvidenceTypes": ["Architecture document"],
+      "validationGuidance": "This is difficult to fully verify for third-party/foundation models - look for at least a documented data sourcing policy."
+    },
+    {
+      "controlId": "AIMS-8",
+      "title": "Impact assessment for AI systems affecting individuals",
+      "domain": "Operation",
+      "summary": "Before deployment, the vendor assesses potential impacts of the AI system on individuals or groups, including fairness and access considerations.",
+      "expectedEvidenceTypes": ["Architecture document", "Security policy"],
+      "validationGuidance": "Look for this being a gating step before deployment, not a post-hoc review after complaints arise."
+    },
+    {
+      "controlId": "AIMS-9",
+      "title": "Performance evaluation and internal audit of the AI management system",
+      "domain": "Performance Evaluation",
+      "summary": "The organization periodically evaluates the effectiveness of its AI management system, including through internal audit or equivalent review.",
+      "expectedEvidenceTypes": ["SOC 2 report", "Security policy"],
+      "validationGuidance": "A recent internal audit report or independent assessment is stronger evidence than a stated intention to audit."
+    },
+    {
+      "controlId": "AIMS-10",
+      "title": "Continual improvement and corrective action process",
+      "domain": "Improvement",
+      "summary": "The vendor has a defined process for identifying nonconformities in its AI management system and taking corrective action, with evidence of past use.",
+      "expectedEvidenceTypes": ["Security policy"],
+      "validationGuidance": "Ask for an example of the process being used, not just its existence on paper."
+    }
+  ]
+}
