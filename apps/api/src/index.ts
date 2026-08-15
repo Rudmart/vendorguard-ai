@@ -61,6 +61,9 @@ server.get("/frameworks/:frameworkId/controls", async (request, reply) => {
     return reply.status(401).send({ error: "Not logged in" });
   }
   const { frameworkId } = request.params as { frameworkId: string };
+  if (!/^[a-zA-Z0-9.-]+$/.test(frameworkId)) {
+    return reply.status(400).send({ error: "Invalid framework id" });
+  }
   try {
     const raw = readFileSync(join(FRAMEWORKS_DIR, frameworkId, "controls.json"), "utf-8");
     const data = JSON.parse(raw);
@@ -222,6 +225,7 @@ const start = async () => {
 };
 
 start();
+
 
 
 
