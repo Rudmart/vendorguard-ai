@@ -27,8 +27,8 @@ const governanceItems: NavItem[] = [
 const styles = {
   sidebar: {
     width: 240,
-    background: "#111a2b",
-    borderRight: "1px solid #233150",
+    background: "#1a2340",
+    borderRight: "1px solid #2e3d63",
     padding: "20px 12px",
     display: "flex",
     flexDirection: "column" as const,
@@ -109,3 +109,4 @@ export default function Sidebar() {
     </aside>
   );
 }
+
