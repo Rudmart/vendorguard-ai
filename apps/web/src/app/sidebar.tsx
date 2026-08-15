@@ -11,7 +11,7 @@ type NavItem = {
 
 const overviewItems: NavItem[] = [
   { label: "Executive dashboard", href: "/", built: true },
-  { label: "Vendor inventory", href: "/vendors-list", built: false },
+  { label: "Vendor inventory", href: "/vendors-list", built: true },
 ];
 
 const assessmentItems: NavItem[] = [
@@ -109,4 +109,5 @@ export default function Sidebar() {
     </aside>
   );
 }
+
 
