@@ -1,0 +1,82 @@
+{
+  "frameworkId": "eu-ai-act",
+  "frameworkName": "EU AI Act (Regulation (EU) 2024/1689)",
+  "version": "2024",
+  "sourceUrl": "https://artificialintelligenceact.eu/",
+  "licenseNote": "EU regulation text is public. Summaries below are original interpretive content written for this application, not reproductions of the regulation's legal text - not legal advice.",
+  "demonstrationSubsetDisclaimer": "This is an illustrative subset for portfolio demonstration purposes, not full framework coverage or legal guidance.",
+  "controls": [
+    {
+      "controlId": "EUAI-1",
+      "title": "AI system risk classification",
+      "domain": "Risk Classification",
+      "summary": "The vendor has classified its AI systems according to the Act's risk tiers (unacceptable, high, limited, minimal) and can justify the classification.",
+      "expectedEvidenceTypes": ["Architecture document", "Security policy"],
+      "validationGuidance": "This is foundational - if classification hasn't been done, none of the tier-specific obligations can be verified. Treat missing classification as a significant gap, not just informational."
+    },
+    {
+      "controlId": "EUAI-2",
+      "title": "Prohibited practices screening",
+      "domain": "Risk Classification",
+      "summary": "The vendor has confirmed its AI systems do not engage in practices the Act prohibits outright, such as certain forms of biometric categorization or manipulative techniques.",
+      "expectedEvidenceTypes": ["Security policy"],
+      "validationGuidance": "Ask for the specific screening performed, not just a general assurance of legal compliance."
+    },
+    {
+      "controlId": "EUAI-3",
+      "title": "Risk management system for high-risk AI",
+      "domain": "High-Risk Obligations",
+      "summary": "For AI systems classified as high-risk, the vendor maintains a continuous risk management system covering the system's full lifecycle.",
+      "expectedEvidenceTypes": ["Security policy", "Architecture document"],
+      "validationGuidance": "Only applicable if the vendor's system falls into a high-risk category (e.g. employment, credit, biometric ID) - mark NOT_APPLICABLE with justification otherwise."
+    },
+    {
+      "controlId": "EUAI-4",
+      "title": "Data governance for high-risk AI training data",
+      "domain": "High-Risk Obligations",
+      "summary": "Training, validation, and testing data for high-risk AI systems meets quality criteria and is examined for possible biases.",
+      "expectedEvidenceTypes": ["Architecture document"],
+      "validationGuidance": "Look for documented data governance practices specific to the high-risk system, not generic data quality statements."
+    },
+    {
+      "controlId": "EUAI-5",
+      "title": "Technical documentation and record-keeping",
+      "domain": "High-Risk Obligations",
+      "summary": "The vendor maintains technical documentation sufficient to demonstrate compliance, including automatically generated logs where required.",
+      "expectedEvidenceTypes": ["Architecture document"],
+      "validationGuidance": "Ask whether documentation is retained for the legally required period and can be produced on request, not only that it exists."
+    },
+    {
+      "controlId": "EUAI-6",
+      "title": "Human oversight measures for high-risk AI",
+      "domain": "High-Risk Obligations",
+      "summary": "High-risk AI systems are designed to allow effective human oversight, including the ability for a human to intervene or halt the system.",
+      "expectedEvidenceTypes": ["Architecture document", "Security policy"],
+      "validationGuidance": "Confirm the oversight mechanism is practically usable within the actual operational workflow, not a theoretical capability."
+    },
+    {
+      "controlId": "EUAI-7",
+      "title": "Transparency obligations toward users",
+      "domain": "Transparency",
+      "summary": "Users are informed when they are interacting with an AI system (e.g. chatbots, deepfake content, emotion recognition) as required by the Act.",
+      "expectedEvidenceTypes": ["Data processing agreement", "Security policy"],
+      "validationGuidance": "Check the actual user-facing disclosure, not just a clause buried in terms of service."
+    },
+    {
+      "controlId": "EUAI-8",
+      "title": "Conformity assessment and CE marking (high-risk systems)",
+      "domain": "Conformity",
+      "summary": "Where required, the vendor has completed a conformity assessment procedure and can provide evidence of CE marking for the AI system.",
+      "expectedEvidenceTypes": ["Architecture document"],
+      "validationGuidance": "This is a formal, documented process - a vendor claiming compliance without a conformity assessment record should be flagged for follow-up."
+    },
+    {
+      "controlId": "EUAI-9",
+      "title": "Post-market monitoring plan",
+      "domain": "Post-Market",
+      "summary": "The vendor has a plan to monitor the performance of high-risk AI systems after deployment and to report serious incidents to authorities as required.",
+      "expectedEvidenceTypes": ["Security policy"],
+      "validationGuidance": "Look for a defined incident reporting threshold and timeline, not just a general monitoring statement."
+    }
+  ]
+}
