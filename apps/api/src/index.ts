@@ -6,7 +6,7 @@ import cookie from "@fastify/cookie";
 import rateLimit from "@fastify/rate-limit";
 import { registerAuthRoutes, getSessionFromCookie, COOKIE_NAME } from "./auth-routes.js";
 import { readdirSync, readFileSync } from "fs";
-import { join, dirname } from "path";
+import { join, dirname, resolve, sep } from "path";
 import { fileURLToPath } from "url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -70,8 +70,13 @@ server.get("/frameworks/:frameworkId/controls", async (request, reply) => {
   if (!/^[a-zA-Z0-9.-]+$/.test(frameworkId)) {
     return reply.status(400).send({ error: "Invalid framework id" });
   }
+  const resolvedFrameworksDir = resolve(FRAMEWORKS_DIR);
+  const resolvedPath = resolve(join(resolvedFrameworksDir, frameworkId, "controls.json"));
+  if (!resolvedPath.startsWith(resolvedFrameworksDir + sep)) {
+    return reply.status(400).send({ error: "Invalid framework id" });
+  }
   try {
-    const raw = readFileSync(join(FRAMEWORKS_DIR, frameworkId, "controls.json"), "utf-8");
+    const raw = readFileSync(resolvedPath, "utf-8");
     const data = JSON.parse(raw);
     return data;
   } catch {
@@ -231,6 +236,8 @@ const start = async () => {
 };
 
 start();
+
+
 
 
 
