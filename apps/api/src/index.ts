@@ -3,6 +3,7 @@ import cors from "@fastify/cors";
 import { prisma } from "@vendorguard/database";
 import { calculateInherentRisk } from "@vendorguard/risk-engine";
 import cookie from "@fastify/cookie";
+import rateLimit from "@fastify/rate-limit";
 import { registerAuthRoutes, getSessionFromCookie, COOKIE_NAME } from "./auth-routes.js";
 import { readdirSync, readFileSync } from "fs";
 import { join, dirname } from "path";
@@ -19,6 +20,11 @@ server.register(cors, {
 });
 
 server.register(cookie);
+
+server.register(rateLimit, {
+  max: 100,
+  timeWindow: "1 minute",
+});
 
 server.register(registerAuthRoutes);
 
@@ -225,6 +231,8 @@ const start = async () => {
 };
 
 start();
+
+
 
 
 
