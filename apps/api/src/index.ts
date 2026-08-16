@@ -129,6 +129,56 @@ server.post("/vendors/:id/assessments", async (request, reply) => {
   return reply.status(201).send(assessment);
 });
 
+server.post("/assessments/:id/findings", async (request, reply) => {
+  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  if (!session) {
+    return reply.status(401).send({ error: "Not logged in" });
+  }
+  const { id: assessmentId } = request.params as { id: string };
+  const body = request.body as { controlId?: string; status?: string };
+
+  if (!body.controlId || !body.status) {
+    return reply.status(400).send({ error: "controlId and status are required" });
+  }
+
+  const validStatuses = ["PASS", "PARTIAL", "FAIL", "INSUFFICIENT_EVIDENCE", "CONFLICTING_EVIDENCE", "NOT_APPLICABLE"];
+  if (!validStatuses.includes(body.status)) {
+    return reply.status(400).send({ error: "Invalid status" });
+  }
+
+  const assessment = await prisma.assessment.findUnique({ where: { id: assessmentId } });
+  if (!assessment) {
+    return reply.status(404).send({ error: "Assessment not found" });
+  }
+
+  const control = await prisma.control.findFirst({ where: { id: body.controlId } });
+  if (!control) {
+    return reply.status(404).send({ error: "Control not found" });
+  }
+
+  const existing = await prisma.controlFinding.findFirst({
+    where: { assessmentId, controlId: body.controlId },
+  });
+
+  const finding = existing
+    ? await prisma.controlFinding.update({
+        where: { id: existing.id },
+        data: { status: body.status as any, requiresHumanReview: false },
+      })
+    : await prisma.controlFinding.create({
+        data: {
+          tenantId: session.tenantId,
+          vendorId: assessment.vendorId,
+          assessmentId,
+          controlId: body.controlId,
+          status: body.status as any,
+          requiresHumanReview: false,
+        },
+      });
+
+  return reply.status(200).send(finding);
+});
+
 server.get("/assessments/:id", async (request, reply) => {
   const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
   if (!session) {
@@ -323,6 +373,7 @@ const start = async () => {
 };
 
 start();
+
 
 
 
