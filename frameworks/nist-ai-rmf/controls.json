@@ -85,6 +85,22 @@
       "summary": "Where the vendor relies on third-party or foundation AI models, it assesses and documents the risk this dependency introduces.",
       "expectedEvidenceTypes": ["Architecture document", "SOC 2 report"],
       "validationGuidance": "This is a common gap - many vendors build on top of third-party models without formally assessing that dependency's risk."
+    },
+    {
+      "controlId": "AI-GOV-3",
+      "title": "AI-specific risk tolerance documented",
+      "domain": "Govern",
+      "summary": "The organization has documented its risk tolerance specific to AI system deployment, distinct from general IT risk tolerance.",
+      "expectedEvidenceTypes": ["Security policy"],
+      "validationGuidance": "Look for AI-specific thresholds (e.g. acceptable error rates for consequential decisions), not a generic risk appetite statement."
+    },
+    {
+      "controlId": "AI-MAP-3",
+      "title": "AI system dependencies and interconnections mapped",
+      "domain": "Map",
+      "summary": "The vendor documents how its AI systems interact with other systems and data flows, including upstream and downstream dependencies.",
+      "expectedEvidenceTypes": ["Architecture document"],
+      "validationGuidance": "Ask specifically whether the map includes data flowing into the model, not only the model's outputs."
     }
   ]
 }
