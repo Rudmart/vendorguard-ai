@@ -84,6 +84,93 @@ server.get("/frameworks/:frameworkId/controls", async (request, reply) => {
   }
 });
 
+server.post("/vendors/:id/assessments", async (request, reply) => {
+  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  if (!session) {
+    return reply.status(401).send({ error: "Not logged in" });
+  }
+  const { id: vendorId } = request.params as { id: string };
+  const body = request.body as { frameworkIds?: string[] };
+  const frameworkIds = body.frameworkIds ?? [];
+
+  const vendor = await prisma.vendor.findUnique({ where: { id: vendorId } });
+  if (!vendor) {
+    return reply.status(404).send({ error: "Vendor not found" });
+  }
+
+  const assessment = await prisma.assessment.create({
+    data: {
+      tenantId: session.tenantId,
+      vendorId,
+      status: "DRAFT",
+      scoringModelVersion: "risk-model-2025.1",
+      startedByUserId: session.userId,
+    },
+  });
+
+  for (const catalogId of frameworkIds) {
+    const framework = await prisma.framework.findUnique({ where: { catalogId } });
+    if (!framework) continue;
+    const version = await prisma.frameworkVersion.findFirst({
+      where: { frameworkId: framework.id, isCurrent: true },
+    });
+    if (!version) continue;
+    await prisma.assessmentFramework.create({
+      data: {
+        tenantId: session.tenantId,
+        assessmentId: assessment.id,
+        frameworkId: framework.id,
+        frameworkVersion: version.version,
+        applicabilityReason: "manually-selected",
+      },
+    });
+  }
+
+  return reply.status(201).send(assessment);
+});
+
+server.get("/assessments/:id", async (request, reply) => {
+  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  if (!session) {
+    return reply.status(401).send({ error: "Not logged in" });
+  }
+  const { id } = request.params as { id: string };
+
+  const assessment = await prisma.assessment.findUnique({
+    where: { id },
+    include: {
+      vendor: true,
+      frameworks: { include: { framework: true } },
+      findings: true,
+    },
+  });
+  if (!assessment) {
+    return reply.status(404).send({ error: "Assessment not found" });
+  }
+
+  const frameworkVersions = await Promise.all(
+    assessment.frameworks.map(async (af) => {
+      const version = await prisma.frameworkVersion.findFirst({
+        where: { frameworkId: af.frameworkId, version: af.frameworkVersion },
+        include: { controls: true },
+      });
+      return {
+        frameworkId: af.framework.catalogId,
+        frameworkName: af.framework.name,
+        controls: version?.controls ?? [],
+      };
+    })
+  );
+
+  return {
+    id: assessment.id,
+    status: assessment.status,
+    vendor: { id: assessment.vendor.id, legalName: assessment.vendor.legalName },
+    frameworks: frameworkVersions,
+    findings: assessment.findings,
+  };
+});
+
 server.get("/vendors", async (request, reply) => {
   const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
   if (!session) {
@@ -236,6 +323,7 @@ const start = async () => {
 };
 
 start();
+
 
 
 
