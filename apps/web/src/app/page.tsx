@@ -1,4 +1,5 @@
 import AddVendorForm from "./add-vendor-form";
+import RegisterVendorButton from "./register-vendor";
 import SignOutButton from "./sign-out-button";
 import VendorList from "./vendor-list";
 import { cookies } from "next/headers";
@@ -71,6 +72,7 @@ export default async function HomePage() {
         <SignOutButton />
       </div>
 
+      <RegisterVendorButton><AddVendorForm /></RegisterVendorButton>
       <VendorList vendors={vendorsWithScores} />
 
       <details>
@@ -84,3 +86,6 @@ export default async function HomePage() {
     </main>
   );
 }
+
+
+
