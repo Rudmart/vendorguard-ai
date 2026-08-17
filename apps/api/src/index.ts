@@ -141,8 +141,8 @@ server.post("/assessments/:id/findings", async (request, reply) => {
     return reply.status(400).send({ error: "controlId and status are required" });
   }
 
-  const validStatuses = ["PASS", "PARTIAL", "FAIL", "INSUFFICIENT_EVIDENCE", "CONFLICTING_EVIDENCE", "NOT_APPLICABLE"];
-  if (!validStatuses.includes(body.status)) {
+  const validStatuses = ["PASS", "PARTIAL", "FAIL", "INSUFFICIENT_EVIDENCE", "CONFLICTING_EVIDENCE", "NOT_APPLICABLE"] as const;
+  if (!validStatuses.includes(body.status as (typeof validStatuses)[number])) {
     return reply.status(400).send({ error: "Invalid status" });
   }
 
@@ -342,8 +342,8 @@ server.patch("/remediations/:id", async (request, reply) => {
   const { id } = request.params as { id: string };
   const body = request.body as { status?: string };
 
-  const validStatuses = ["OPEN", "IN_PROGRESS", "OVERDUE", "CLOSED"];
-  if (!body.status || !validStatuses.includes(body.status)) {
+  const validStatuses = ["OPEN", "IN_PROGRESS", "OVERDUE", "CLOSED"] as const;
+  if (!body.status || !validStatuses.includes(body.status as (typeof validStatuses)[number])) {
     return reply.status(400).send({ error: "Invalid status" });
   }
 
@@ -362,6 +362,26 @@ server.patch("/remediations/:id", async (request, reply) => {
   });
 
   return updated;
+});
+
+server.get("/ai-inventory", async (request, reply) => {
+  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  if (!session) {
+    return reply.status(401).send({ error: "Not logged in" });
+  }
+
+  const allVendors = await prisma.vendor.findMany({
+    where: { deletedAt: null },
+    select: { id: true, legalName: true, serviceCategory: true, aiFunctionality: true },
+  });
+
+  const aiVendors = allVendors.filter((v: (typeof allVendors)[number]) => v.aiFunctionality);
+
+  return {
+    totalVendors: allVendors.length,
+    aiVendorCount: aiVendors.length,
+    vendors: aiVendors,
+  };
 });
 
 server.get("/vendors", async (request, reply) => {
@@ -516,6 +536,12 @@ const start = async () => {
 };
 
 start();
+
+
+
+
+
+
 
 
 
