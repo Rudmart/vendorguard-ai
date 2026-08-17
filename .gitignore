@@ -18,3 +18,5 @@ apps/api/api-deploy.zip
 .env.production
 .env.*
 !.env.*.example
+
+apps/web/tsconfig.tsbuildinfo

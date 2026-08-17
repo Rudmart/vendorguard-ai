@@ -272,6 +272,98 @@ server.get("/vendors/:id/evidence", async (request, reply) => {
   return { evidence };
 });
 
+server.post("/vendors/:id/remediations", async (request, reply) => {
+  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  if (!session) {
+    return reply.status(401).send({ error: "Not logged in" });
+  }
+  const { id: vendorId } = request.params as { id: string };
+  const body = request.body as { title?: string; description?: string; dueDate?: string; findingId?: string };
+
+  if (!body.title || !body.description) {
+    return reply.status(400).send({ error: "title and description are required" });
+  }
+
+  const vendor = await prisma.vendor.findUnique({ where: { id: vendorId } });
+  if (!vendor) {
+    return reply.status(404).send({ error: "Vendor not found" });
+  }
+
+  const remediation = await prisma.remediationAction.create({
+    data: {
+      tenantId: session.tenantId,
+      vendorId,
+      findingId: body.findingId ?? null,
+      title: body.title,
+      description: body.description,
+      status: "OPEN",
+      dueDate: body.dueDate ? new Date(body.dueDate) : null,
+    },
+  });
+
+  return reply.status(201).send(remediation);
+});
+
+server.get("/remediations", async (request, reply) => {
+  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  if (!session) {
+    return reply.status(401).send({ error: "Not logged in" });
+  }
+
+  const remediations = await prisma.remediationAction.findMany({
+    where: { tenantId: session.tenantId },
+    orderBy: { createdAt: "desc" },
+    include: { vendor: { select: { legalName: true } } },
+  });
+
+  return { remediations };
+});
+
+server.get("/vendors/:id/remediations", async (request, reply) => {
+  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  if (!session) {
+    return reply.status(401).send({ error: "Not logged in" });
+  }
+  const { id: vendorId } = request.params as { id: string };
+
+  const remediations = await prisma.remediationAction.findMany({
+    where: { vendorId },
+    orderBy: { createdAt: "desc" },
+  });
+
+  return { remediations };
+});
+
+server.patch("/remediations/:id", async (request, reply) => {
+  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  if (!session) {
+    return reply.status(401).send({ error: "Not logged in" });
+  }
+  const { id } = request.params as { id: string };
+  const body = request.body as { status?: string };
+
+  const validStatuses = ["OPEN", "IN_PROGRESS", "OVERDUE", "CLOSED"];
+  if (!body.status || !validStatuses.includes(body.status)) {
+    return reply.status(400).send({ error: "Invalid status" });
+  }
+
+  const existing = await prisma.remediationAction.findUnique({ where: { id } });
+  if (!existing) {
+    return reply.status(404).send({ error: "Remediation not found" });
+  }
+
+  const updated = await prisma.remediationAction.update({
+    where: { id },
+    data: {
+      status: body.status as (typeof validStatuses)[number],
+      closedAt: body.status === "CLOSED" ? new Date() : null,
+      closedByUserId: body.status === "CLOSED" ? session.userId : null,
+    },
+  });
+
+  return updated;
+});
+
 server.get("/vendors", async (request, reply) => {
   const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
   if (!session) {
@@ -424,6 +516,8 @@ const start = async () => {
 };
 
 start();
+
+
 
 
 
