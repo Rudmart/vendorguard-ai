@@ -221,6 +221,57 @@ server.get("/assessments/:id", async (request, reply) => {
   };
 });
 
+server.post("/vendors/:id/evidence", async (request, reply) => {
+  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  if (!session) {
+    return reply.status(401).send({ error: "Not logged in" });
+  }
+  const { id: vendorId } = request.params as { id: string };
+  const body = request.body as { displayFilename?: string; documentType?: string; expirationDate?: string };
+
+  if (!body.displayFilename || !body.documentType) {
+    return reply.status(400).send({ error: "displayFilename and documentType are required" });
+  }
+
+  const vendor = await prisma.vendor.findUnique({ where: { id: vendorId } });
+  if (!vendor) {
+    return reply.status(404).send({ error: "Vendor not found" });
+  }
+
+  const evidence = await prisma.evidenceDocument.create({
+    data: {
+      tenantId: session.tenantId,
+      vendorId,
+      displayFilename: body.displayFilename,
+      storageKey: `manual-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      mimeType: "application/octet-stream",
+      sizeBytes: 0,
+      sha256Hash: "manual-entry",
+      documentType: body.documentType,
+      state: "UPLOADED",
+      expirationDate: body.expirationDate ? new Date(body.expirationDate) : null,
+      uploadedByUserId: session.userId,
+    },
+  });
+
+  return reply.status(201).send(evidence);
+});
+
+server.get("/vendors/:id/evidence", async (request, reply) => {
+  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  if (!session) {
+    return reply.status(401).send({ error: "Not logged in" });
+  }
+  const { id: vendorId } = request.params as { id: string };
+
+  const evidence = await prisma.evidenceDocument.findMany({
+    where: { vendorId, deletedAt: null },
+    orderBy: { createdAt: "desc" },
+  });
+
+  return { evidence };
+});
+
 server.get("/vendors", async (request, reply) => {
   const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
   if (!session) {
@@ -373,6 +424,7 @@ const start = async () => {
 };
 
 start();
+
 
 
 
