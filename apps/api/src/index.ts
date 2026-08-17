@@ -375,7 +375,7 @@ server.get("/ai-inventory", async (request, reply) => {
     select: { id: true, legalName: true, serviceCategory: true, aiFunctionality: true },
   });
 
-  const aiVendors = allVendors.filter((v) => v.aiFunctionality);
+  const aiVendors = allVendors.filter((v: (typeof allVendors)[number]) => v.aiFunctionality);
 
   return {
     totalVendors: allVendors.length,
@@ -536,6 +536,7 @@ const start = async () => {
 };
 
 start();
+
 
 
 
