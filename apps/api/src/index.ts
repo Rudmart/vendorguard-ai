@@ -1,6 +1,6 @@
 import Fastify from "fastify";
 import cors from "@fastify/cors";
-import { prisma } from "@vendorguard/database";
+import { prisma, FindingStatus } from "@vendorguard/database";
 import { calculateInherentRisk } from "@vendorguard/risk-engine";
 import cookie from "@fastify/cookie";
 import rateLimit from "@fastify/rate-limit";
@@ -163,7 +163,7 @@ server.post("/assessments/:id/findings", async (request, reply) => {
   const finding = existing
     ? await prisma.controlFinding.update({
         where: { id: existing.id },
-        data: { status: body.status as any, requiresHumanReview: false },
+        data: { status: body.status as FindingStatus, requiresHumanReview: false },
       })
     : await prisma.controlFinding.create({
         data: {
@@ -171,7 +171,7 @@ server.post("/assessments/:id/findings", async (request, reply) => {
           vendorId: assessment.vendorId,
           assessmentId,
           controlId: body.controlId,
-          status: body.status as any,
+          status: body.status as FindingStatus,
           requiresHumanReview: false,
         },
       });
@@ -373,6 +373,8 @@ const start = async () => {
 };
 
 start();
+
+
 
 
 
