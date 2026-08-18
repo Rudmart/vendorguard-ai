@@ -422,6 +422,7 @@ server.post("/vendors", async (request, reply) => {
     operationalDependency?: number;
     fourthPartyConcentration?: number;
     geographicRegulatoryExposure?: number;
+    aiFunctionality?: boolean;
   };
 
   if (!body.legalName) {
@@ -446,6 +447,7 @@ server.post("/vendors", async (request, reply) => {
       operationalDependency: body.operationalDependency ?? null,
       fourthPartyConcentration: body.fourthPartyConcentration ?? null,
       geographicRegulatoryExposure: body.geographicRegulatoryExposure ?? null,
+      aiFunctionality: body.aiFunctionality ?? false,
     },
   });
 
@@ -536,6 +538,11 @@ const start = async () => {
 };
 
 start();
+
+
+
+
+
 
 
 
