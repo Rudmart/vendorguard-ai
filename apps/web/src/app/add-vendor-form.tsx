@@ -9,6 +9,7 @@ export default function AddVendorForm() {
   const [serviceDescription, setServiceDescription] = useState("");
   const [serviceCategory, setServiceCategory] = useState("");
   const [criticality, setCriticality] = useState("");
+  const [aiFunctionality, setAiFunctionality] = useState(false);
   const [dataSensitivity, setDataSensitivity] = useState("");
   const [businessCriticality, setBusinessCriticality] = useState("");
   const [accessPrivilege, setAccessPrivilege] = useState("");
@@ -33,6 +34,7 @@ export default function AddVendorForm() {
           serviceDescription,
           serviceCategory,
           criticality,
+          aiFunctionality,
           dataSensitivity: dataSensitivity === "" ? undefined : Number(dataSensitivity),
           businessCriticality: businessCriticality === "" ? undefined : Number(businessCriticality),
           accessPrivilege: accessPrivilege === "" ? undefined : Number(accessPrivilege),
@@ -135,6 +137,15 @@ export default function AddVendorForm() {
           <option value="HIGH">HIGH</option>
           <option value="CRITICAL">CRITICAL</option>
         </select>
+      </label>
+
+      <label style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16, fontSize: 13, color: "#8b96ac" }}>
+        <input
+          type="checkbox"
+          checked={aiFunctionality}
+          onChange={(e) => setAiFunctionality(e.target.checked)}
+        />
+        This vendor has AI functionality
       </label>
 
       <h3 style={{ fontSize: 15, color: "#8b96ac", marginBottom: 4, marginTop: 24 }}>
