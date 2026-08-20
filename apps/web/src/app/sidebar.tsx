@@ -14,12 +14,12 @@ const overviewItems: NavItem[] = [
   { label: "Executive dashboard", href: "/", built: true, icon: "\u2637" },
   { label: "Third-party risk", href: "/third-party-risk", built: false, icon: "\uD83D\uDEE1" },
   { label: "Vendor inventory", href: "/vendors-list", built: true, icon: "\uD83C\uDFE2" },
-  { label: "Vendor detail", href: "/vendors", built: false, icon: "\uD83D\uDC64" },
+  { label: "Vendor detail", href: "/vendors", built: true, icon: "\uD83D\uDC64" },
 ];
 
 const assessmentItems: NavItem[] = [
-  { label: "Assessment workspace", href: "/assessment", built: false, icon: "\u2705" },
-  { label: "Evidence library", href: "/evidence", built: false, icon: "\uD83D\uDCC4", badge: "3" },
+  { label: "Assessment workspace", href: "/assessments", built: true, icon: "\u2705" },
+  { label: "Evidence library", href: "/evidence", built: true, icon: "\uD83D\uDCC4", badge: "3" },
   { label: "AI inventory", href: "/ai-inventory", built: true, icon: "\u2728" },
   { label: "AI assistant", href: "/ai-assistant", built: false, icon: "\u2728" },
   { label: "Framework explorer", href: "/frameworks", built: true, icon: "\uD83D\uDCD8" },
