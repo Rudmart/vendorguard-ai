@@ -451,6 +451,17 @@ server.post("/vendors", async (request, reply) => {
     },
   });
 
+
+  await prisma.auditEvent.create({
+    data: {
+      tenantId: tenant.id,
+      actorUserId: session.userId,
+      action: "vendor.created",
+      targetType: "Vendor",
+      targetId: vendor.id,
+      outcome: "SUCCESS",
+    },
+  });
   return reply.status(201).send(vendor);
 });
 
