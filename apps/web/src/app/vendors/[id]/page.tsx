@@ -1,4 +1,4 @@
-﻿import { cookies } from "next/headers";
+import { cookies } from "next/headers";
 import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
 import DeleteVendorButton from "../delete-vendor-button";
@@ -75,6 +75,12 @@ export default async function VendorDetailPage({ params }: { params: { id: strin
       </div>
       <div style={{ marginTop: 12 }}>
         <DeleteVendorButton id={vendor.id} />
+        <Link href={`/vendors/${vendor.id}/assessment/new`} style={{ marginLeft: 12, color: "#3b82f6", fontSize: 13, textDecoration: "none" }}>
+          Start Assessment
+        </Link>
+        <Link href={`/vendors/${vendor.id}/evidence`} style={{ marginLeft: 12, color: "#3b82f6", fontSize: 13, textDecoration: "none" }}>
+          View Evidence
+        </Link>
       </div>
 
       {risk && (
