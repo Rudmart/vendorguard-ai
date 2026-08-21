@@ -578,6 +578,17 @@ server.delete("/vendors/:id", async (request, reply) => {
     return reply.status(404).send({ error: "Vendor not found" });
   }
   await prisma.vendor.update({ where: { id }, data: { deletedAt: new Date() } });
+
+  await prisma.auditEvent.create({
+    data: {
+      tenantId: session.tenantId,
+      actorUserId: session.userId,
+      action: "vendor.deleted",
+      targetType: "Vendor",
+      targetId: existing.id,
+      outcome: "SUCCESS",
+    },
+  });
   return reply.status(204).send();
 });
 const start = async () => {
