@@ -179,6 +179,27 @@ server.post("/assessments/:id/findings", async (request, reply) => {
   return reply.status(200).send(finding);
 });
 
+server.get("/assessments", async (request, reply) => {
+  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  if (!session) {
+    return reply.status(401).send({ error: "Not logged in" });
+  }
+
+  const assessments = await prisma.assessment.findMany({
+    include: { vendor: true },
+    orderBy: { createdAt: "desc" },
+  });
+
+  return {
+    assessments: assessments.map((a: (typeof assessments)[number]) => ({
+      id: a.id,
+      status: a.status,
+      createdAt: a.createdAt,
+      vendor: { id: a.vendor.id, legalName: a.vendor.legalName },
+    })),
+  };
+});
+
 server.get("/assessments/:id", async (request, reply) => {
   const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
   if (!session) {

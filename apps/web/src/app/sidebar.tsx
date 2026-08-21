@@ -19,7 +19,7 @@ const overviewItems: NavItem[] = [
 ];
 
 const assessmentItems: NavItem[] = [
-  { label: "Assessment workspace", href: "/vendors-list", built: true, icon: "\u2705" },
+  { label: "Assessment workspace", href: "/assessments", built: true, icon: "\u2705" },
   { label: "Evidence library", href: "/evidence", built: true, icon: "\uD83D\uDCC4", badge: "3" },
   { label: "AI inventory", href: "/ai-inventory", built: true, icon: "\u2728" },
   { label: "AI assistant", href: "/ai-assistant", built: false, icon: "\u2728" },
