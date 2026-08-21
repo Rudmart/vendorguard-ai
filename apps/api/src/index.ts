@@ -565,6 +565,17 @@ server.patch("/vendors/:id", async (request, reply) => {
       ...(body.geographicRegulatoryExposure !== undefined && { geographicRegulatoryExposure: body.geographicRegulatoryExposure }),
     },
   });
+
+  await prisma.auditEvent.create({
+    data: {
+      tenantId: session.tenantId,
+      actorUserId: session.userId,
+      action: "vendor.updated",
+      targetType: "Vendor",
+      targetId: vendor.id,
+      outcome: "SUCCESS",
+    },
+  });
   return vendor;
 });
 server.delete("/vendors/:id", async (request, reply) => {
