@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 
 type NavItem = {
@@ -18,12 +19,12 @@ const overviewItems: NavItem[] = [
 ];
 
 const assessmentItems: NavItem[] = [
-  { label: "Assessment workspace", href: "/assessments", built: true, icon: "\u2705" },
+  { label: "Assessment workspace", href: "/vendors-list", built: true, icon: "\u2705" },
   { label: "Evidence library", href: "/evidence", built: true, icon: "\uD83D\uDCC4", badge: "3" },
   { label: "AI inventory", href: "/ai-inventory", built: true, icon: "\u2728" },
   { label: "AI assistant", href: "/ai-assistant", built: false, icon: "\u2728" },
   { label: "Framework explorer", href: "/frameworks", built: true, icon: "\uD83D\uDCD8" },
-  { label: "Remediation tracker", href: "/remediation", built: true, icon: "\u2705", badge: "7" },
+  { label: "Remediation tracker", href: "/remediation", built: true, icon: "\u2705", badge: undefined },
 ];
 
 const governanceItems: NavItem[] = [
@@ -136,6 +137,19 @@ function NavSection({ items, pathname }: { items: NavItem[]; pathname: string })
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const [remediationBadge, setRemediationBadge] = useState<string | undefined>(undefined);
+
+  useEffect(() => {
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/remediations`, { credentials: "include" })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data && Array.isArray(data.remediations)) {
+          const openCount = data.remediations.filter((i: { status: string }) => i.status !== "CLOSED").length;
+          setRemediationBadge(openCount > 0 ? String(openCount) : undefined);
+        }
+      })
+      .catch(() => {});
+  }, []);
   if (pathname === "/login") return null;
 
   return (
@@ -152,7 +166,7 @@ export default function Sidebar() {
       <NavSection items={overviewItems} pathname={pathname} />
 
       <div style={styles.sectionLabel}>Assessment</div>
-      <NavSection items={assessmentItems} pathname={pathname} />
+      <NavSection items={assessmentItems.map((item) => item.label === "Remediation tracker" ? { ...item, badge: undefined } : item)} pathname={pathname} />
 
       <div style={styles.sectionLabel}>Governance</div>
       <NavSection items={governanceItems} pathname={pathname} />
