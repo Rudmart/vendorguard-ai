@@ -166,7 +166,7 @@ export default function Sidebar() {
       <NavSection items={overviewItems} pathname={pathname} />
 
       <div style={styles.sectionLabel}>Assessment</div>
-      <NavSection items={assessmentItems.map((item) => item.label === "Remediation tracker" ? { ...item, badge: undefined } : item)} pathname={pathname} />
+      <NavSection items={assessmentItems.map((item) => item.label === "Remediation tracker" ? { ...item, badge: remediationBadge } : item)} pathname={pathname} />
 
       <div style={styles.sectionLabel}>Governance</div>
       <NavSection items={governanceItems} pathname={pathname} />
