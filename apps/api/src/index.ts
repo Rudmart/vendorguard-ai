@@ -126,6 +126,17 @@ server.post("/vendors/:id/assessments", async (request, reply) => {
     });
   }
 
+
+  await prisma.auditEvent.create({
+    data: {
+      tenantId: session.tenantId,
+      actorUserId: session.userId,
+      action: "assessment.created",
+      targetType: "Assessment",
+      targetId: assessment.id,
+      outcome: "SUCCESS",
+    },
+  });
   return reply.status(201).send(assessment);
 });
 
@@ -275,6 +286,17 @@ server.post("/vendors/:id/evidence", async (request, reply) => {
     },
   });
 
+
+  await prisma.auditEvent.create({
+    data: {
+      tenantId: session.tenantId,
+      actorUserId: session.userId,
+      action: "evidence.created",
+      targetType: "EvidenceDocument",
+      targetId: evidence.id,
+      outcome: "SUCCESS",
+    },
+  });
   return reply.status(201).send(evidence);
 });
 
