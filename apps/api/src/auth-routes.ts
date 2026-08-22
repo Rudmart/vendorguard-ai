@@ -51,9 +51,9 @@ export async function registerAuthRoutes(server: FastifyInstance) {
     reply.setCookie(COOKIE_NAME, JSON.stringify(session), {
       path: "/",
       httpOnly: true,
-      sameSite: "none",
-      secure: true,
-      domain: ".delightfulforest-d2fb8ed2.eastus2.azurecontainerapps.io",
+      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+      secure: process.env.NODE_ENV === "production",
+      ...(process.env.NODE_ENV === "production" ? { domain: ".delightfulforest-d2fb8ed2.eastus2.azurecontainerapps.io" } : {}),
       maxAge: 60 * 60 * 24 * 7,
     });
 
