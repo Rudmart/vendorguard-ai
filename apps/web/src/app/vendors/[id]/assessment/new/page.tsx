@@ -11,6 +11,9 @@ const AVAILABLE_FRAMEWORKS = [
   { id: "glba-safeguards", name: "GLBA Safeguards Rule" },
   { id: "nist-800-66", name: "NIST SP 800-66 (HIPAA)" },
   { id: "iso-22301", name: "ISO 22301 (Business Continuity)" },
+  { id: "eu-ai-act", name: "EU AI Act (Regulation (EU) 2024/1689)" },
+  { id: "iso-42001", name: "ISO/IEC 42001:2023 (AI Management System)" },
+  { id: "iso-23894", name: "ISO/IEC 23894:2023 (AI Risk Management)" },
 ];
 
 export default function NewAssessmentPage() {
