@@ -16,6 +16,10 @@ type Vendor = {
   operationalDependency: number | null;
   fourthPartyConcentration: number | null;
   geographicRegulatoryExposure: number | null;
+  aiProductType: string | null;
+  aiProviders: string[];
+  customerDataTrainingPolicy: boolean;
+  humanOversightDocumented: boolean;
 };
 
 const inputStyle = {
@@ -79,6 +83,10 @@ export default function EditVendorPage() {
           operationalDependency: vendor.operationalDependency,
           fourthPartyConcentration: vendor.fourthPartyConcentration,
           geographicRegulatoryExposure: vendor.geographicRegulatoryExposure,
+          aiProductType: vendor.aiProductType,
+          aiProviders: vendor.aiProviders,
+          customerDataTrainingPolicy: vendor.customerDataTrainingPolicy,
+          humanOversightDocumented: vendor.humanOversightDocumented,
         }),
       });
       if (!res.ok) throw new Error("Save failed");
@@ -132,6 +140,49 @@ export default function EditVendorPage() {
             value={vendor.serviceCategory}
             onChange={(e) => setVendor({ ...vendor, serviceCategory: e.target.value })}
           />
+        </label>
+
+        <label style={labelStyle}>
+          AI Product Type
+          <select
+            style={inputStyle}
+            value={vendor.aiProductType || "NONE"}
+            onChange={(e) => setVendor({ ...vendor, aiProductType: e.target.value })}
+          >
+            <option value="NONE">Not an AI product</option>
+            <option value="GENERATIVE">Generative AI</option>
+            <option value="PREDICTIVE">Predictive AI</option>
+            <option value="ML">Machine Learning</option>
+            <option value="AGENT">AI Agent</option>
+          </select>
+        </label>
+
+        <label style={labelStyle}>
+          AI Providers (comma-separated)
+          <input
+            style={inputStyle}
+            value={(vendor.aiProviders || []).join(", ")}
+            onChange={(e) => setVendor({ ...vendor, aiProviders: e.target.value.split(",").map((s) => s.trim()).filter(Boolean) })}
+            placeholder="e.g. OpenAI, Anthropic"
+          />
+        </label>
+
+        <label style={{ ...labelStyle, display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
+          <input
+            type="checkbox"
+            checked={vendor.customerDataTrainingPolicy || false}
+            onChange={(e) => setVendor({ ...vendor, customerDataTrainingPolicy: e.target.checked })}
+          />
+          Customer data may be used for model training
+        </label>
+
+        <label style={{ ...labelStyle, display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
+          <input
+            type="checkbox"
+            checked={vendor.humanOversightDocumented || false}
+            onChange={(e) => setVendor({ ...vendor, humanOversightDocumented: e.target.checked })}
+          />
+          Human oversight is documented
         </label>
 
         {error && <p style={{ color: "#f87171", fontSize: 13, marginBottom: 16 }}>{error}</p>}

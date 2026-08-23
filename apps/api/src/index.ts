@@ -1,4 +1,4 @@
-import Fastify from "fastify";
+﻿import Fastify from "fastify";
 import cors from "@fastify/cors";
 import { prisma } from "@vendorguard/database";
 import { calculateInherentRisk } from "@vendorguard/risk-engine";
@@ -549,6 +549,10 @@ server.patch("/vendors/:id", async (request, reply) => {
     operationalDependency?: number;
     fourthPartyConcentration?: number;
     geographicRegulatoryExposure?: number;
+    aiProductType?: string;
+    aiProviders?: string[];
+    customerDataTrainingPolicy?: boolean;
+    humanOversightDocumented?: boolean;
   };
   const vendor = await prisma.vendor.update({
     where: { id },
@@ -563,6 +567,10 @@ server.patch("/vendors/:id", async (request, reply) => {
       ...(body.operationalDependency !== undefined && { operationalDependency: body.operationalDependency }),
       ...(body.fourthPartyConcentration !== undefined && { fourthPartyConcentration: body.fourthPartyConcentration }),
       ...(body.geographicRegulatoryExposure !== undefined && { geographicRegulatoryExposure: body.geographicRegulatoryExposure }),
+      ...(body.aiProductType !== undefined && { aiProductType: body.aiProductType }),
+      ...(body.aiProviders !== undefined && { aiProviders: body.aiProviders }),
+      ...(body.customerDataTrainingPolicy !== undefined && { customerDataTrainingPolicy: body.customerDataTrainingPolicy }),
+      ...(body.humanOversightDocumented !== undefined && { humanOversightDocumented: body.humanOversightDocumented }),
     },
   });
 
