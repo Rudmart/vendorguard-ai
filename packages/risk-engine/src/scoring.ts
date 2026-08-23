@@ -176,3 +176,105 @@ export function calculateResidualRisk(
     assumptions,
   };
 }
+
+// -----------------------------------------------------------------------
+// AI-specific risk scoring (Milestone 2: AI Risk Assessment).
+// Mirrors the general risk model above exactly - same input validation,
+// same clamping, same "missing input = provisional" safeguard, same
+// human-review principle: this module never calls an AI provider and
+// never lets an LLM set the final score.
+// -----------------------------------------------------------------------
+
+export const AI_RISK_FACTOR_WEIGHTS = {
+  modelRisk: 0.20,
+  dataRisk: 0.20,
+  securityRisk: 0.20,
+  regulatoryRisk: 0.15,
+  humanOversightRisk: 0.15,
+  governanceRisk: 0.10,
+} as const;
+
+export type AIRiskFactorKey = keyof typeof AI_RISK_FACTOR_WEIGHTS;
+
+const AI_WEIGHT_SUM = Object.values(AI_RISK_FACTOR_WEIGHTS).reduce((a, b) => a + b, 0);
+if (Math.abs(AI_WEIGHT_SUM - 1) > 1e-9) {
+  throw new Error(`AI_RISK_FACTOR_WEIGHTS must sum to 1.0, got ${AI_WEIGHT_SUM}`);
+}
+
+export const aiRiskFactorInputsSchema = z.object({
+  modelRisk: factorInputSchema.optional(),
+  dataRisk: factorInputSchema.optional(),
+  securityRisk: factorInputSchema.optional(),
+  regulatoryRisk: factorInputSchema.optional(),
+  humanOversightRisk: factorInputSchema.optional(),
+  governanceRisk: factorInputSchema.optional(),
+});
+
+export type AIRiskFactorInputs = z.infer<typeof aiRiskFactorInputsSchema>;
+
+export interface AIFactorContribution {
+  factor: AIRiskFactorKey;
+  weight: number;
+  value: number;
+  contribution: number;
+  wasProvided: boolean;
+}
+
+export interface AIInherentRiskResult {
+  modelVersion: string;
+  score: number;
+  band: RiskBandName;
+  factors: AIFactorContribution[];
+  weights: typeof AI_RISK_FACTOR_WEIGHTS;
+  missingInputs: AIRiskFactorKey[];
+  assumptions: string[];
+}
+
+/**
+ * Calculates AI-specific inherent risk from the six weighted AI risk
+ * domains. Only meaningful for vendors where aiFunctionality is true.
+ * Same missing-input safeguard as calculateInherentRisk: an omitted
+ * factor is treated as 0 and flagged, never silently assumed safe.
+ */
+export function calculateAIInherentRisk(rawInputs: AIRiskFactorInputs): AIInherentRiskResult {
+  const inputs = aiRiskFactorInputsSchema.parse(rawInputs);
+
+  const missingInputs: AIRiskFactorKey[] = [];
+  const factors: AIFactorContribution[] = (Object.keys(AI_RISK_FACTOR_WEIGHTS) as AIRiskFactorKey[]).map(
+    (factor) => {
+      const weight = AI_RISK_FACTOR_WEIGHTS[factor];
+      const provided = inputs[factor];
+      const wasProvided = typeof provided === "number";
+      if (!wasProvided) missingInputs.push(factor);
+      const value = wasProvided ? provided : 0;
+      return {
+        factor,
+        weight,
+        value,
+        contribution: weight * value,
+        wasProvided,
+      };
+    },
+  );
+
+  const rawScore = factors.reduce((sum, f) => sum + f.contribution, 0);
+  const score = Math.round(clamp(rawScore, 0, 100) * 100) / 100;
+
+  const assumptions: string[] = [];
+  if (missingInputs.length > 0) {
+    assumptions.push(
+      `Missing AI factor inputs treated as 0 (lowest risk) for: ${missingInputs.join(", ")}. ` +
+        "This score should be treated as provisional until the AI risk questionnaire is complete.",
+    );
+  }
+
+  return {
+    modelVersion: SCORING_MODEL_VERSION,
+    score,
+    band: bandFor(score),
+    factors,
+    weights: AI_RISK_FACTOR_WEIGHTS,
+    missingInputs,
+    assumptions,
+  };
+}

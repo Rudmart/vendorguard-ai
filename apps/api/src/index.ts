@@ -1,7 +1,7 @@
 ﻿import Fastify from "fastify";
 import cors from "@fastify/cors";
 import { prisma } from "@vendorguard/database";
-import { calculateInherentRisk } from "@vendorguard/risk-engine";
+import { calculateInherentRisk, calculateAIInherentRisk, calculateResidualRisk } from "@vendorguard/risk-engine";
 import cookie from "@fastify/cookie";
 import rateLimit from "@fastify/rate-limit";
 import { registerAuthRoutes, getSessionFromCookie, COOKIE_NAME } from "./auth-routes.js";
@@ -250,6 +250,67 @@ server.get("/assessments/:id", async (request, reply) => {
     vendor: { id: assessment.vendor.id, legalName: assessment.vendor.legalName },
     frameworks: frameworkVersions,
     findings: assessment.findings,
+  };
+});
+server.post("/assessments/:id/ai-risk-score", async (request, reply) => {
+  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  if (!session) {
+    return reply.status(401).send({ error: "Not logged in" });
+  }
+  const { id } = request.params as { id: string };
+  const body = request.body as {
+    modelRisk?: number;
+    dataRisk?: number;
+    securityRisk?: number;
+    regulatoryRisk?: number;
+    humanOversightRisk?: number;
+    governanceRisk?: number;
+    controlEffectiveness?: number;
+  };
+
+  const assessment = await prisma.assessment.findUnique({ where: { id } });
+  if (!assessment) {
+    return reply.status(404).send({ error: "Assessment not found" });
+  }
+
+  const inherentResult = calculateAIInherentRisk({
+    modelRisk: body.modelRisk,
+    dataRisk: body.dataRisk,
+    securityRisk: body.securityRisk,
+    regulatoryRisk: body.regulatoryRisk,
+    humanOversightRisk: body.humanOversightRisk,
+    governanceRisk: body.governanceRisk,
+  });
+
+  const controlEffectiveness = body.controlEffectiveness ?? 0;
+  const residualResult = calculateResidualRisk(inherentResult.score, controlEffectiveness);
+
+  const updated = await prisma.assessment.update({
+    where: { id },
+    data: {
+      aiInherentScore: inherentResult.score,
+      aiResidualScore: residualResult.score,
+      aiRiskBand: residualResult.band,
+      aiControlEffectiveness: controlEffectiveness,
+      aiFactorInputsJson: inherentResult.factors as object,
+    },
+  });
+
+  await prisma.auditEvent.create({
+    data: {
+      tenantId: session.tenantId,
+      actorUserId: session.userId,
+      action: "assessment.ai_risk_scored",
+      targetType: "Assessment",
+      targetId: updated.id,
+      outcome: "SUCCESS",
+    },
+  });
+
+  return {
+    assessment: updated,
+    inherent: inherentResult,
+    residual: residualResult,
   };
 });
 
