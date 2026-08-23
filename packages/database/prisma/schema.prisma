@@ -1,4 +1,4 @@
-// VendorGuard AI ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â Prisma schema
+// VendorGuard AI - Database Schema
 // Implements every entity from spec ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â§5. Every tenant-owned model carries an
 // explicit tenantId column with an index; application code must resolve
 // tenantId from authenticated context (see packages/auth) and NEVER trust a
@@ -275,6 +275,11 @@ model Assessment {
   residualScore         Float?
   riskBand              RiskBand?
   controlEffectiveness  Float?
+  aiInherentScore       Float?
+  aiResidualScore       Float?
+  aiRiskBand            RiskBand?
+  aiControlEffectiveness Float?
+  aiFactorInputsJson    Json?
   factorInputsJson      Json? // raw factor inputs used, for reproducibility/audit
   startedByUserId       String
   reviewerUserId        String?
