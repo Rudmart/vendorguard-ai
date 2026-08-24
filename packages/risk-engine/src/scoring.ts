@@ -278,3 +278,102 @@ export function calculateAIInherentRisk(rawInputs: AIRiskFactorInputs): AIInhere
     assumptions,
   };
 }
+
+// -----------------------------------------------------------------------
+// AI Impact Assessment (Milestone 3)
+// -----------------------------------------------------------------------
+
+export const AI_IMPACT_FACTOR_WEIGHTS = {
+  potentialHarmSeverity: 0.25,
+  individualsAffectedScale: 0.20,
+  decisionAutonomyLevel: 0.15,
+  sensitiveDataInvolved: 0.15,
+  regulatoryExposureLevel: 0.15,
+  explainabilityLevel: 0.10,
+} as const;
+
+export type AIImpactFactorKey = keyof typeof AI_IMPACT_FACTOR_WEIGHTS;
+
+const AI_IMPACT_WEIGHT_SUM = Object.values(AI_IMPACT_FACTOR_WEIGHTS).reduce((a, b) => a + b, 0);
+if (Math.abs(AI_IMPACT_WEIGHT_SUM - 1) > 1e-9) {
+  throw new Error(`AI_IMPACT_FACTOR_WEIGHTS must sum to 1.0, got ${AI_IMPACT_WEIGHT_SUM}`);
+}
+
+export const aiImpactFactorInputsSchema = z.object({
+  potentialHarmSeverity: factorInputSchema.optional(),
+  individualsAffectedScale: factorInputSchema.optional(),
+  decisionAutonomyLevel: factorInputSchema.optional(),
+  sensitiveDataInvolved: factorInputSchema.optional(),
+  regulatoryExposureLevel: factorInputSchema.optional(),
+  explainabilityLevel: factorInputSchema.optional(),
+});
+
+export type AIImpactFactorInputs = z.infer<typeof aiImpactFactorInputsSchema>;
+
+export interface AIImpactFactorContribution {
+  factor: AIImpactFactorKey;
+  weight: number;
+  value: number;
+  contribution: number;
+  wasProvided: boolean;
+}
+
+export interface AIImpactResult {
+  modelVersion: string;
+  score: number;
+  band: RiskBandName;
+  factors: AIImpactFactorContribution[];
+  weights: typeof AI_IMPACT_FACTOR_WEIGHTS;
+  missingInputs: AIImpactFactorKey[];
+  assumptions: string[];
+}
+
+/**
+ * Calculates the AI Impact Assessment score from six weighted factors
+ * covering harm severity, scale of affected individuals, decision
+ * autonomy, sensitive data involvement, regulatory exposure, and
+ * explainability. Independent from AI inherent/residual risk scoring.
+ * Missing inputs are treated as 0 and flagged, never silently assumed safe.
+ */
+export function calculateAIImpactScore(rawInputs: AIImpactFactorInputs): AIImpactResult {
+  const inputs = aiImpactFactorInputsSchema.parse(rawInputs);
+
+  const missingInputs: AIImpactFactorKey[] = [];
+  const factors: AIImpactFactorContribution[] = (Object.keys(AI_IMPACT_FACTOR_WEIGHTS) as AIImpactFactorKey[]).map(
+    (factor) => {
+      const weight = AI_IMPACT_FACTOR_WEIGHTS[factor];
+      const provided = inputs[factor];
+      const wasProvided = typeof provided === "number";
+      if (!wasProvided) missingInputs.push(factor);
+      const value = wasProvided ? provided : 0;
+      return {
+        factor,
+        weight,
+        value,
+        contribution: weight * value,
+        wasProvided,
+      };
+    },
+  );
+
+  const rawScore = factors.reduce((sum, f) => sum + f.contribution, 0);
+  const score = Math.round(clamp(rawScore, 0, 100) * 100) / 100;
+
+  const assumptions: string[] = [];
+  if (missingInputs.length > 0) {
+    assumptions.push(
+      `Missing AI impact factor inputs treated as 0 (lowest impact) for: ${missingInputs.join(", ")}. ` +
+        "This score should be treated as provisional until the AI impact questionnaire is complete.",
+    );
+  }
+
+  return {
+    modelVersion: SCORING_MODEL_VERSION,
+    score,
+    band: bandFor(score),
+    factors,
+    weights: AI_IMPACT_FACTOR_WEIGHTS,
+    missingInputs,
+    assumptions,
+  };
+}
