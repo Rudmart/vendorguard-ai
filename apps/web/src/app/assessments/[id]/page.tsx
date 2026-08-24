@@ -90,6 +90,23 @@ export default function AssessmentDetailPage() {
         Status: {data.status} &middot; {assessedCount}/{totalControls} controls assessed
       </p>
 
+      <a
+        href={`/assessments/${assessmentId}/questionnaire`}
+        style={{
+          display: "inline-block",
+          background: "#3b82f6",
+          color: "#000",
+          fontWeight: 700,
+          fontSize: 13,
+          borderRadius: 8,
+          padding: "8px 16px",
+          textDecoration: "none",
+          marginBottom: 24,
+        }}
+      >
+        AI Vendor Risk Questionnaire &rarr;
+      </a>
+
       {data.frameworks.map((fw) => (
         <div key={fw.frameworkId} style={{ marginBottom: 32 }}>
           <h2 style={{ fontSize: 16, marginBottom: 12 }}>{fw.frameworkName}</h2>
