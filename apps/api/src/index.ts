@@ -1,7 +1,7 @@
-﻿import Fastify from "fastify";
+import Fastify from "fastify";
 import cors from "@fastify/cors";
 import { prisma } from "@vendorguard/database";
-import { calculateInherentRisk, calculateAIInherentRisk, calculateResidualRisk } from "@vendorguard/risk-engine";
+import { calculateInherentRisk, calculateAIInherentRisk, calculateAIImpactScore, calculateResidualRisk } from "@vendorguard/risk-engine";
 import cookie from "@fastify/cookie";
 import rateLimit from "@fastify/rate-limit";
 import { registerAuthRoutes, getSessionFromCookie, COOKIE_NAME } from "./auth-routes.js";
@@ -313,6 +313,61 @@ server.post("/assessments/:id/ai-risk-score", async (request, reply) => {
     residual: residualResult,
   };
 });
+server.post("/assessments/:id/ai-impact-score", async (request, reply) => {
+  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  if (!session) {
+    return reply.status(401).send({ error: "Not logged in" });
+  }
+  const { id } = request.params as { id: string };
+  const body = request.body as {
+    potentialHarmSeverity?: number;
+    individualsAffectedScale?: number;
+    decisionAutonomyLevel?: number;
+    sensitiveDataInvolved?: number;
+    regulatoryExposureLevel?: number;
+    explainabilityLevel?: number;
+  };
+
+  const assessment = await prisma.assessment.findUnique({ where: { id } });
+  if (!assessment) {
+    return reply.status(404).send({ error: "Assessment not found" });
+  }
+
+  const impactResult = calculateAIImpactScore({
+    potentialHarmSeverity: body.potentialHarmSeverity,
+    individualsAffectedScale: body.individualsAffectedScale,
+    decisionAutonomyLevel: body.decisionAutonomyLevel,
+    sensitiveDataInvolved: body.sensitiveDataInvolved,
+    regulatoryExposureLevel: body.regulatoryExposureLevel,
+    explainabilityLevel: body.explainabilityLevel,
+  });
+
+  const updated = await prisma.assessment.update({
+    where: { id },
+    data: {
+      impactScore: impactResult.score,
+      impactBand: impactResult.band,
+      impactFactorInputsJson: impactResult.factors as object,
+    },
+  });
+
+  await prisma.auditEvent.create({
+    data: {
+      tenantId: session.tenantId,
+      actorUserId: session.userId,
+      action: "assessment.ai_impact_scored",
+      targetType: "Assessment",
+      targetId: updated.id,
+      outcome: "SUCCESS",
+    },
+  });
+
+  return {
+    assessment: updated,
+    impact: impactResult,
+  };
+});
+
 
 server.post("/vendors/:id/evidence", async (request, reply) => {
   const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
