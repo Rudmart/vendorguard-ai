@@ -1,7 +1,7 @@
 import Fastify from "fastify";
 import cors from "@fastify/cors";
 import { prisma } from "@vendorguard/database";
-import { calculateInherentRisk, calculateAIInherentRisk, calculateAIImpactScore, calculateResidualRisk } from "@vendorguard/risk-engine";
+import { calculateInherentRisk, calculateAIInherentRisk, calculateAIImpactScore, calculateResidualRisk, QUESTIONNAIRE_QUESTIONS, mapQuestionnaireToRiskFactors, type QuestionnaireAnswers } from "@vendorguard/risk-engine";
 import cookie from "@fastify/cookie";
 import rateLimit from "@fastify/rate-limit";
 import { registerAuthRoutes, getSessionFromCookie, COOKIE_NAME } from "./auth-routes.js";
@@ -366,6 +366,228 @@ server.post("/assessments/:id/ai-impact-score", async (request, reply) => {
     assessment: updated,
     impact: impactResult,
   };
+});
+
+server.post("/assessments/:id/questionnaire", async (request, reply) => {
+  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  if (!session) {
+    return reply.status(401).send({ error: "Not logged in" });
+  }
+  const { id } = request.params as { id: string };
+  const assessment = await prisma.assessment.findUnique({ where: { id } });
+  if (!assessment) {
+    return reply.status(404).send({ error: "Assessment not found" });
+  }
+
+  const questionnaire = await prisma.questionnaire.create({
+    data: {
+      tenantId: session.tenantId,
+      assessmentId: id,
+      name: "AI Vendor Risk Questionnaire",
+      version: "1.0",
+      status: "DRAFT",
+    },
+  });
+
+  await prisma.auditEvent.create({
+    data: {
+      tenantId: session.tenantId,
+      actorUserId: session.userId,
+      action: "questionnaire.created",
+      targetType: "Questionnaire",
+      targetId: questionnaire.id,
+      outcome: "SUCCESS",
+    },
+  });
+
+  return { questionnaire, questions: QUESTIONNAIRE_QUESTIONS };
+});
+
+server.get("/questionnaires/:id", async (request, reply) => {
+  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  if (!session) {
+    return reply.status(401).send({ error: "Not logged in" });
+  }
+  const { id } = request.params as { id: string };
+  const questionnaire = await prisma.questionnaire.findUnique({
+    where: { id },
+    include: { responses: true },
+  });
+  if (!questionnaire) {
+    return reply.status(404).send({ error: "Questionnaire not found" });
+  }
+  return { questionnaire, questions: QUESTIONNAIRE_QUESTIONS };
+});
+
+server.patch("/questionnaires/:id/responses", async (request, reply) => {
+  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  if (!session) {
+    return reply.status(401).send({ error: "Not logged in" });
+  }
+  const { id } = request.params as { id: string };
+  const body = request.body as { answers: Record<string, unknown> };
+
+  const questionnaire = await prisma.questionnaire.findUnique({ where: { id } });
+  if (!questionnaire) {
+    return reply.status(404).send({ error: "Questionnaire not found" });
+  }
+
+  for (const [questionKey, value] of Object.entries(body.answers ?? {})) {
+    const existing = await prisma.questionnaireResponse.findFirst({
+      where: { questionnaireId: id, questionKey },
+    });
+    if (existing) {
+      await prisma.questionnaireResponse.update({
+        where: { id: existing.id },
+        data: { answerJson: { value } as object, answeredByUserId: session.userId },
+      });
+    } else {
+      await prisma.questionnaireResponse.create({
+        data: {
+          tenantId: session.tenantId,
+          questionnaireId: id,
+          questionKey,
+          answerJson: { value } as object,
+          answeredByUserId: session.userId,
+        },
+      });
+    }
+  }
+
+  const updated = await prisma.questionnaire.update({
+    where: { id },
+    data: { status: questionnaire.status === "DRAFT" ? "IN_PROGRESS" : questionnaire.status },
+  });
+
+  await prisma.auditEvent.create({
+    data: {
+      tenantId: session.tenantId,
+      actorUserId: session.userId,
+      action: "questionnaire.responses_saved",
+      targetType: "Questionnaire",
+      targetId: id,
+      outcome: "SUCCESS",
+    },
+  });
+
+  return { questionnaire: updated };
+});
+
+server.post("/questionnaires/:id/submit", async (request, reply) => {
+  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  if (!session) {
+    return reply.status(401).send({ error: "Not logged in" });
+  }
+  const { id } = request.params as { id: string };
+
+  const questionnaire = await prisma.questionnaire.findUnique({
+    where: { id },
+    include: { responses: true },
+  });
+  if (!questionnaire) {
+    return reply.status(404).send({ error: "Questionnaire not found" });
+  }
+
+  const answers: QuestionnaireAnswers = {};
+  for (const r of questionnaire.responses) {
+    answers[r.questionKey] = r.answerJson as { value: boolean | string | string[] };
+  }
+  const { aiRiskFactors, aiImpactFactors } = mapQuestionnaireToRiskFactors(answers);
+
+  const inherentResult = calculateAIInherentRisk(aiRiskFactors);
+  const residualResult = calculateResidualRisk(inherentResult.score, 0);
+  const impactResult = calculateAIImpactScore(aiImpactFactors);
+
+  await prisma.assessment.update({
+    where: { id: questionnaire.assessmentId },
+    data: {
+      aiInherentScore: inherentResult.score,
+      aiResidualScore: residualResult.score,
+      aiRiskBand: residualResult.band,
+      aiFactorInputsJson: inherentResult.factors as object,
+      impactScore: impactResult.score,
+      impactBand: impactResult.band,
+      impactFactorInputsJson: impactResult.factors as object,
+    },
+  });
+
+  const updated = await prisma.questionnaire.update({
+    where: { id },
+    data: { status: "SUBMITTED", submittedByUserId: session.userId },
+  });
+
+  await prisma.auditEvent.create({
+    data: {
+      tenantId: session.tenantId,
+      actorUserId: session.userId,
+      action: "questionnaire.submitted",
+      targetType: "Questionnaire",
+      targetId: id,
+      outcome: "SUCCESS",
+    },
+  });
+
+  return { questionnaire: updated, inherent: inherentResult, residual: residualResult, impact: impactResult };
+});
+
+server.post("/questionnaires/:id/review", async (request, reply) => {
+  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  if (!session) {
+    return reply.status(401).send({ error: "Not logged in" });
+  }
+  const { id } = request.params as { id: string };
+  const questionnaire = await prisma.questionnaire.findUnique({ where: { id } });
+  if (!questionnaire) {
+    return reply.status(404).send({ error: "Questionnaire not found" });
+  }
+
+  const updated = await prisma.questionnaire.update({
+    where: { id },
+    data: { status: "REVIEWED", reviewedByUserId: session.userId },
+  });
+
+  await prisma.auditEvent.create({
+    data: {
+      tenantId: session.tenantId,
+      actorUserId: session.userId,
+      action: "questionnaire.reviewed",
+      targetType: "Questionnaire",
+      targetId: id,
+      outcome: "SUCCESS",
+    },
+  });
+
+  return { questionnaire: updated };
+});
+
+server.post("/questionnaires/:id/approve", async (request, reply) => {
+  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  if (!session) {
+    return reply.status(401).send({ error: "Not logged in" });
+  }
+  const { id } = request.params as { id: string };
+  const questionnaire = await prisma.questionnaire.findUnique({ where: { id } });
+  if (!questionnaire) {
+    return reply.status(404).send({ error: "Questionnaire not found" });
+  }
+
+  const updated = await prisma.questionnaire.update({
+    where: { id },
+    data: { status: "APPROVED", approvedByUserId: session.userId },
+  });
+
+  await prisma.auditEvent.create({
+    data: {
+      tenantId: session.tenantId,
+      actorUserId: session.userId,
+      action: "questionnaire.approved",
+      targetType: "Questionnaire",
+      targetId: id,
+      outcome: "SUCCESS",
+    },
+  });
+
+  return { questionnaire: updated };
 });
 
 
