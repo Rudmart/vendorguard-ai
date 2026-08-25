@@ -1,7 +1,7 @@
 import Fastify from "fastify";
 import cors from "@fastify/cors";
 import { prisma } from "@vendorguard/database";
-import { calculateInherentRisk, calculateAIInherentRisk, calculateAIImpactScore, calculateResidualRisk, QUESTIONNAIRE_QUESTIONS, mapQuestionnaireToRiskFactors, type QuestionnaireAnswers } from "@vendorguard/risk-engine";
+import { calculateInherentRisk, calculateAIInherentRisk, calculateAIImpactScore, calculateResidualRisk, QUESTIONNAIRE_QUESTIONS, mapQuestionnaireToRiskFactors, calculateFullRiskRating, type QuestionnaireAnswers } from "@vendorguard/risk-engine";
 import cookie from "@fastify/cookie";
 import rateLimit from "@fastify/rate-limit";
 import { registerAuthRoutes, getSessionFromCookie, COOKIE_NAME } from "./auth-routes.js";
@@ -590,6 +590,70 @@ server.post("/questionnaires/:id/approve", async (request, reply) => {
   return { questionnaire: updated };
 });
 
+
+server.post("/assessments/:id/risk-rating", async (request, reply) => {
+  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  if (!session) {
+    return reply.status(401).send({ error: "Not logged in" });
+  }
+  const { id } = request.params as { id: string };
+  const body = request.body as {
+    businessCriticality?: number;
+    dataSensitivity?: number;
+    aiAutonomy?: number;
+    regulatoryExposure?: number;
+    securityPosture?: number;
+    modelRisk?: number;
+    vendorMaturity?: number;
+    controlEffectiveness?: number;
+  };
+
+  const assessment = await prisma.assessment.findUnique({ where: { id } });
+  if (!assessment) {
+    return reply.status(404).send({ error: "Assessment not found" });
+  }
+
+  const controlEffectiveness = body.controlEffectiveness ?? 0;
+  const result = calculateFullRiskRating(
+    {
+      businessCriticality: body.businessCriticality,
+      dataSensitivity: body.dataSensitivity,
+      aiAutonomy: body.aiAutonomy,
+      regulatoryExposure: body.regulatoryExposure,
+      securityPosture: body.securityPosture,
+      modelRisk: body.modelRisk,
+      vendorMaturity: body.vendorMaturity,
+    },
+    controlEffectiveness,
+  );
+
+  const riskRating = await prisma.riskRating.create({
+    data: {
+      tenantId: session.tenantId,
+      assessmentId: id,
+      inherentScore: result.inherent.score,
+      controlEffectiveness: result.controlEffectiveness,
+      residualScore: result.residualScore,
+      finalRating: result.finalRating,
+      factorInputsJson: result.inherent.factors as object,
+      weightsUsedJson: result.inherent.weights as object,
+      createdByUserId: session.userId,
+    },
+  });
+
+  await prisma.auditEvent.create({
+    data: {
+      tenantId: session.tenantId,
+      actorUserId: session.userId,
+      action: "risk_rating.calculated",
+      targetType: "Assessment",
+      targetId: id,
+      outcome: "SUCCESS",
+    },
+  });
+
+  return { riskRating, result };
+});
 
 server.post("/vendors/:id/evidence", async (request, reply) => {
   const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
