@@ -85,11 +85,11 @@ export interface ResidualRiskResult {
   assumptions: string[];
 }
 
-function clamp(value: number, min: number, max: number): number {
+export function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
-function bandFor(score: number): RiskBandName {
+export function bandFor(score: number): RiskBandName {
   const band = RISK_BANDS.find((b) => score >= b.min && score <= b.max);
   // Score is always clamped to [0,100] before this is called, so a band
   // is guaranteed to exist; the fallback satisfies strict typing only.
