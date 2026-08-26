@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { calculateResidualRisk, bandFor, clamp, SCORING_MODEL_VERSION, type RiskBandName } from "./scoring.js";
+import { calculateResidualRisk, clamp, SCORING_MODEL_VERSION, type RiskBandName } from "./scoring.js";
 
 /**
  * Configurable AI Vendor Risk Rating engine (Milestone 5).
