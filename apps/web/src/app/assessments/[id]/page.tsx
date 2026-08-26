@@ -107,6 +107,24 @@ export default function AssessmentDetailPage() {
         AI Vendor Risk Questionnaire &rarr;
       </a>
 
+      <a
+        href={`/assessments/${assessmentId}/risk-rating`}
+        style={{
+          display: "inline-block",
+          background: "#22c55e",
+          color: "#000",
+          fontWeight: 700,
+          fontSize: 13,
+          borderRadius: 8,
+          padding: "8px 16px",
+          textDecoration: "none",
+          marginBottom: 24,
+          marginLeft: 12,
+        }}
+      >
+        Configurable Risk Rating &rarr;
+      </a>
+
       {data.frameworks.map((fw) => (
         <div key={fw.frameworkId} style={{ marginBottom: 32 }}>
           <h2 style={{ fontSize: 16, marginBottom: 12 }}>{fw.frameworkName}</h2>
