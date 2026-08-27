@@ -277,13 +277,13 @@ server.get("/assessments/:id/framework-mapping", async (request, reply) => {
     return reply.status(404).send({ error: "Assessment not found" });
   }
 
-  const findingsByControlId = new Map(assessment.findings.map((f) => [f.controlId, f]));
+  const findingsByControlId = new Map(assessment.findings.map((f: (typeof assessment.findings)[number]) => [f.controlId, f]));
 
   const allControls = await prisma.control.findMany({
     include: { frameworkVersion: { include: { framework: true } } },
   });
 
-  const applicabilityControls = allControls.map((c) => ({
+  const applicabilityControls = allControls.map((c: (typeof allControls)[number]) => ({
     id: c.id,
     controlId: c.controlId,
     title: c.title,
@@ -322,7 +322,7 @@ server.get("/assessments/:id/framework-mapping", async (request, reply) => {
       requirement: req.control.title,
       applicability: req.applicable,
       applicabilityReason: req.reason,
-      evidence: finding?.evidence.map((e) => ({
+      evidence: finding?.evidence.map((e: NonNullable<typeof finding>["evidence"][number]) => ({
         filename: e.document.displayFilename,
         page: e.page,
         section: e.section,
@@ -330,7 +330,7 @@ server.get("/assessments/:id/framework-mapping", async (request, reply) => {
       controlStatus: status,
       gaps: finding?.gaps ?? [],
       risk: { score: risk.score, band: risk.band },
-      remediation: finding?.remediations.map((r) => ({
+      remediation: finding?.remediations.map((r: NonNullable<typeof finding>["remediations"][number]) => ({
         title: r.title,
         status: r.status,
         dueDate: r.dueDate,
