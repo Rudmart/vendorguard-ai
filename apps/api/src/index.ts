@@ -277,7 +277,7 @@ server.get("/assessments/:id/framework-mapping", async (request, reply) => {
     return reply.status(404).send({ error: "Assessment not found" });
   }
 
-  const findingsByControlId = new Map(assessment.findings.map((f: (typeof assessment.findings)[number]) => [f.controlId, f]));
+  const findingsByControlId = new Map<string, (typeof assessment.findings)[number]>(assessment.findings.map((f: (typeof assessment.findings)[number]) => [f.controlId, f]));
 
   const allControls = await prisma.control.findMany({
     include: { frameworkVersion: { include: { framework: true } } },
