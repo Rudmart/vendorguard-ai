@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { resolveApplicableFrameworks, listActiveFrameworksForIndustry } from "./applicability.js";
+import { resolveApplicableFrameworks, listActiveFrameworksForIndustry, resolveApplicableRequirements } from "./applicability.js";
 
 const baseVendor = {
   serviceCategory: "Human Resources",
@@ -13,7 +13,7 @@ const baseVendor = {
   processesMedicareMedicaidClaims: false,
 };
 
-describe("resolveApplicableFrameworks — GENERAL tenant", () => {
+describe("resolveApplicableFrameworks â€” GENERAL tenant", () => {
   it("always includes the four GENERAL ACTIVE frameworks, and no banking/healthcare frameworks", () => {
     const results = resolveApplicableFrameworks(baseVendor);
     const ids = results.map((r) => r.framework.id).sort();
@@ -52,7 +52,7 @@ describe("resolveApplicableFrameworks — GENERAL tenant", () => {
   });
 });
 
-describe("resolveApplicableFrameworks — BANKING_FINANCIAL tenant", () => {
+describe("resolveApplicableFrameworks â€” BANKING_FINANCIAL tenant", () => {
   it("adds FFIEC, GLBA, and ISO 22301 as industry-active, on top of the four GENERAL frameworks", () => {
     const results = resolveApplicableFrameworks(baseVendor, { industry: "BANKING_FINANCIAL" });
     const ids = results.map((r) => r.framework.id);
@@ -113,7 +113,7 @@ describe("resolveApplicableFrameworks — BANKING_FINANCIAL tenant", () => {
   });
 });
 
-describe("resolveApplicableFrameworks — HEALTHCARE tenant", () => {
+describe("resolveApplicableFrameworks â€” HEALTHCARE tenant", () => {
   it("adds NIST 800-66 and ISO 22301 as industry-active, on top of the four GENERAL frameworks", () => {
     const results = resolveApplicableFrameworks(baseVendor, { industry: "HEALTHCARE" });
     const ids = results.map((r) => r.framework.id);
@@ -161,5 +161,73 @@ describe("listActiveFrameworksForIndustry", () => {
     const healthcare = listActiveFrameworksForIndustry("HEALTHCARE").map((f) => f.id);
     expect(banking).toContain("iso-22301");
     expect(healthcare).toContain("iso-22301");
+  });
+});
+
+
+describe("resolveApplicableRequirements", () => {
+  const sampleControls = [
+    { id: "c1", controlId: "CSF-1", title: "Asset Management", frameworkCatalogId: "nist-csf-2.0" },
+    { id: "c2", controlId: "ISO-1", title: "Access Control Policy", frameworkCatalogId: "iso-27001-2022" },
+    { id: "c3", controlId: "AIRMF-1", title: "AI Governance Structure", frameworkCatalogId: "nist-ai-rmf" },
+    { id: "c4", controlId: "ISO42-1", title: "AI Management System Scope", frameworkCatalogId: "iso-42001" },
+    { id: "c5", controlId: "EUAI-1", title: "AI system risk classification", frameworkCatalogId: "eu-ai-act" },
+    { id: "c6", controlId: "PCI-1", title: "Cardholder Data Encryption", frameworkCatalogId: "pci-dss" },
+  ];
+
+  it("returns requirements only for controls under frameworks that actually apply", () => {
+    const results = resolveApplicableRequirements(baseVendor, sampleControls);
+    const controlIds = results.map((r) => r.control.controlId).sort();
+    // baseVendor: no AI, no payment card data -> only the 4 GENERAL ACTIVE frameworks' controls
+    expect(controlIds).toEqual(["AIRMF-1", "CSF-1", "ISO-1"].sort());
+  });
+
+  it("is genuinely data-driven: changing vendor AI fields changes which requirements appear, without any code change", () => {
+    const withoutAi = resolveApplicableRequirements(baseVendor, sampleControls);
+    const withAi = resolveApplicableRequirements(
+      { ...baseVendor, aiFunctionality: true, aiProductType: "GENERATIVE_AI" },
+      sampleControls,
+    );
+    expect(withoutAi.some((r) => r.control.controlId === "ISO42-1")).toBe(false);
+    expect(withAi.some((r) => r.control.controlId === "ISO42-1")).toBe(true);
+  });
+
+  it("is genuinely data-driven: EU AI Act requirement only appears when EU exposure trigger matches", () => {
+    const noEu = resolveApplicableRequirements(
+      { ...baseVendor, aiFunctionality: true, aiProductType: "GENERATIVE_AI" },
+      sampleControls,
+    );
+    const withEu = resolveApplicableRequirements(
+      { ...baseVendor, aiFunctionality: true, aiProductType: "GENERATIVE_AI" },
+      sampleControls,
+      { operatesInEu: true },
+    );
+    expect(noEu.some((r) => r.control.controlId === "EUAI-1")).toBe(false);
+    expect(withEu.some((r) => r.control.controlId === "EUAI-1")).toBe(true);
+  });
+
+  it("every result includes a non-empty, real reason string tracing back to the framework trigger", () => {
+    const results = resolveApplicableRequirements(baseVendor, sampleControls);
+    for (const r of results) {
+      expect(r.reason.length).toBeGreaterThan(0);
+      expect(r.applicable).toBe(true);
+    }
+  });
+
+  it("PCI-DSS control is excluded when the vendor has no payment card data classification", () => {
+    const results = resolveApplicableRequirements(baseVendor, sampleControls);
+    expect(results.some((r) => r.control.controlId === "PCI-1")).toBe(false);
+  });
+
+  it("PCI-DSS control appears once the vendor's data classification triggers it", () => {
+    const results = resolveApplicableRequirements(
+      { ...baseVendor, dataClassifications: ["PAYMENT_CARD"] },
+      sampleControls,
+    );
+    expect(results.some((r) => r.control.controlId === "PCI-1")).toBe(true);
+  });
+
+  it("returns an empty array when given no controls", () => {
+    expect(resolveApplicableRequirements(baseVendor, [])).toEqual([]);
   });
 });
