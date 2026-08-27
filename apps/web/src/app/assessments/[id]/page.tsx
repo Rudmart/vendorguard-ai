@@ -125,6 +125,24 @@ export default function AssessmentDetailPage() {
         Configurable Risk Rating &rarr;
       </a>
 
+      <a
+        href={`/assessments/${assessmentId}/framework-mapping`}
+        style={{
+          display: "inline-block",
+          background: "#a855f7",
+          color: "#000",
+          fontWeight: 700,
+          fontSize: 13,
+          borderRadius: 8,
+          padding: "8px 16px",
+          textDecoration: "none",
+          marginBottom: 24,
+          marginLeft: 12,
+        }}
+      >
+        Framework Requirement Mapping &rarr;
+      </a>
+
       {data.frameworks.map((fw) => (
         <div key={fw.frameworkId} style={{ marginBottom: 32 }}>
           <h2 style={{ fontSize: 16, marginBottom: 12 }}>{fw.frameworkName}</h2>
