@@ -149,3 +149,73 @@ export function resolveApplicableFrameworks(
 export function listActiveFrameworksForIndustry(industry: IndustryVertical): FrameworkCatalogEntry[] {
   return listActiveVendorAssessmentFrameworks(industry);
 }
+
+
+/**
+ * Minimal control shape needed to resolve requirement-level applicability.
+ * Mirrors packages/database's Control model fields, passed in by the
+ * caller (e.g. the API route) since framework-engine has no dependency
+ * on the database package - see module comment above.
+ */
+export interface ApplicabilityControlInput {
+  id: string;
+  controlId: string;
+  title: string;
+  frameworkCatalogId: string;
+}
+
+export interface ApplicableRequirementResult {
+  control: ApplicabilityControlInput;
+  framework: FrameworkCatalogEntry;
+  applicable: boolean;
+  reason: string;
+}
+
+/**
+ * Resolves requirement-level (per-Control) applicability by expanding
+ * each applicable framework (per resolveApplicableFrameworks) into its
+ * individual seeded controls. Every control under an applicable framework
+ * is marked applicable with the SAME reasoning as its parent framework -
+ * a deliberate simplification: no per-control condition is invented
+ * beyond what resolveApplicableFrameworks already establishes, so every
+ * "why" string traces back to a real, tested trigger rather than an
+ * authored threshold. Purely additive - does not touch or replace the
+ * existing manual framework-selection flow used at assessment creation.
+ */
+export function resolveApplicableRequirements(
+  vendor: VendorApplicabilityProfile,
+  controls: ApplicabilityControlInput[],
+  tenant: Partial<TenantApplicabilityProfile> = {},
+): ApplicableRequirementResult[] {
+  const applicableFrameworks = resolveApplicableFrameworks(vendor, tenant);
+  const applicableFrameworkIds = new Map(
+    applicableFrameworks.map((r) => [r.framework.id, r]),
+  );
+
+  const results: ApplicableRequirementResult[] = [];
+  for (const control of controls) {
+    const match = applicableFrameworkIds.get(control.frameworkCatalogId);
+    if (!match) continue;
+    results.push({
+      control,
+      framework: match.framework,
+      applicable: true,
+      reason: reasonText(match.reason, match.framework),
+    });
+  }
+  return results;
+}
+
+function reasonText(
+  reason: ApplicableFrameworkResult["reason"],
+  framework: FrameworkCatalogEntry,
+): string {
+  switch (reason) {
+    case "always-active":
+      return `Applies to all vendors - ${framework.name} is a general-purpose framework.`;
+    case "industry-active":
+      return `Applies because your organization operates in a regulated industry (${framework.industries.join(", ")}).`;
+    case "trigger-matched":
+      return `Applies because this vendor matches ${framework.name}'s activation trigger: ${framework.activationTriggers.join("; ")}.`;
+  }
+}

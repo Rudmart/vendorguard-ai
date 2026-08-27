@@ -1,7 +1,8 @@
 import Fastify from "fastify";
 import cors from "@fastify/cors";
 import { prisma } from "@vendorguard/database";
-import { calculateInherentRisk, calculateAIInherentRisk, calculateAIImpactScore, calculateResidualRisk, QUESTIONNAIRE_QUESTIONS, mapQuestionnaireToRiskFactors, calculateFullRiskRating, type QuestionnaireAnswers } from "@vendorguard/risk-engine";
+import { calculateInherentRisk, calculateAIInherentRisk, calculateAIImpactScore, calculateResidualRisk, QUESTIONNAIRE_QUESTIONS, mapQuestionnaireToRiskFactors, calculateFullRiskRating, calculateRequirementRisk, type QuestionnaireAnswers } from "@vendorguard/risk-engine";
+import { resolveApplicableRequirements } from "@vendorguard/framework-engine";
 import cookie from "@fastify/cookie";
 import rateLimit from "@fastify/rate-limit";
 import { registerAuthRoutes, getSessionFromCookie, COOKIE_NAME } from "./auth-routes.js";
@@ -252,6 +253,94 @@ server.get("/assessments/:id", async (request, reply) => {
     findings: assessment.findings,
   };
 });
+
+server.get("/assessments/:id/framework-mapping", async (request, reply) => {
+  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  if (!session) {
+    return reply.status(401).send({ error: "Not logged in" });
+  }
+  const { id } = request.params as { id: string };
+
+  const assessment = await prisma.assessment.findUnique({
+    where: { id },
+    include: {
+      vendor: true,
+      findings: {
+        include: {
+          evidence: { include: { document: true } },
+          remediations: true,
+        },
+      },
+    },
+  });
+  if (!assessment) {
+    return reply.status(404).send({ error: "Assessment not found" });
+  }
+
+  const findingsByControlId = new Map<string, (typeof assessment.findings)[number]>(assessment.findings.map((f: (typeof assessment.findings)[number]) => [f.controlId, f]));
+
+  const allControls = await prisma.control.findMany({
+    include: { frameworkVersion: { include: { framework: true } } },
+  });
+
+  const applicabilityControls = allControls.map((c: (typeof allControls)[number]) => ({
+    id: c.id,
+    controlId: c.controlId,
+    title: c.title,
+    frameworkCatalogId: c.frameworkVersion.framework.catalogId,
+  }));
+
+  const vendorProfile = {
+    serviceCategory: assessment.vendor.serviceCategory ?? undefined,
+    category: assessment.vendor.category ?? undefined,
+    dataClassifications: assessment.vendor.dataClassifications ?? [],
+    aiFunctionality: assessment.vendor.aiFunctionality,
+    aiProductType: (assessment.vendor.aiProductType ?? "NONE") as "GENERATIVE_AI" | "PREDICTIVE_ML" | "NONE",
+    servesGovernmentCustomers: assessment.vendor.servesGovernmentCustomers ?? false,
+    processingLocations: assessment.vendor.processingLocations ?? [],
+    processesSwiftMessaging: assessment.vendor.processesSwiftMessaging ?? false,
+    affectsFinancialReporting: assessment.vendor.affectsFinancialReporting ?? false,
+    processesMedicareMedicaidClaims: assessment.vendor.processesMedicareMedicaidClaims ?? false,
+  };
+
+  const applicableRequirements = resolveApplicableRequirements(vendorProfile, applicabilityControls);
+
+  const riskContext = {
+    businessCriticality: assessment.vendor.businessCriticality,
+    dataSensitivity: assessment.vendor.dataSensitivity,
+    decisionAutonomyLevel: assessment.decisionAutonomyLevel,
+    geographicRegulatoryExposure: assessment.vendor.geographicRegulatoryExposure,
+  };
+
+  const rows = applicableRequirements.map((req) => {
+    const finding = findingsByControlId.get(req.control.id);
+    const status = finding?.status ?? "INSUFFICIENT_EVIDENCE";
+    const risk = calculateRequirementRisk(status, riskContext);
+
+    return {
+      framework: req.framework.name,
+      requirement: req.control.title,
+      applicability: req.applicable,
+      applicabilityReason: req.reason,
+      evidence: finding?.evidence.map((e: NonNullable<typeof finding>["evidence"][number]) => ({
+        filename: e.document.displayFilename,
+        page: e.page,
+        section: e.section,
+      })) ?? [],
+      controlStatus: status,
+      gaps: finding?.gaps ?? [],
+      risk: { score: risk.score, band: risk.band },
+      remediation: finding?.remediations.map((r: NonNullable<typeof finding>["remediations"][number]) => ({
+        title: r.title,
+        status: r.status,
+        dueDate: r.dueDate,
+      })) ?? [],
+    };
+  });
+
+  return { assessmentId: id, rows };
+});
+
 server.post("/assessments/:id/ai-risk-score", async (request, reply) => {
   const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
   if (!session) {
