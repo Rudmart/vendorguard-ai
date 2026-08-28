@@ -351,7 +351,7 @@ export const FRAMEWORK_CATALOG: readonly FrameworkCatalogEntry[] = [
     scope: "VENDOR_ASSESSMENT",
     status: "CONDITIONAL",
     purpose: "Questionnaire/control lens for assessing a vendor's own LLM-based product, not our platform.",
-    activationTriggers: ["Vendor.aiFunctionality == true AND Vendor.aiProductType == 'GENERATIVE_AI'"],
+    activationTriggers: ["Vendor.aiFunctionality == true AND Vendor.aiProductType == 'GENERATIVE'"],
     industries: ["GENERAL"],
     seededControlCount: 0,
     sourceUrl: "https://genai.owasp.org/llm-top-10/",
