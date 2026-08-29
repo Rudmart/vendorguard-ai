@@ -13,7 +13,7 @@ export const vendorApplicabilityProfileSchema = z.object({
   category: z.string().optional(),
   dataClassifications: z.array(z.string()).default([]),
   aiFunctionality: z.boolean().default(false),
-  aiProductType: z.enum(["GENERATIVE_AI", "PREDICTIVE_ML", "NONE"]).default("NONE"),
+  aiProductType: z.enum(["GENERATIVE", "PREDICTIVE", "ML", "AGENT", "NONE"]).default("NONE"),
   servesGovernmentCustomers: z.boolean().default(false),
   processingLocations: z.array(z.string()).default([]),
   processesSwiftMessaging: z.boolean().default(false),
@@ -68,7 +68,7 @@ function evaluateConditionalTrigger(
       return vendor.aiFunctionality && (vendorInEu || tenant.operatesInEu);
     }
     case "owasp-llm-top10-vendor":
-      return vendor.aiFunctionality && vendor.aiProductType === "GENERATIVE_AI";
+      return vendor.aiFunctionality && vendor.aiProductType === "GENERATIVE";
     case "iso-27036":
       // Requires an existing ISO 27001 assessment relationship - not
       // resolvable from vendor fields alone; left false until Phase 4's

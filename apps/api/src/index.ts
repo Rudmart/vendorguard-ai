@@ -295,7 +295,7 @@ server.get("/assessments/:id/framework-mapping", async (request, reply) => {
     category: assessment.vendor.category ?? undefined,
     dataClassifications: assessment.vendor.dataClassifications ?? [],
     aiFunctionality: assessment.vendor.aiFunctionality,
-    aiProductType: (assessment.vendor.aiProductType ?? "NONE") as "GENERATIVE_AI" | "PREDICTIVE_ML" | "NONE",
+    aiProductType: (assessment.vendor.aiProductType ?? "NONE") as "GENERATIVE" | "PREDICTIVE" | "ML" | "AGENT" | "NONE",
     servesGovernmentCustomers: assessment.vendor.servesGovernmentCustomers ?? false,
     processingLocations: assessment.vendor.processingLocations ?? [],
     processesSwiftMessaging: assessment.vendor.processesSwiftMessaging ?? false,
