@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { getAnthropicClient } from "./anthropicClient.js";
 
 export const evidenceAnalysisResultSchema = z.object({
   relevantControlIds: z.array(z.string()),
@@ -25,62 +24,32 @@ export interface AnalyzeEvidenceInput {
   candidateControls: ControlForAnalysis[];
 }
 
-const SYSTEM_PROMPT = `You are an evidence review assistant for a Third-Party Risk Management platform.
-You analyze vendor-submitted evidence documents (SOC 2 reports, ISO certificates, security assessments,
-AI governance policies, penetration tests, model documentation, vendor questionnaires) and propose which
-compliance controls the evidence supports, what gaps exist, and how confident you are.
+function analyzeFake(input: AnalyzeEvidenceInput): EvidenceAnalysisResult {
+  const firstTwoControls = input.candidateControls.slice(0, 2).map((c) => c.controlId);
+  return {
+    relevantControlIds: firstTwoControls,
+    gaps: [
+      "[FAKE MODE] Evidence does not explicitly state testing frequency.",
+      "[FAKE MODE] No mention of who reviews exceptions.",
+    ],
+    recommendations: [
+      "[FAKE MODE] Ask the vendor to clarify control testing cadence.",
+      "[FAKE MODE] Request the most recent exception log, if any.",
+    ],
+    confidence: 0.42,
+    expirationDate: null,
+    summary: `[FAKE MODE] This is a placeholder analysis of a ${input.documentType} document. Replace AI_PROVIDER=fake with AI_PROVIDER=azure-ai to run a real analysis.`,
+  };
+}
 
-Your output is ALWAYS advisory and ALWAYS subject to human review before it affects any risk score or
-compliance status. You are not making a final determination - you are proposing a starting point for a
-human reviewer.
-
-Respond with ONLY a JSON object matching this exact shape, no other text:
-{
-  "relevantControlIds": string[],   // controlId values (not internal ids) this evidence appears to support
-  "gaps": string[],                 // specific things the evidence does NOT demonstrate or leaves unclear
-  "recommendations": string[],      // concrete next steps for a human reviewer
-  "confidence": number,             // 0 to 1, your confidence in this analysis overall
-  "expirationDate": string | null,  // ISO 8601 date if the document states an expiration/validity end date, else null
-  "summary": string                 // 2-3 sentence plain-language summary of what this evidence shows
-}`;
+async function analyzeAzureAi(_input: AnalyzeEvidenceInput): Promise<EvidenceAnalysisResult> {
+  throw new Error("AI_PROVIDER=azure-ai is not yet implemented - see M8 Phase 1 follow-up");
+}
 
 export async function analyzeEvidence(input: AnalyzeEvidenceInput): Promise<EvidenceAnalysisResult> {
-  const client = getAnthropicClient();
-
-  const controlsList = input.candidateControls
-    .map((c) => `- ${c.controlId}: ${c.title} - ${c.summary}`)
-    .join("\n");
-
-  const userPrompt = `Document type: ${input.documentType}
-
-Candidate controls to evaluate against:
-${controlsList}
-
-Evidence text:
-"""
-${input.evidenceText}
-"""
-
-Analyze this evidence and respond with the JSON object described in your instructions.`;
-
-  const response = await client.messages.create({
-    model: "claude-sonnet-4-5-20250929",
-    max_tokens: 2000,
-    system: SYSTEM_PROMPT,
-    messages: [{ role: "user", content: userPrompt }],
-  });
-
-  const textBlock = response.content.find((block) => block.type === "text");
-  if (!textBlock || textBlock.type !== "text") {
-    throw new Error("Anthropic response contained no text block");
+  const provider = process.env.AI_PROVIDER ?? "fake";
+  if (provider === "azure-ai") {
+    return analyzeAzureAi(input);
   }
-
-  let parsedJson: unknown;
-  try {
-    parsedJson = JSON.parse(textBlock.text);
-  } catch (err) {
-    throw new Error(`Failed to parse model output as JSON: ${(err as Error).message}`);
-  }
-
-  return evidenceAnalysisResultSchema.parse(parsedJson);
+  return analyzeFake(input);
 }

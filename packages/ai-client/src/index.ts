@@ -1,4 +1,3 @@
-export { getAnthropicClient } from "./anthropicClient.js";
 export {
   analyzeEvidence,
   evidenceAnalysisResultSchema,
