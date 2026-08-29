@@ -33,7 +33,7 @@ describe("resolveApplicableFrameworks â€” GENERAL tenant", () => {
 
   it("activates the EU AI Act when the tenant itself operates in the EU", () => {
     const results = resolveApplicableFrameworks(
-      { ...baseVendor, aiFunctionality: true, aiProductType: "GENERATIVE_AI" },
+      { ...baseVendor, aiFunctionality: true, aiProductType: "GENERATIVE" },
       { operatesInEu: true },
     );
     expect(results.some((r) => r.framework.id === "eu-ai-act")).toBe(true);
@@ -43,7 +43,7 @@ describe("resolveApplicableFrameworks â€” GENERAL tenant", () => {
     const results = resolveApplicableFrameworks({
       ...baseVendor,
       aiFunctionality: true,
-      aiProductType: "GENERATIVE_AI",
+      aiProductType: "GENERATIVE",
       dataClassifications: ["PAYMENT_CARD", "PHI"],
     });
     expect(results.some((r) => r.framework.id === "shared-assessments-sig")).toBe(false);
@@ -185,7 +185,7 @@ describe("resolveApplicableRequirements", () => {
   it("is genuinely data-driven: changing vendor AI fields changes which requirements appear, without any code change", () => {
     const withoutAi = resolveApplicableRequirements(baseVendor, sampleControls);
     const withAi = resolveApplicableRequirements(
-      { ...baseVendor, aiFunctionality: true, aiProductType: "GENERATIVE_AI" },
+      { ...baseVendor, aiFunctionality: true, aiProductType: "GENERATIVE" },
       sampleControls,
     );
     expect(withoutAi.some((r) => r.control.controlId === "ISO42-1")).toBe(false);
@@ -194,11 +194,11 @@ describe("resolveApplicableRequirements", () => {
 
   it("is genuinely data-driven: EU AI Act requirement only appears when EU exposure trigger matches", () => {
     const noEu = resolveApplicableRequirements(
-      { ...baseVendor, aiFunctionality: true, aiProductType: "GENERATIVE_AI" },
+      { ...baseVendor, aiFunctionality: true, aiProductType: "GENERATIVE" },
       sampleControls,
     );
     const withEu = resolveApplicableRequirements(
-      { ...baseVendor, aiFunctionality: true, aiProductType: "GENERATIVE_AI" },
+      { ...baseVendor, aiFunctionality: true, aiProductType: "GENERATIVE" },
       sampleControls,
       { operatesInEu: true },
     );
