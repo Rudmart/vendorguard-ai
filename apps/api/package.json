@@ -22,7 +22,7 @@
     "@vendorguard/risk-engine": "workspace:*",
     "@vendorguard/framework-engine": "workspace:*",
     "@vendorguard/shared": "workspace:*",
-    "fastify": "4.28.1"
+    "fastify": "5.12.1"
   },
   "devDependencies": {
     "@types/node": "22.7.5",
