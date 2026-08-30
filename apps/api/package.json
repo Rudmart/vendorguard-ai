@@ -14,7 +14,7 @@
   },
   "dependencies": {
     "@fastify/cookie": "9",
-    "@fastify/cors": "8",
+    "@fastify/cors": "11",
     "@fastify/rate-limit": "9",
     "@vendorguard/ai-client": "workspace:*",
     "@vendorguard/auth": "workspace:*",
