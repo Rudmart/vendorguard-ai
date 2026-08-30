@@ -3,6 +3,7 @@ import cors from "@fastify/cors";
 import { prisma } from "@vendorguard/database";
 import { calculateInherentRisk, calculateAIInherentRisk, calculateAIImpactScore, calculateResidualRisk, QUESTIONNAIRE_QUESTIONS, mapQuestionnaireToRiskFactors, calculateFullRiskRating, calculateRequirementRisk, type QuestionnaireAnswers } from "@vendorguard/risk-engine";
 import { resolveApplicableRequirements } from "@vendorguard/framework-engine";
+import { runEvidenceAnalysis } from "./evidenceAnalysis.js";
 import cookie from "@fastify/cookie";
 import rateLimit from "@fastify/rate-limit";
 import { registerAuthRoutes, getSessionFromCookie, COOKIE_NAME } from "./auth-routes.js";
@@ -189,6 +190,27 @@ server.post("/assessments/:id/findings", async (request, reply) => {
       });
 
   return reply.status(200).send(finding);
+});
+server.post("/assessments/:id/evidence/:evidenceDocumentId/analyze", async (request, reply) => {
+  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  if (!session) {
+    return reply.status(401).send({ error: "Not logged in" });
+  }
+  const { id: assessmentId, evidenceDocumentId } = request.params as {
+    id: string;
+    evidenceDocumentId: string;
+  };
+  try {
+    const result = await runEvidenceAnalysis({
+      tenantId: session.tenantId,
+      assessmentId,
+      evidenceDocumentId,
+    });
+    return reply.status(200).send(result);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Analysis failed";
+    return reply.status(400).send({ error: message });
+  }
 });
 
 server.get("/assessments", async (request, reply) => {
