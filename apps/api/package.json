@@ -16,6 +16,7 @@
     "@fastify/cookie": "9",
     "@fastify/cors": "8",
     "@fastify/rate-limit": "9",
+    "@vendorguard/ai-client": "workspace:*",
     "@vendorguard/auth": "workspace:*",
     "@vendorguard/database": "workspace:*",
     "@vendorguard/risk-engine": "workspace:*",

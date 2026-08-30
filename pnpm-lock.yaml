@@ -41,6 +41,9 @@ importers:
       '@fastify/rate-limit':
         specifier: '9'
         version: 9.1.0
+      '@vendorguard/ai-client':
+        specifier: workspace:*
+        version: link:../../packages/ai-client
       '@vendorguard/auth':
         specifier: workspace:*
         version: link:../../packages/auth
