@@ -212,6 +212,57 @@ server.post("/assessments/:id/evidence/:evidenceDocumentId/analyze", async (requ
     return reply.status(400).send({ error: message });
   }
 });
+server.post("/assessments/:id/findings/:findingId/review", async (request, reply) => {
+  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  if (!session) {
+    return reply.status(401).send({ error: "Not logged in" });
+  }
+  const { id: assessmentId, findingId } = request.params as { id: string; findingId: string };
+  const body = request.body as {
+    decision?: string;
+    rationale?: string;
+    finalStatus?: string;
+  };
+  const validDecisions = ["ACCEPT", "REJECT", "OVERRIDE", "REQUEST_MORE_EVIDENCE", "NOT_APPLICABLE"] as const;
+  if (!body.decision || !validDecisions.includes(body.decision as (typeof validDecisions)[number])) {
+    return reply.status(400).send({ error: "decision must be one of: " + validDecisions.join(", ") });
+  }
+  if (!body.rationale) {
+    return reply.status(400).send({ error: "rationale is required" });
+  }
+  const validStatuses = ["PASS", "PARTIAL", "FAIL", "INSUFFICIENT_EVIDENCE", "CONFLICTING_EVIDENCE", "NOT_APPLICABLE"] as const;
+  if (body.finalStatus && !validStatuses.includes(body.finalStatus as (typeof validStatuses)[number])) {
+    return reply.status(400).send({ error: "Invalid finalStatus" });
+  }
+  const finding = await prisma.controlFinding.findFirst({
+    where: { id: findingId, assessmentId, tenantId: session.tenantId },
+  });
+  if (!finding) {
+    return reply.status(404).send({ error: "Finding not found" });
+  }
+  const changedValuesJson =
+    body.finalStatus && body.finalStatus !== finding.status
+      ? { status: { from: finding.status, to: body.finalStatus } }
+      : undefined;
+  const reviewDecision = await prisma.reviewDecision.create({
+    data: {
+      tenantId: session.tenantId,
+      findingId: finding.id,
+      reviewerUserId: session.userId,
+      decision: body.decision as (typeof validDecisions)[number],
+      rationale: body.rationale,
+      changedValuesJson,
+    },
+  });
+  const updatedFinding = await prisma.controlFinding.update({
+    where: { id: finding.id },
+    data: {
+      requiresHumanReview: false,
+      status: (body.finalStatus as (typeof validStatuses)[number] | undefined) ?? finding.status,
+    },
+  });
+  return reply.status(200).send({ reviewDecision, finding: updatedFinding });
+});
 
 server.get("/assessments", async (request, reply) => {
   const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
