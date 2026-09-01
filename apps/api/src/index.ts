@@ -263,6 +263,20 @@ server.post("/assessments/:id/findings/:findingId/review", async (request, reply
   });
   return reply.status(200).send({ reviewDecision, finding: updatedFinding });
 });
+server.get("/evidence/:evidenceDocumentId", async (request, reply) => {
+  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  if (!session) {
+    return reply.status(401).send({ error: "Not logged in" });
+  }
+  const { evidenceDocumentId } = request.params as { evidenceDocumentId: string };
+  const document = await prisma.evidenceDocument.findFirst({
+    where: { id: evidenceDocumentId, tenantId: session.tenantId },
+  });
+  if (!document) {
+    return reply.status(404).send({ error: "Evidence document not found" });
+  }
+  return reply.status(200).send(document);
+});
 
 server.get("/assessments", async (request, reply) => {
   const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
