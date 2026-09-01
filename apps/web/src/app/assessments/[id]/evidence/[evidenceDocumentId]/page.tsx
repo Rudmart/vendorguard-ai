@@ -29,6 +29,11 @@ type Finding = {
   requiresHumanReview: boolean;
 };
 
+type ReviewDecisionRecord = {
+  decision: string;
+  rationale: string;
+};
+
 const panelStyle = {
   background: "#1a2340",
   border: "1px solid #2e3d63",
@@ -38,6 +43,14 @@ const panelStyle = {
 };
 const labelStyle = { fontWeight: 700, fontSize: 13, marginBottom: 10, textTransform: "uppercase" as const, letterSpacing: 0.5 };
 
+const decisionColors: Record<string, string> = {
+  ACCEPT: "#22c55e",
+  OVERRIDE: "#f59e0b",
+  REJECT: "#e5484d",
+  REQUEST_MORE_EVIDENCE: "#f59e0b",
+  NOT_APPLICABLE: "#8b96ac",
+};
+
 export default function EvidenceAnalysisPage() {
   const params = useParams();
   const assessmentId = params.id as string;
@@ -46,6 +59,7 @@ export default function EvidenceAnalysisPage() {
   const [document, setDocument] = useState<EvidenceDoc | null>(null);
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
   const [findings, setFindings] = useState<Finding[]>([]);
+  const [decisions, setDecisions] = useState<Record<string, ReviewDecisionRecord>>({});
   const [loadingDoc, setLoadingDoc] = useState(true);
   const [analyzing, setAnalyzing] = useState(false);
   const [reviewingId, setReviewingId] = useState<string | null>(null);
@@ -96,6 +110,10 @@ export default function EvidenceAnalysisPage() {
     if (res.ok) {
       const data = await res.json();
       setFindings((prev) => prev.map((f) => (f.id === findingId ? data.finding : f)));
+      setDecisions((prev) => ({
+        ...prev,
+        [findingId]: { decision: data.reviewDecision.decision, rationale: data.reviewDecision.rationale },
+      }));
       setReviewingId(null);
       setRationale("");
     }
@@ -177,94 +195,121 @@ export default function EvidenceAnalysisPage() {
             {findings.length === 0 ? (
               <p style={{ color: "#8b96ac", fontSize: 13 }}>No findings proposed.</p>
             ) : (
-              findings.map((f) => (
-                <div
-                  key={f.id}
-                  style={{
-                    border: "1px solid #2e3d63",
-                    borderRadius: 8,
-                    padding: 14,
-                    marginBottom: 10,
-                  }}
-                >
-                  <div style={{ fontWeight: 600, fontSize: 13 }}>
-                    Control: {f.controlId} &middot; Status: {f.status}
-                  </div>
-                  <div style={{ color: "#8b96ac", fontSize: 12, marginTop: 4 }}>
-                    {f.requiresHumanReview ? "Awaiting human review" : "Reviewed"}
-                  </div>
+              findings.map((f) => {
+                const dec = decisions[f.id];
+                return (
+                  <div
+                    key={f.id}
+                    style={{
+                      border: "1px solid #2e3d63",
+                      borderRadius: 8,
+                      padding: 14,
+                      marginBottom: 10,
+                    }}
+                  >
+                    <div style={{ fontWeight: 600, fontSize: 13 }}>
+                      Control: {f.controlId} &middot; Status: {f.status}
+                    </div>
 
-                  {f.requiresHumanReview &&
-                    (reviewingId === f.id ? (
-                      <div style={{ marginTop: 10 }}>
-                        <textarea
-                          placeholder="Rationale (required)"
-                          value={rationale}
-                          onChange={(e) => setRationale(e.target.value)}
-                          style={{
-                            width: "100%",
-                            background: "#141b2d",
-                            border: "1px solid #2e3d63",
-                            borderRadius: 8,
-                            padding: "8px 12px",
-                            color: "#e5e9f0",
-                            fontSize: 13,
-                            marginBottom: 8,
-                            minHeight: 60,
-                          }}
-                        />
-                        <select
-                          value={finalStatus}
-                          onChange={(e) => setFinalStatus(e.target.value)}
-                          style={{
-                            width: "100%",
-                            background: "#141b2d",
-                            border: "1px solid #2e3d63",
-                            borderRadius: 8,
-                            padding: "8px 12px",
-                            color: "#e5e9f0",
-                            fontSize: 13,
-                            marginBottom: 10,
-                          }}
-                        >
-                          <option value="PASS">PASS</option>
-                          <option value="PARTIAL">PARTIAL</option>
-                          <option value="FAIL">FAIL</option>
-                          <option value="INSUFFICIENT_EVIDENCE">INSUFFICIENT_EVIDENCE</option>
-                          <option value="CONFLICTING_EVIDENCE">CONFLICTING_EVIDENCE</option>
-                          <option value="NOT_APPLICABLE">NOT_APPLICABLE</option>
-                        </select>
-                        <div style={{ display: "flex", gap: 8 }}>
-                          <button
-                            onClick={() => submitReview(f.id, "ACCEPT")}
-                            style={{ background: "#22c55e", color: "#fff", border: "none", borderRadius: 6, padding: "6px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}
-                          >
-                            Accept
-                          </button>
-                          <button
-                            onClick={() => submitReview(f.id, "OVERRIDE")}
-                            style={{ background: "#f59e0b", color: "#fff", border: "none", borderRadius: 6, padding: "6px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}
-                          >
-                            Override
-                          </button>
-                          <button
-                            onClick={() => submitReview(f.id, "REJECT")}
-                            style={{ background: "#e5484d", color: "#fff", border: "none", borderRadius: 6, padding: "6px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}
-                          >
-                            Reject
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <button
-                        onClick={() => setReviewingId(f.id)}
-                        style={{ marginTop: 10, background: "#3b82f6", color: "#fff", border: "none", borderRadius: 6, padding: "6px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}
+                    {!f.requiresHumanReview && dec && (
+                      <div
+                        style={{
+                          marginTop: 8,
+                          padding: "8px 10px",
+                          borderRadius: 6,
+                          background: "#141b2d",
+                          border: `1px solid ${decisionColors[dec.decision] || "#2e3d63"}`,
+                        }}
                       >
-                        Review
-                      </button>
-                    ))}
-                </div>
-              ))
+                        <div style={{ fontWeight: 700, fontSize: 12, color: decisionColors[dec.decision] || "#c5cbe0" }}>
+                          {dec.decision}
+                        </div>
+                        <div style={{ fontSize: 12, color: "#c5cbe0", marginTop: 2 }}>{dec.rationale}</div>
+                      </div>
+                    )}
+
+                    {!f.requiresHumanReview && !dec && (
+                      <div style={{ color: "#8b96ac", fontSize: 12, marginTop: 4 }}>
+                        Reviewed previously (decision details not loaded in this session)
+                      </div>
+                    )}
+
+                    {f.requiresHumanReview && (
+                      <div style={{ color: "#8b96ac", fontSize: 12, marginTop: 4 }}>Awaiting human review</div>
+                    )}
+
+                    {f.requiresHumanReview &&
+                      (reviewingId === f.id ? (
+                        <div style={{ marginTop: 10 }}>
+                          <textarea
+                            placeholder="Rationale (required)"
+                            value={rationale}
+                            onChange={(e) => setRationale(e.target.value)}
+                            style={{
+                              width: "100%",
+                              background: "#141b2d",
+                              border: "1px solid #2e3d63",
+                              borderRadius: 8,
+                              padding: "8px 12px",
+                              color: "#e5e9f0",
+                              fontSize: 13,
+                              marginBottom: 8,
+                              minHeight: 60,
+                            }}
+                          />
+                          <select
+                            value={finalStatus}
+                            onChange={(e) => setFinalStatus(e.target.value)}
+                            style={{
+                              width: "100%",
+                              background: "#141b2d",
+                              border: "1px solid #2e3d63",
+                              borderRadius: 8,
+                              padding: "8px 12px",
+                              color: "#e5e9f0",
+                              fontSize: 13,
+                              marginBottom: 10,
+                            }}
+                          >
+                            <option value="PASS">PASS</option>
+                            <option value="PARTIAL">PARTIAL</option>
+                            <option value="FAIL">FAIL</option>
+                            <option value="INSUFFICIENT_EVIDENCE">INSUFFICIENT_EVIDENCE</option>
+                            <option value="CONFLICTING_EVIDENCE">CONFLICTING_EVIDENCE</option>
+                            <option value="NOT_APPLICABLE">NOT_APPLICABLE</option>
+                          </select>
+                          <div style={{ display: "flex", gap: 8 }}>
+                            <button
+                              onClick={() => submitReview(f.id, "ACCEPT")}
+                              style={{ background: "#22c55e", color: "#fff", border: "none", borderRadius: 6, padding: "6px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}
+                            >
+                              Accept
+                            </button>
+                            <button
+                              onClick={() => submitReview(f.id, "OVERRIDE")}
+                              style={{ background: "#f59e0b", color: "#fff", border: "none", borderRadius: 6, padding: "6px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}
+                            >
+                              Override
+                            </button>
+                            <button
+                              onClick={() => submitReview(f.id, "REJECT")}
+                              style={{ background: "#e5484d", color: "#fff", border: "none", borderRadius: 6, padding: "6px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}
+                            >
+                              Reject
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => setReviewingId(f.id)}
+                          style={{ marginTop: 10, background: "#3b82f6", color: "#fff", border: "none", borderRadius: 6, padding: "6px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}
+                        >
+                          Review
+                        </button>
+                      ))}
+                  </div>
+                );
+              })
             )}
           </div>
         </>
