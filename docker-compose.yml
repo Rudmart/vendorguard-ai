@@ -1,5 +1,4 @@
 name: vendorguard-ai
-
 services:
   postgres:
     image: postgres:16-alpine
@@ -18,14 +17,13 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
-
   # Azurite emulates Azure Blob Storage for local development only.
   # Never point Azurite credentials at a deployed environment.
   azurite:
     image: mcr.microsoft.com/azure-storage/azurite:3.30.0
     container_name: vendorguard-azurite
     restart: unless-stopped
-    command: "azurite --blobHost 0.0.0.0 --blobPort 10000 --silent"
+    command: "azurite --blobHost 0.0.0.0 --blobPort 10000 --silent --skipApiVersionCheck"
     ports:
       - "10000:10000"
     volumes:
@@ -35,7 +33,6 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
-
 volumes:
   vendorguard-postgres-data:
   vendorguard-azurite-data:
