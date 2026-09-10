@@ -45,7 +45,7 @@ export async function runEvidenceAnalysis(params: RunEvidenceAnalysisParams) {
     })),
   });
 
-  const controlByControlId = new Map(candidateControls.map((c: (typeof candidateControls)[number]) => [c.controlId, c]));
+  const controlByControlId = new Map<string, (typeof candidateControls)[number]>(candidateControls.map((c: (typeof candidateControls)[number]) => [c.controlId, c]));
   const findings = [];
   const firstChunk = document.chunks[0];
 
