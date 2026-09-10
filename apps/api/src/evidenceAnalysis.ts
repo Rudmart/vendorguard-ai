@@ -31,13 +31,13 @@ export async function runEvidenceAnalysis(params: RunEvidenceAnalysisParams) {
 
   const evidenceText =
     document.chunks.length > 0
-      ? document.chunks.map((c) => c.text).join("\n\n")
+      ? document.chunks.map((c: (typeof document.chunks)[number]) => c.text).join("\n\n")
       : `[No extracted text available for ${document.displayFilename}. Document type: ${document.documentType}.]`;
 
   const analysis = await analyzeEvidence({
     documentType: document.documentType,
     evidenceText,
-    candidateControls: candidateControls.map((c) => ({
+    candidateControls: candidateControls.map((c: (typeof candidateControls)[number]) => ({
       id: c.id,
       controlId: c.controlId,
       title: c.title,
@@ -45,7 +45,7 @@ export async function runEvidenceAnalysis(params: RunEvidenceAnalysisParams) {
     })),
   });
 
-  const controlByControlId = new Map(candidateControls.map((c) => [c.controlId, c]));
+  const controlByControlId = new Map(candidateControls.map((c: (typeof candidateControls)[number]) => [c.controlId, c]));
   const findings = [];
   const firstChunk = document.chunks[0];
 
