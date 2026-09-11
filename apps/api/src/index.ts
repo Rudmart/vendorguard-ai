@@ -1,3 +1,4 @@
+import "dotenv/config";
 import Fastify from "fastify";
 import cors from "@fastify/cors";
 import { prisma } from "@vendorguard/database";
@@ -6,6 +7,13 @@ import { resolveApplicableRequirements } from "@vendorguard/framework-engine";
 import { runEvidenceAnalysis } from "./evidenceAnalysis.js";
 import cookie from "@fastify/cookie";
 import rateLimit from "@fastify/rate-limit";
+import multipart from "@fastify/multipart";
+import { getStorageClient } from "@vendorguard/storage-client";
+import { extractAndSaveEvidenceChunks } from "./evidenceExtraction.js";
+import { buildExecutiveReport } from "./executiveReport.js";
+import { renderExecutiveReportPdf } from "./executiveReportPdf.js";
+import { askAssistant } from "@vendorguard/ai-client";
+import { buildAssistantContext } from "./assistantContext.js";
 import { registerAuthRoutes, getSessionFromCookie, COOKIE_NAME } from "./auth-routes.js";
 import { readdirSync, readFileSync } from "fs";
 import { join, dirname, resolve, sep } from "path";
@@ -22,6 +30,7 @@ server.register(cors, {
 });
 
 server.register(cookie);
+server.register(multipart, { limits: { fileSize: 25 * 1024 * 1024, files: 1 } });
 
 server.register(rateLimit, {
   max: 100,
@@ -278,6 +287,52 @@ server.get("/evidence/:evidenceDocumentId", async (request, reply) => {
   return reply.status(200).send(document);
 });
 
+server.get("/vendors/:id/executive-report", async (request, reply) => {
+  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  if (!session) {
+    return reply.status(401).send({ error: "Not logged in" });
+  }
+  const { id: vendorId } = request.params as { id: string };
+
+  const report = await buildExecutiveReport(session.tenantId, vendorId);
+  if (!report) {
+    return reply.status(404).send({ error: "Vendor not found" });
+  }
+
+  await prisma.auditEvent.create({
+    data: {
+      tenantId: session.tenantId,
+      actorUserId: session.userId,
+      action: "report.generated",
+      targetType: "Vendor",
+      targetId: vendorId,
+      outcome: "SUCCESS",
+    },
+  });
+
+  return reply.status(200).send(report);
+});
+server.get("/evidence/:evidenceDocumentId/download", async (request, reply) => {
+  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  if (!session) {
+    return reply.status(401).send({ error: "Not logged in" });
+  }
+  const { evidenceDocumentId } = request.params as { evidenceDocumentId: string };
+  const document = await prisma.evidenceDocument.findFirst({
+    where: { id: evidenceDocumentId, tenantId: session.tenantId },
+  });
+  if (!document) {
+    return reply.status(404).send({ error: "Evidence document not found" });
+  }
+
+  const containerName = process.env.AZURE_STORAGE_CONTAINER_EVIDENCE ?? "evidence";
+  const storageClient = getStorageClient();
+  const buffer = await storageClient.downloadFile(containerName, document.storageKey);
+
+  reply.header("Content-Type", document.mimeType);
+  reply.header("Content-Disposition", "inline; filename=\"" + document.displayFilename + "\"");
+  return reply.send(buffer);
+});
 server.get("/assessments", async (request, reply) => {
   const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
   if (!session) {
@@ -297,6 +352,36 @@ server.get("/assessments", async (request, reply) => {
       vendor: { id: a.vendor.id, legalName: a.vendor.legalName },
     })),
   };
+});
+
+server.get("/vendors/:id/executive-report/export", async (request, reply) => {
+  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  if (!session) {
+    return reply.status(401).send({ error: "Not logged in" });
+  }
+  const { id: vendorId } = request.params as { id: string };
+
+  const report = await buildExecutiveReport(session.tenantId, vendorId);
+  if (!report) {
+    return reply.status(404).send({ error: "Vendor not found" });
+  }
+
+  const pdfBuffer = await renderExecutiveReportPdf(report);
+
+  await prisma.auditEvent.create({
+    data: {
+      tenantId: session.tenantId,
+      actorUserId: session.userId,
+      action: "report.exported",
+      targetType: "Vendor",
+      targetId: vendorId,
+      outcome: "SUCCESS",
+    },
+  });
+
+  reply.header("Content-Type", "application/pdf");
+  reply.header("Content-Disposition", "attachment; filename=\"executive-report-" + vendorId + ".pdf\"");
+  return reply.send(pdfBuffer);
 });
 
 server.get("/assessments/:id", async (request, reply) => {
@@ -339,6 +424,108 @@ server.get("/assessments/:id", async (request, reply) => {
     frameworks: frameworkVersions,
     findings: assessment.findings,
   };
+});
+
+server.post("/vendors/:id/assistant/messages", async (request, reply) => {
+  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  if (!session) {
+    return reply.status(401).send({ error: "Not logged in" });
+  }
+  const { id: vendorId } = request.params as { id: string };
+  const body = request.body as { conversationId?: string; question?: string };
+  const question = body.question;
+  if (!question || question.trim().length === 0) {
+    return reply.status(400).send({ error: "question is required" });
+  }
+
+  const vendor = await prisma.vendor.findFirst({
+    where: { id: vendorId, tenantId: session.tenantId },
+  });
+  if (!vendor) {
+    return reply.status(404).send({ error: "Vendor not found" });
+  }
+
+  const MODEL_VERSION = "claude-sonnet-4-5-20250929";
+  const PROMPT_TEMPLATE_VERSION = "assistant-v1";
+
+  let conversation;
+  if (body.conversationId) {
+    conversation = await prisma.assistantConversation.findFirst({
+      where: { id: body.conversationId, tenantId: session.tenantId, vendorId },
+    });
+    if (!conversation) {
+      return reply.status(404).send({ error: "Conversation not found" });
+    }
+  } else {
+    conversation = await prisma.assistantConversation.create({
+      data: {
+        tenantId: session.tenantId,
+        vendorId,
+        userId: session.userId,
+        modelVersion: MODEL_VERSION,
+        promptTemplateVersion: PROMPT_TEMPLATE_VERSION,
+      },
+    });
+  }
+
+  const priorMessages = await prisma.assistantMessage.findMany({
+    where: { tenantId: session.tenantId, conversationId: conversation.id },
+    orderBy: { createdAt: "asc" },
+  });
+
+  const context = await buildAssistantContext(session.tenantId, vendorId);
+
+  const result = await askAssistant({
+    question,
+    priorMessages: priorMessages.map((m) => ({
+      role: m.role as "user" | "assistant",
+      content: m.content,
+    })),
+    context,
+  });
+
+  await prisma.assistantMessage.create({
+    data: {
+      tenantId: session.tenantId,
+      conversationId: conversation.id,
+      role: "user",
+      content: question,
+      promptInjectionFlagged: false,
+    },
+  });
+
+  const assistantMessage = await prisma.assistantMessage.create({
+    data: {
+      tenantId: session.tenantId,
+      conversationId: conversation.id,
+      role: "assistant",
+      content: result.content,
+      citationsJson: result.citations,
+      promptInjectionFlagged: result.promptInjectionFlagged,
+    },
+  });
+
+  await prisma.auditEvent.create({
+    data: {
+      tenantId: session.tenantId,
+      actorUserId: session.userId,
+      action: "assistant.message_sent",
+      targetType: "Vendor",
+      targetId: vendorId,
+      outcome: "SUCCESS",
+    },
+  });
+
+  return reply.status(200).send({
+    conversationId: conversation.id,
+    message: {
+      id: assistantMessage.id,
+      content: result.content,
+      insufficientEvidence: result.insufficientEvidence,
+      citations: result.citations,
+      promptInjectionFlagged: result.promptInjectionFlagged,
+    },
+  });
 });
 
 server.get("/assessments/:id/framework-mapping", async (request, reply) => {
@@ -878,6 +1065,93 @@ server.post("/vendors/:id/evidence", async (request, reply) => {
   return reply.status(201).send(evidence);
 });
 
+server.post("/vendors/:id/evidence/upload", async (request, reply) => {
+  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  if (!session) {
+    return reply.status(401).send({ error: "Not logged in" });
+  }
+  const { id: vendorId } = request.params as { id: string };
+
+  const vendor = await prisma.vendor.findUnique({ where: { id: vendorId } });
+  if (!vendor) {
+    return reply.status(404).send({ error: "Vendor not found" });
+  }
+
+  const data = await request.file();
+  if (!data) {
+    return reply.status(400).send({ error: "No file uploaded" });
+  }
+
+  const ALLOWED_MIME_TYPES = new Set([
+    "application/pdf",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  ]);
+  if (!ALLOWED_MIME_TYPES.has(data.mimetype)) {
+    return reply.status(400).send({ error: "Unsupported file type. Allowed: PDF, DOCX, XLSX." });
+  }
+
+  const documentTypeField = data.fields.documentType as { value?: string } | undefined;
+  const expirationDateField = data.fields.expirationDate as { value?: string } | undefined;
+  const documentType = documentTypeField?.value;
+  const expirationDateRaw = expirationDateField?.value;
+  if (!documentType) {
+    return reply.status(400).send({ error: "documentType is required" });
+  }
+
+  const buffer = await data.toBuffer();
+  const MAX_FILE_SIZE_BYTES = 25 * 1024 * 1024;
+  if (buffer.byteLength > MAX_FILE_SIZE_BYTES) {
+    return reply.status(400).send({ error: "File exceeds 25 MB limit" });
+  }
+
+  const storageKey = "evidence/" + vendorId + "/" + Date.now() + "-" + data.filename;
+  const containerName = process.env.AZURE_STORAGE_CONTAINER_EVIDENCE ?? "evidence";
+  const storageClient = getStorageClient();
+  const uploadResult = await storageClient.uploadFile(containerName, storageKey, buffer, data.mimetype);
+
+  const evidence = await prisma.evidenceDocument.create({
+    data: {
+      tenantId: session.tenantId,
+      vendorId,
+      displayFilename: data.filename,
+      storageKey: uploadResult.storageKey,
+      mimeType: uploadResult.mimeType,
+      sizeBytes: uploadResult.sizeBytes,
+      sha256Hash: uploadResult.sha256Hash,
+      documentType,
+      state: "UPLOADED",
+      expirationDate: expirationDateRaw ? new Date(expirationDateRaw) : null,
+      uploadedByUserId: session.userId,
+    },
+  });
+
+  let chunksExtracted = 0;
+  try {
+    const extractionResult = await extractAndSaveEvidenceChunks({
+      tenantId: session.tenantId,
+      documentId: evidence.id,
+      buffer,
+      mimeType: uploadResult.mimeType,
+    });
+    chunksExtracted = extractionResult.chunksCreated;
+  } catch (extractionError) {
+    server.log.error(extractionError, "Evidence text extraction failed");
+  }
+
+  await prisma.auditEvent.create({
+    data: {
+      tenantId: session.tenantId,
+      actorUserId: session.userId,
+      action: "evidence.uploaded",
+      targetType: "EvidenceDocument",
+      targetId: evidence.id,
+      outcome: "SUCCESS",
+    },
+  });
+
+  return reply.status(201).send({ ...evidence, chunksExtracted });
+});
 server.get("/vendors/:id/evidence", async (request, reply) => {
   const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
   if (!session) {
