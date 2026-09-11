@@ -32,10 +32,6 @@ const governanceItems: NavItem[] = [
   { label: "Administration", href: "/administration", built: false, icon: "\u2699" },
 ];
 
-const assistantItems: NavItem[] = [
-  { label: "AI assistant", href: "/vendors-list", built: true, icon: "\uD83D\uDCAC" },
-];
-
 const styles = {
   sidebar: {
     width: 240,
@@ -141,6 +137,20 @@ function NavSection({ items, pathname }: { items: NavItem[]; pathname: string })
 export default function Sidebar() {
   const pathname = usePathname();
   const [remediationBadge, setRemediationBadge] = useState<string | undefined>(undefined);
+  const [lastVendorId, setLastVendorId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const stored = localStorage.getItem("vg_last_vendor_id");
+    if (stored) setLastVendorId(stored);
+  }, []);
+
+  useEffect(() => {
+    const match = pathname.match(/^\/vendors\/([^/]+)/);
+    if (match) {
+      setLastVendorId(match[1]);
+      localStorage.setItem("vg_last_vendor_id", match[1]);
+    }
+  }, [pathname]);
 
   useEffect(() => {
     fetch(`${process.env.NEXT_PUBLIC_API_URL}/remediations`, { credentials: "include" })
@@ -175,7 +185,7 @@ export default function Sidebar() {
       <NavSection items={governanceItems} pathname={pathname} />
 
       <div style={{ borderTop: "1px solid #2e3d63", margin: "12px 10px" }} />
-      <NavSection items={assistantItems} pathname={pathname} />
+      <NavSection items={[{ label: "AI assistant", href: lastVendorId ? `/vendors/${lastVendorId}/assistant` : "/vendors-list", built: true, icon: "\uD83D\uDCAC" }]} pathname={pathname} />
       <div style={styles.footer}>
         <div style={styles.avatar}>RM</div>
         <div>

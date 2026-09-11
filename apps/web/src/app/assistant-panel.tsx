@@ -85,17 +85,15 @@ export default function AssistantPanel({
   return (
     <div
       style={{
-        position: "fixed",
-        top: 64,
-        right: 0,
-        bottom: 0,
         width: 420,
+        flexShrink: 0,
         background: "#141b2d",
         borderLeft: "1px solid #2e3d63",
         display: "flex",
         flexDirection: "column",
-        zIndex: 1000,
-        boxShadow: "-8px 0 24px rgba(0,0,0,0.3)",
+        height: "100vh",
+        position: "sticky",
+        top: 0,
       }}
     >
       <div
