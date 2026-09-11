@@ -81,6 +81,9 @@ export default async function VendorDetailPage({ params }: { params: { id: strin
         <Link href={`/vendors/${vendor.id}/evidence`} style={{ marginLeft: 12, color: "#3b82f6", fontSize: 13, textDecoration: "none" }}>
           View Evidence
         </Link>
+        <Link href={`/vendors/${vendor.id}/executive-report`} style={{ marginLeft: 12, color: "#3b82f6", fontSize: 13, textDecoration: "none" }}>
+          View Executive Report
+        </Link>
       </div>
 
       {risk && (
