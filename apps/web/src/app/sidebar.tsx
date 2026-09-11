@@ -22,15 +22,18 @@ const assessmentItems: NavItem[] = [
   { label: "Assessment workspace", href: "/assessments", built: true, icon: "\u2705" },
   { label: "Evidence library", href: "/evidence", built: true, icon: "\uD83D\uDCC4", badge: "3" },
   { label: "AI inventory", href: "/ai-inventory", built: true, icon: "\u2728" },
-  { label: "AI assistant", href: "/ai-assistant", built: false, icon: "\u2728" },
   { label: "Framework explorer", href: "/frameworks", built: true, icon: "\uD83D\uDCD8" },
   { label: "Remediation tracker", href: "/remediation", built: true, icon: "\u2705", badge: undefined },
 ];
 
 const governanceItems: NavItem[] = [
-  { label: "Reports", href: "/reports", built: false, icon: "\uD83D\uDCC8" },
-  { label: "Audit log", href: "/audit-log", built: false, icon: "\uD83D\uDCC4" },
+{ label: "Vendor Reports", href: "/reports", built: false, icon: "\uD83D\uDCC8" },
+  { label: "Audit Logs", href: "/audit-log", built: false, icon: "\uD83D\uDCC4" },
   { label: "Administration", href: "/administration", built: false, icon: "\u2699" },
+];
+
+const assistantItems: NavItem[] = [
+  { label: "AI assistant", href: "/vendors-list", built: true, icon: "\uD83D\uDCAC" },
 ];
 
 const styles = {
@@ -171,6 +174,8 @@ export default function Sidebar() {
       <div style={styles.sectionLabel}>Governance</div>
       <NavSection items={governanceItems} pathname={pathname} />
 
+      <div style={{ borderTop: "1px solid #2e3d63", margin: "12px 10px" }} />
+      <NavSection items={assistantItems} pathname={pathname} />
       <div style={styles.footer}>
         <div style={styles.avatar}>RM</div>
         <div>
