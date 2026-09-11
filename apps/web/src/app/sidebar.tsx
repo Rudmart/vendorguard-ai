@@ -32,10 +32,6 @@ const governanceItems: NavItem[] = [
   { label: "Administration", href: "/administration", built: false, icon: "\u2699" },
 ];
 
-const assistantItems: NavItem[] = [
-  { label: "AI assistant", href: "/vendors-list", built: true, icon: "\uD83D\uDCAC" },
-];
-
 const styles = {
   sidebar: {
     width: 240,
