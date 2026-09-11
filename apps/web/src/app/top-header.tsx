@@ -1,30 +1,16 @@
 "use client";
-
-import { useState, useEffect } from "react";
-import { usePathname } from "next/navigation";
-import AssistantPanel from "./assistant-panel";
+import { useState } from "react";
 
 const industries = ["Banking & Financial", "Healthcare", "General"];
 
-export default function TopHeader() {
+export default function TopHeader({
+  chatOpen,
+  onToggleChat,
+}: {
+  chatOpen: boolean;
+  onToggleChat: () => void;
+}) {
   const [activeIndustry, setActiveIndustry] = useState("Banking & Financial");
-  const [chatOpen, setChatOpen] = useState(false);
-  const [vendorName, setVendorName] = useState<string | null>(null);
-  const pathname = usePathname();
-
-  const vendorMatch = pathname.match(/^\/vendors\/([^/]+)/);
-  const vendorId = vendorMatch ? vendorMatch[1] : null;
-
-  useEffect(() => {
-    if (!vendorId) {
-      setVendorName(null);
-      return;
-    }
-    fetch(`${process.env.NEXT_PUBLIC_API_URL}/vendors/${vendorId}`, { credentials: "include" })
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => setVendorName(data?.legalName ?? null))
-      .catch(() => setVendorName(null));
-  }, [vendorId]);
 
   return (
     <div
@@ -123,28 +109,21 @@ export default function TopHeader() {
       </div>
 
       <button
-        onClick={() => setChatOpen(true)}
+        onClick={onToggleChat}
         style={{
-          border: "1px solid #2e3d63",
-          background: "#1a2340",
+          border: chatOpen ? "1px solid #3b82f6" : "1px solid #2e3d63",
+          background: chatOpen ? "rgba(59,130,246,0.14)" : "#1a2340",
           borderRadius: 10,
           width: 34,
           height: 34,
           cursor: "pointer",
-          color: "#8b96ac",
+          color: chatOpen ? "#3b82f6" : "#8b96ac",
           fontSize: 15,
         }}
         aria-label="AI Assistant"
       >
         &#128172;
       </button>
-
-      <AssistantPanel
-        isOpen={chatOpen}
-        onClose={() => setChatOpen(false)}
-        vendorId={vendorId}
-        vendorName={vendorName}
-      />
     </div>
   );
 }
