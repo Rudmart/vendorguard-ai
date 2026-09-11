@@ -52,6 +52,20 @@ enum EvidenceState {
   EXPIRED
 }
 
+enum ControlSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum ImpactType {
+  REGULATORY
+  FINANCIAL
+  SECURITY
+  OPERATIONAL
+}
+
 enum FindingStatus {
   PASS
   PARTIAL
@@ -499,6 +513,8 @@ model Control {
   parentControlId     String?
   expectedEvidenceTypes String[]
   validationGuidance  String
+  severity            ControlSeverity @default(MEDIUM)
+  impactType          ImpactType      @default(OPERATIONAL)
   createdAt           DateTime @default(now())
 
   frameworkVersion FrameworkVersion @relation(fields: [frameworkVersionId], references: [id], onDelete: Cascade)

@@ -59,6 +59,8 @@ async function seedFrameworks() {
           domain: control.domain,
           expectedEvidenceTypes: control.expectedEvidenceTypes ?? [],
           validationGuidance: control.validationGuidance ?? "",
+          severity: control.severity ?? "MEDIUM",
+          impactType: control.impactType ?? "OPERATIONAL",
         },
         create: {
           frameworkVersionId: frameworkVersion.id,
@@ -68,6 +70,8 @@ async function seedFrameworks() {
           domain: control.domain,
           expectedEvidenceTypes: control.expectedEvidenceTypes ?? [],
           validationGuidance: control.validationGuidance ?? "",
+          severity: control.severity ?? "MEDIUM",
+          impactType: control.impactType ?? "OPERATIONAL",
         },
       });
     }
