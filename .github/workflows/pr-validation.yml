@@ -17,6 +17,22 @@ jobs:
   install-and-validate:
     name: Lint, typecheck, test, build
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: vendorguard
+          POSTGRES_PASSWORD: vendorguard
+          POSTGRES_DB: vendorguard_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://vendorguard:vendorguard@localhost:5432/vendorguard_test
     steps:
       - uses: actions/checkout@v4
 
@@ -36,6 +52,10 @@ jobs:
 
       - name: Generate Prisma Client
         run: pnpm --filter @vendorguard/database exec prisma generate
+
+      - name: Push database schema
+        run: pnpm --filter @vendorguard/database exec prisma db push --skip-generate
+
       - name: Lint
         run: pnpm lint
 
