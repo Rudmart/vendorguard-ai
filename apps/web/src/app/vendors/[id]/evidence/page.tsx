@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useParams } from "next/navigation";
 
 type Evidence = {
@@ -7,6 +7,7 @@ type Evidence = {
   displayFilename: string;
   documentType: string;
   state: string;
+  sizeBytes: number;
   expirationDate: string | null;
   createdAt: string;
 };
@@ -16,10 +17,12 @@ export default function EvidenceLibraryPage() {
   const vendorId = params.id as string;
   const [evidence, setEvidence] = useState<Evidence[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filename, setFilename] = useState("");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [docType, setDocType] = useState("");
   const [expiration, setExpiration] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [uploadError, setUploadError] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   async function load() {
     const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/vendors/${vendorId}/evidence`, {
@@ -36,24 +39,48 @@ export default function EvidenceLibraryPage() {
     load();
   }, [vendorId]);
 
-  async function handleAdd() {
-    if (!filename || !docType) return;
+  async function handleUpload() {
+    setUploadError("");
+    if (!selectedFile || !docType) {
+      setUploadError("Please choose a file and enter a document type.");
+      return;
+    }
     setSubmitting(true);
-    await fetch(`${process.env.NEXT_PUBLIC_API_URL}/vendors/${vendorId}/evidence`, {
+
+    const formData = new FormData();
+    formData.append("file", selectedFile);
+    formData.append("documentType", docType);
+    if (expiration) {
+      formData.append("expirationDate", expiration);
+    }
+
+    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/vendors/${vendorId}/evidence/upload`, {
       method: "POST",
       credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        displayFilename: filename,
-        documentType: docType,
-        expirationDate: expiration || null,
-      }),
+      body: formData,
     });
-    setFilename("");
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: "Upload failed" }));
+      setUploadError(err.error || "Upload failed");
+      setSubmitting(false);
+      return;
+    }
+
+    setSelectedFile(null);
     setDocType("");
     setExpiration("");
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
     await load();
     setSubmitting(false);
+  }
+
+  function formatSize(bytes: number): string {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   }
 
   return (
@@ -72,13 +99,19 @@ export default function EvidenceLibraryPage() {
           marginBottom: 24,
         }}
       >
-        <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 12 }}>Add Evidence</div>
+        <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 12 }}>Upload Evidence</div>
+
         <input
-          placeholder="Filename (e.g. SOC2-Report-2026.pdf)"
-          value={filename}
-          onChange={(e) => setFilename(e.target.value)}
-          style={{ width: "100%", background: "#141b2d", border: "1px solid #2e3d63", borderRadius: 8, padding: "8px 12px", color: "#e5e9f0", fontSize: 13, marginBottom: 10 }}
+          ref={fileInputRef}
+          type="file"
+          accept=".pdf,.docx,.xlsx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+          onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
+          style={{ width: "100%", color: "#e5e9f0", fontSize: 13, marginBottom: 10 }}
         />
+        <div style={{ color: "#8b96ac", fontSize: 11, marginBottom: 12 }}>
+          PDF, Word, or Excel &middot; up to 25 MB
+        </div>
+
         <input
           placeholder="Document type (e.g. SOC 2 report)"
           value={docType}
@@ -92,8 +125,13 @@ export default function EvidenceLibraryPage() {
           onChange={(e) => setExpiration(e.target.value)}
           style={{ width: "100%", background: "#141b2d", border: "1px solid #2e3d63", borderRadius: 8, padding: "8px 12px", color: "#e5e9f0", fontSize: 13, marginBottom: 12 }}
         />
+
+        {uploadError && (
+          <div style={{ color: "#f87171", fontSize: 12, marginBottom: 10 }}>{uploadError}</div>
+        )}
+
         <button
-          onClick={handleAdd}
+          onClick={handleUpload}
           disabled={submitting}
           style={{
             background: "#3b82f6",
@@ -107,7 +145,7 @@ export default function EvidenceLibraryPage() {
             opacity: submitting ? 0.6 : 1,
           }}
         >
-          {submitting ? "Adding..." : "Add Evidence"}
+          {submitting ? "Uploading..." : "Upload Evidence"}
         </button>
       </div>
 
@@ -120,7 +158,9 @@ export default function EvidenceLibraryPage() {
           {evidence.map((e) => (
             <div
               key={e.id}
+              onClick={() => window.open(`${process.env.NEXT_PUBLIC_API_URL}/evidence/${e.id}/download`, "_blank")}
               style={{
+                cursor: "pointer",
                 background: "#1a2340",
                 border: "1px solid #2e3d63",
                 borderRadius: 10,
@@ -129,7 +169,7 @@ export default function EvidenceLibraryPage() {
             >
               <div style={{ fontWeight: 600, fontSize: 14 }}>{e.displayFilename}</div>
               <div style={{ color: "#8b96ac", fontSize: 12, marginTop: 4 }}>
-                {e.documentType} &middot; {e.state}
+                {e.documentType} &middot; {e.state} &middot; {formatSize(e.sizeBytes)}
                 {e.expirationDate && ` \u00b7 Expires ${new Date(e.expirationDate).toLocaleDateString()}`}
               </div>
             </div>
