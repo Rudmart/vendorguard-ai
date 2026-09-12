@@ -173,6 +173,15 @@ function buildServerForContext(context: RequestContext) {
             required: ["evidenceDocumentId"],
           },
         },
+        {
+          name: "generate_report",
+          description: "Generate a structured executive risk summary for a vendor - risk scores, findings by status, remediation status, evidence count. Uses only authoritative VendorGuard data, never AI-generated facts.",
+          inputSchema: {
+            type: "object",
+            properties: { vendorId: { type: "string", description: "The vendor's ID" } },
+            required: ["vendorId"],
+          },
+        },
       ],
     };
   });
@@ -341,6 +350,60 @@ function buildServerForContext(context: RequestContext) {
 
         await logToolCall(context, name, "SUCCESS", { evidenceDocumentId });
         return { content: [{ type: "text", text: JSON.stringify(analysis, null, 2) }] };
+      }
+
+      if (name === "generate_report") {
+        const vendorId = String(args?.vendorId ?? "");
+        const vendor = await prisma.vendor.findFirst({
+          where: { id: vendorId, tenantId: context.tenantId },
+        });
+        if (!vendor) {
+          await logToolCall(context, name, "DENIED", { vendorId });
+          return { content: [{ type: "text", text: "Vendor not found." }], isError: true };
+        }
+
+        const assessment = await prisma.assessment.findFirst({
+          where: { vendorId, tenantId: context.tenantId },
+          orderBy: { updatedAt: "desc" },
+        });
+
+        const findings = assessment
+          ? await prisma.controlFinding.findMany({ where: { assessmentId: assessment.id, tenantId: context.tenantId } })
+          : [];
+        const findingsByStatus = findings.reduce<Record<string, number>>((acc, f) => {
+          acc[f.status] = (acc[f.status] ?? 0) + 1;
+          return acc;
+        }, {});
+
+        const remediations = await prisma.remediationAction.findMany({
+          where: { vendorId, tenantId: context.tenantId },
+        });
+        const remediationByStatus = remediations.reduce<Record<string, number>>((acc, r) => {
+          acc[r.status] = (acc[r.status] ?? 0) + 1;
+          return acc;
+        }, {});
+
+        const evidenceCount = await prisma.evidenceDocument.count({
+          where: { vendorId, tenantId: context.tenantId, deletedAt: null },
+        });
+
+        const report = {
+          vendor: { id: vendor.id, legalName: vendor.legalName, criticality: vendor.criticality },
+          risk: assessment
+            ? {
+                inherentScore: assessment.inherentScore,
+                residualScore: assessment.residualScore,
+                riskBand: assessment.riskBand,
+                controlEffectiveness: assessment.controlEffectiveness,
+              }
+            : null,
+          findingsByStatus,
+          remediationByStatus,
+          evidenceCount,
+        };
+
+        await logToolCall(context, name, "SUCCESS", { vendorId });
+        return { content: [{ type: "text", text: JSON.stringify(report, null, 2) }] };
       }
 
       await logToolCall(context, name, "ERROR", { reason: "unknown tool" });
