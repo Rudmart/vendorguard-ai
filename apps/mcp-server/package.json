@@ -10,10 +10,13 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@fastify/cookie": "9",
+    "@fastify/cors": "8",
     "@modelcontextprotocol/sdk": "^1.0.0",
     "@vendorguard/auth": "workspace:^",
     "@vendorguard/database": "workspace:^",
     "@vendorguard/shared": "workspace:^",
+    "dotenv": "^17.4.2",
     "fastify": "4.28.1",
     "zod": "^3.25.0"
   },
