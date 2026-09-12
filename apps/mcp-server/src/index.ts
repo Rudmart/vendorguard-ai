@@ -118,6 +118,24 @@ function buildServerForContext(context: RequestContext) {
             required: ["assessmentId"],
           },
         },
+        {
+          name: "get_findings",
+          description: "Get all findings for a given assessment, scoped to the caller's tenant.",
+          inputSchema: {
+            type: "object",
+            properties: { assessmentId: { type: "string", description: "The assessment's ID" } },
+            required: ["assessmentId"],
+          },
+        },
+        {
+          name: "get_remediation",
+          description: "Get all remediation actions for a given finding, scoped to the caller's tenant.",
+          inputSchema: {
+            type: "object",
+            properties: { findingId: { type: "string", description: "The finding's ID" } },
+            required: ["findingId"],
+          },
+        },
       ],
     };
   });
@@ -183,6 +201,33 @@ function buildServerForContext(context: RequestContext) {
           return { content: [{ type: "text", text: "Assessment not found." }], isError: true };
         }
         return { content: [{ type: "text", text: JSON.stringify(assessment, null, 2) }] };
+      }
+
+      if (name === "get_findings") {
+        const assessmentId = String(args?.assessmentId ?? "");
+        // Confirm the assessment itself belongs to this tenant before
+        // returning any findings under it - never trust assessmentId alone.
+        const assessment = await prisma.assessment.findFirst({
+          where: { id: assessmentId, tenantId: context.tenantId },
+        });
+        if (!assessment) {
+          await logToolCall(context, name, "DENIED", { assessmentId });
+          return { content: [{ type: "text", text: "Assessment not found." }], isError: true };
+        }
+        const findings = await prisma.controlFinding.findMany({
+          where: { assessmentId, tenantId: context.tenantId },
+        });
+        await logToolCall(context, name, "SUCCESS", { assessmentId, count: findings.length });
+        return { content: [{ type: "text", text: JSON.stringify(findings, null, 2) }] };
+      }
+
+      if (name === "get_remediation") {
+        const findingId = String(args?.findingId ?? "");
+        const remediations = await prisma.remediationAction.findMany({
+          where: { findingId, tenantId: context.tenantId },
+        });
+        await logToolCall(context, name, "SUCCESS", { findingId, count: remediations.length });
+        return { content: [{ type: "text", text: JSON.stringify(remediations, null, 2) }] };
       }
 
       await logToolCall(context, name, "ERROR", { reason: "unknown tool" });
