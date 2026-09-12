@@ -1,7 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { prisma } from "@vendorguard/database";
-
-const COOKIE_NAME = "vg_session";
+import { COOKIE_NAME, getSessionFromCookie } from "@vendorguard/auth";
 
 export async function registerAuthRoutes(server: FastifyInstance) {
   server.post("/auth/login", async (request, reply) => {
@@ -79,20 +78,4 @@ export async function registerAuthRoutes(server: FastifyInstance) {
   });
 }
 
-export function getSessionFromCookie(cookieValue: string | undefined) {
-  if (!cookieValue) return null;
-  try {
-    return JSON.parse(cookieValue) as {
-      userId: string;
-      tenantId: string;
-      email: string;
-      displayName: string;
-      role: string;
-    };
-  } catch {
-    return null;
-  }
-}
-
-export { COOKIE_NAME };
 
