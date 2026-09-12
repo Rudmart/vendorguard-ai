@@ -12,7 +12,18 @@ import {
 import { prisma } from "@vendorguard/database";
 import { getSessionFromCookie, COOKIE_NAME, requestContextSchema, type RequestContext } from "@vendorguard/auth";
 import { listFrameworks, listControls, getControl, searchControls } from "./frameworks-data.js";
-import { analyzeEvidence } from "@vendorguard/ai-client";
+import { analyzeEvidence, detectPromptInjection } from "@vendorguard/ai-client";
+
+// Explicit tool allowlist (spec §16). Even though the handler below only
+// recognizes these exact names anyway, this makes the allowlist a named,
+// checkable thing rather than an implicit side effect of an if-chain -
+// any tool call outside this set is denied and audited before any other
+// logic runs.
+const ALLOWED_TOOLS = new Set([
+  "get_vendor", "get_framework", "search_controls", "get_risk", "get_assessment",
+  "get_findings", "get_remediation", "get_control", "map_controls",
+  "get_evidence", "evaluate_evidence", "generate_report",
+]);
 
 const server = Fastify({ logger: true });
 
@@ -189,6 +200,11 @@ function buildServerForContext(context: RequestContext) {
   mcp.setRequestHandler(CallToolRequestSchema, async (request) => {
     const { name, arguments: args } = request.params;
 
+    if (!ALLOWED_TOOLS.has(name)) {
+      await logToolCall(context, name, "DENIED", { reason: "tool not in allowlist" });
+      return { content: [{ type: "text", text: "This tool is not permitted." }], isError: true };
+    }
+
     try {
       if (name === "get_vendor") {
         const vendorId = String(args?.vendorId ?? "");
@@ -337,6 +353,13 @@ function buildServerForContext(context: RequestContext) {
             ? document.chunks.map((c) => c.text).join("\n\n")
             : `[No extracted text available for ${document.displayFilename}.]`;
 
+        // Evidence text is untrusted content - it came from an uploaded
+        // document, not a trusted instruction source. Flag it before it
+        // ever reaches the model, same detection used for the AI
+        // Assistant (M10), so an attempt to plant instructions inside a
+        // document is surfaced rather than silently followed.
+        const promptInjectionFlagged = detectPromptInjection(evidenceText);
+
         const analysis = await analyzeEvidence({
           documentType: document.documentType,
           evidenceText,
@@ -348,8 +371,10 @@ function buildServerForContext(context: RequestContext) {
           })),
         });
 
-        await logToolCall(context, name, "SUCCESS", { evidenceDocumentId });
-        return { content: [{ type: "text", text: JSON.stringify(analysis, null, 2) }] };
+        await logToolCall(context, name, "SUCCESS", { evidenceDocumentId, promptInjectionFlagged });
+        return {
+          content: [{ type: "text", text: JSON.stringify({ ...analysis, promptInjectionFlagged }, null, 2) }],
+        };
       }
 
       if (name === "generate_report") {
