@@ -12,6 +12,7 @@ import {
 import { prisma } from "@vendorguard/database";
 import { getSessionFromCookie, COOKIE_NAME, requestContextSchema, type RequestContext } from "@vendorguard/auth";
 import { listFrameworks, listControls, getControl, searchControls } from "./frameworks-data.js";
+import { analyzeEvidence } from "@vendorguard/ai-client";
 
 const server = Fastify({ logger: true });
 
@@ -154,6 +155,24 @@ function buildServerForContext(context: RequestContext) {
             required: ["controlId"],
           },
         },
+        {
+          name: "get_evidence",
+          description: "List evidence documents for a vendor, scoped to the caller's tenant.",
+          inputSchema: {
+            type: "object",
+            properties: { vendorId: { type: "string", description: "The vendor's ID" } },
+            required: ["vendorId"],
+          },
+        },
+        {
+          name: "evaluate_evidence",
+          description: "Run AI analysis on one evidence document against candidate controls. This is analysis only - it never marks a control compliant or closes a finding; human review is always required.",
+          inputSchema: {
+            type: "object",
+            properties: { evidenceDocumentId: { type: "string", description: "The evidence document's ID" } },
+            required: ["evidenceDocumentId"],
+          },
+        },
       ],
     };
   });
@@ -269,6 +288,59 @@ function buildServerForContext(context: RequestContext) {
         });
         await logToolCall(context, name, "SUCCESS", { controlId, count: mappings.length });
         return { content: [{ type: "text", text: JSON.stringify(mappings, null, 2) }] };
+      }
+
+      if (name === "get_evidence") {
+        const vendorId = String(args?.vendorId ?? "");
+        const documents = await prisma.evidenceDocument.findMany({
+          where: { vendorId, tenantId: context.tenantId, deletedAt: null },
+          select: {
+            id: true,
+            displayFilename: true,
+            mimeType: true,
+            sizeBytes: true,
+            documentType: true,
+            state: true,
+            expirationDate: true,
+            version: true,
+          },
+        });
+        await logToolCall(context, name, "SUCCESS", { vendorId, count: documents.length });
+        return { content: [{ type: "text", text: JSON.stringify(documents, null, 2) }] };
+      }
+
+      if (name === "evaluate_evidence") {
+        const evidenceDocumentId = String(args?.evidenceDocumentId ?? "");
+        const document = await prisma.evidenceDocument.findFirst({
+          where: { id: evidenceDocumentId, tenantId: context.tenantId },
+          include: { chunks: { orderBy: { chunkIndex: "asc" } } },
+        });
+        if (!document) {
+          await logToolCall(context, name, "DENIED", { evidenceDocumentId });
+          return { content: [{ type: "text", text: "Evidence document not found." }], isError: true };
+        }
+
+        const candidateControls = await prisma.control.findMany({
+          where: { expectedEvidenceTypes: { has: document.documentType } },
+        });
+        const evidenceText =
+          document.chunks.length > 0
+            ? document.chunks.map((c) => c.text).join("\n\n")
+            : `[No extracted text available for ${document.displayFilename}.]`;
+
+        const analysis = await analyzeEvidence({
+          documentType: document.documentType,
+          evidenceText,
+          candidateControls: candidateControls.map((c) => ({
+            id: c.id,
+            controlId: c.controlId,
+            title: c.title,
+            summary: c.summary,
+          })),
+        });
+
+        await logToolCall(context, name, "SUCCESS", { evidenceDocumentId });
+        return { content: [{ type: "text", text: JSON.stringify(analysis, null, 2) }] };
       }
 
       await logToolCall(context, name, "ERROR", { reason: "unknown tool" });

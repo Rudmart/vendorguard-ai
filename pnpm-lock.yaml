@@ -108,6 +108,9 @@ importers:
       '@modelcontextprotocol/sdk':
         specifier: ^1.0.0
         version: 1.30.0(zod@3.25.76)
+      '@vendorguard/ai-client':
+        specifier: workspace:^
+        version: link:../../packages/ai-client
       '@vendorguard/auth':
         specifier: workspace:^
         version: link:../../packages/auth

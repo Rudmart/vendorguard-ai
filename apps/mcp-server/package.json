@@ -13,6 +13,7 @@
     "@fastify/cookie": "9",
     "@fastify/cors": "8",
     "@modelcontextprotocol/sdk": "^1.0.0",
+    "@vendorguard/ai-client": "workspace:^",
     "@vendorguard/auth": "workspace:^",
     "@vendorguard/database": "workspace:^",
     "@vendorguard/shared": "workspace:^",
