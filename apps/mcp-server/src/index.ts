@@ -136,6 +136,24 @@ function buildServerForContext(context: RequestContext) {
             required: ["findingId"],
           },
         },
+        {
+          name: "get_control",
+          description: "Get full details on one control from the real control library.",
+          inputSchema: {
+            type: "object",
+            properties: { controlId: { type: "string", description: "The control's database ID" } },
+            required: ["controlId"],
+          },
+        },
+        {
+          name: "map_controls",
+          description: "Get all cross-framework mappings for a given control (which other controls it satisfies or relates to).",
+          inputSchema: {
+            type: "object",
+            properties: { controlId: { type: "string", description: "The control's database ID" } },
+            required: ["controlId"],
+          },
+        },
       ],
     };
   });
@@ -228,6 +246,29 @@ function buildServerForContext(context: RequestContext) {
         });
         await logToolCall(context, name, "SUCCESS", { findingId, count: remediations.length });
         return { content: [{ type: "text", text: JSON.stringify(remediations, null, 2) }] };
+      }
+
+      if (name === "get_control") {
+        // Controls are global reference data (frameworks apply to every
+        // tenant identically), so no tenant scoping is needed here - same
+        // as get_framework and search_controls.
+        const controlId = String(args?.controlId ?? "");
+        const control = await prisma.control.findUnique({ where: { id: controlId } });
+        await logToolCall(context, name, control ? "SUCCESS" : "DENIED", { controlId });
+        if (!control) {
+          return { content: [{ type: "text", text: "Control not found." }], isError: true };
+        }
+        return { content: [{ type: "text", text: JSON.stringify(control, null, 2) }] };
+      }
+
+      if (name === "map_controls") {
+        const controlId = String(args?.controlId ?? "");
+        const mappings = await prisma.controlMapping.findMany({
+          where: { OR: [{ fromControlId: controlId }, { toControlId: controlId }] },
+          include: { fromControl: true, toControl: true },
+        });
+        await logToolCall(context, name, "SUCCESS", { controlId, count: mappings.length });
+        return { content: [{ type: "text", text: JSON.stringify(mappings, null, 2) }] };
       }
 
       await logToolCall(context, name, "ERROR", { reason: "unknown tool" });
