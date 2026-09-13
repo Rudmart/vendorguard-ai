@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { prisma } from "@vendorguard/database";
-import { COOKIE_NAME, getSessionFromCookie } from "@vendorguard/auth";
+import { COOKIE_NAME } from "@vendorguard/auth";
 
 export async function registerAuthRoutes(server: FastifyInstance) {
   server.post("/auth/login", async (request, reply) => {
