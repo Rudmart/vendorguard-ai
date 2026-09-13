@@ -78,7 +78,7 @@ const INJECTION_PHRASES = [
   "reveal your instructions",
 ];
 
-function detectPromptInjection(text: string): boolean {
+export function detectPromptInjection(text: string): boolean {
   const lower = text.toLowerCase();
   return INJECTION_PHRASES.some((phrase) => lower.includes(phrase));
 }

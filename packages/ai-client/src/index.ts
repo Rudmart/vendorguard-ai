@@ -11,5 +11,6 @@ export {
   type AssistantResult,
   type AskAssistantInput,
   type AssistantMessageInput,
+  detectPromptInjection,
   type VendorGuardContext,
 } from "./assistant.js";
