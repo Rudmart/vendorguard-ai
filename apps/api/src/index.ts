@@ -223,6 +223,46 @@ server.post("/assessments/:id/evidence/:evidenceDocumentId/analyze", async (requ
     return reply.status(400).send({ error: message });
   }
 });
+server.get("/reviews/findings", async (request, reply) => {
+  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  if (!session) {
+    return reply.status(401).send({ error: "Not logged in" });
+  }
+
+  try {
+    const context = requestContextSchema.parse({
+      userId: session.userId,
+      tenantId: session.tenantId,
+      role: session.role,
+      correlationId: randomUUID(),
+    });
+    requireFindingReviewAuthority(context);
+  } catch (err) {
+    if (err instanceof AuthorizationError) {
+      return reply.status(403).send({ error: err.message });
+    }
+    return reply.status(400).send({ error: "Invalid session context" });
+  }
+
+  const findings = await prisma.controlFinding.findMany({
+    where: { tenantId: session.tenantId, requiresHumanReview: true },
+    select: {
+      id: true,
+      status: true,
+      confidence: true,
+      gaps: true,
+      recommendations: true,
+      createdAt: true,
+      vendor: { select: { id: true, legalName: true } },
+      assessment: { select: { id: true } },
+      control: { select: { id: true, controlId: true, title: true } },
+    },
+    orderBy: { createdAt: "asc" },
+  });
+
+  return reply.status(200).send({ findings });
+});
+
 server.post("/assessments/:id/findings/:findingId/review", async (request, reply) => {
   const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
   if (!session) {
