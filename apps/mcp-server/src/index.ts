@@ -11,7 +11,6 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import { prisma } from "@vendorguard/database";
 import { getSessionFromCookie, COOKIE_NAME, requestContextSchema, type RequestContext } from "@vendorguard/auth";
-import { listFrameworks, listControls, getControl, searchControls } from "./frameworks-data.js";
 import { analyzeEvidence, detectPromptInjection } from "@vendorguard/ai-client";
 
 // Explicit tool allowlist (spec §16). Even though the handler below only
@@ -180,14 +179,45 @@ function buildServerForContext(context: RequestContext) {
       }
 
       if (name === "get_framework") {
-        await logToolCall(context, name, "SUCCESS");
-        return { content: [{ type: "text", text: JSON.stringify(listFrameworks(), null, 2) }] };
+        // Frameworks are either global (tenantId null, seeded for every
+        // tenant) or tenant-specific - never another tenant's.
+        const frameworks = await prisma.framework.findMany({
+          where: { OR: [{ tenantId: null }, { tenantId: context.tenantId }] },
+          include: { versions: { where: { isCurrent: true } } },
+        });
+        const withCounts = await Promise.all(
+          frameworks.map(async (f) => {
+            const currentVersion = f.versions[0];
+            const controlCount = currentVersion
+              ? await prisma.control.count({ where: { frameworkVersionId: currentVersion.id } })
+              : 0;
+            return {
+              id: f.id,
+              catalogId: f.catalogId,
+              name: f.name,
+              scope: f.scope,
+              currentVersion: currentVersion?.version ?? null,
+              controlCount,
+            };
+          }),
+        );
+        await logToolCall(context, name, "SUCCESS", { count: withCounts.length });
+        return { content: [{ type: "text", text: JSON.stringify(withCounts, null, 2) }] };
       }
 
       if (name === "search_controls") {
         const query = String(args?.query ?? "");
-        await logToolCall(context, name, "SUCCESS", { query });
-        return { content: [{ type: "text", text: JSON.stringify(searchControls(query), null, 2) }] };
+        const controls = await prisma.control.findMany({
+          where: {
+            OR: [
+              { title: { contains: query, mode: "insensitive" } },
+              { summary: { contains: query, mode: "insensitive" } },
+            ],
+          },
+          take: 25,
+        });
+        await logToolCall(context, name, "SUCCESS", { query, count: controls.length });
+        return { content: [{ type: "text", text: JSON.stringify(controls, null, 2) }] };
       }
 
       if (name === "get_risk") {
