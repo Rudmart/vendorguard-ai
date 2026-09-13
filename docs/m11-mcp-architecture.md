@@ -33,3 +33,7 @@ Six passing automated tests prove the authentication boundary rejects requests w
 ## 7. Known security risks and how they are addressed
 
 Cross tenant data leakage is addressed by scoping every query to the tenant id from the verified server side context. A forged or stale session cookie is addressed by always re-reading the current role from the database on every request. Prompt injection through uploaded evidence is addressed by treating evidence text as untrusted content and screening it before it reaches the AI model. A known limitation not yet addressed is full schema validation on tool inputs, which the original specification calls for. Tools currently use plain JSON schemas with manual casting, matching the pattern already used by the pre-existing tools. This is a real, tracked gap, not something glossed over.
+
+## 8. Deferred dependency risk
+
+The mcp-server depends on Fastify 4.28.1, which has 4 known security advisories including one high severity Content-Type validation bypass. The fix requires upgrading to Fastify 5, a major version change affecting apps/api as well, not a safe patch-version bump. This is deliberately deferred to the master plan Phase 4 dependency vulnerability scan rather than fixed here, and an explicit, documented exception is configured in the dependency review workflow in the meantime.
