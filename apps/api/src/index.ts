@@ -1,4 +1,5 @@
 import "dotenv/config";
+import { randomUUID } from "node:crypto";
 import Fastify from "fastify";
 import cors from "@fastify/cors";
 import { prisma } from "@vendorguard/database";
@@ -15,7 +16,7 @@ import { renderExecutiveReportPdf } from "./executiveReportPdf.js";
 import { askAssistant } from "@vendorguard/ai-client";
 import { buildAssistantContext } from "./assistantContext.js";
 import { registerAuthRoutes } from "./auth-routes.js";
-import { getSessionFromCookie, COOKIE_NAME } from "@vendorguard/auth";
+import { getSessionFromCookie, COOKIE_NAME, requireFindingReviewAuthority, AuthorizationError, requestContextSchema } from "@vendorguard/auth";
 import { readdirSync, readFileSync } from "fs";
 import { join, dirname, resolve, sep } from "path";
 import { fileURLToPath } from "url";
@@ -226,6 +227,22 @@ server.post("/assessments/:id/findings/:findingId/review", async (request, reply
   const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
   if (!session) {
     return reply.status(401).send({ error: "Not logged in" });
+  }
+
+  // RBAC: viewing a finding must never imply authority to review it.
+  try {
+    const context = requestContextSchema.parse({
+      userId: session.userId,
+      tenantId: session.tenantId,
+      role: session.role,
+      correlationId: randomUUID(),
+    });
+    requireFindingReviewAuthority(context);
+  } catch (err) {
+    if (err instanceof AuthorizationError) {
+      return reply.status(403).send({ error: err.message });
+    }
+    return reply.status(400).send({ error: "Invalid session context" });
   }
   const { id: assessmentId, findingId } = request.params as { id: string; findingId: string };
   const body = request.body as {
