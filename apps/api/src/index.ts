@@ -24,7 +24,7 @@ import { fileURLToPath } from "url";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const FRAMEWORKS_DIR = join(__dirname, "..", "..", "..", "frameworks");
 
-const server = Fastify({ logger: true });
+export const server = Fastify({ logger: true });
 
 server.register(cors, {
   origin: process.env.WEB_ORIGIN || "http://localhost:3000",
@@ -1598,7 +1598,9 @@ const start = async () => {
   }
 };
 
-start();
+if (process.env.NODE_ENV !== "test") {
+  start();
+}
 
 
 
