@@ -27,6 +27,7 @@ const assessmentItems: NavItem[] = [
 ];
 
 const governanceItems: NavItem[] = [
+  { label: "Pending Reviews", href: "/governance/reviews", built: true, icon: "\u2611" },
 { label: "Vendor Reports", href: "/reports", built: false, icon: "\uD83D\uDCC8" },
   { label: "Audit Logs", href: "/audit-log", built: false, icon: "\uD83D\uDCC4" },
   { label: "Administration", href: "/administration", built: false, icon: "\u2699" },

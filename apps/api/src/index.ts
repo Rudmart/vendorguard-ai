@@ -1,4 +1,5 @@
 import "dotenv/config";
+import { randomUUID } from "node:crypto";
 import Fastify from "fastify";
 import cors from "@fastify/cors";
 import { prisma } from "@vendorguard/database";
@@ -15,7 +16,7 @@ import { renderExecutiveReportPdf } from "./executiveReportPdf.js";
 import { askAssistant } from "@vendorguard/ai-client";
 import { buildAssistantContext } from "./assistantContext.js";
 import { registerAuthRoutes } from "./auth-routes.js";
-import { getSessionFromCookie, COOKIE_NAME } from "@vendorguard/auth";
+import { getSessionFromCookie, COOKIE_NAME, requireFindingReviewAuthority, requireRiskAcceptanceAuthority, AuthorizationError, requestContextSchema } from "@vendorguard/auth";
 import { readdirSync, readFileSync } from "fs";
 import { join, dirname, resolve, sep } from "path";
 import { fileURLToPath } from "url";
@@ -23,7 +24,7 @@ import { fileURLToPath } from "url";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const FRAMEWORKS_DIR = join(__dirname, "..", "..", "..", "frameworks");
 
-const server = Fastify({ logger: true });
+export const server = Fastify({ logger: true });
 
 server.register(cors, {
   origin: process.env.WEB_ORIGIN || "http://localhost:3000",
@@ -222,10 +223,66 @@ server.post("/assessments/:id/evidence/:evidenceDocumentId/analyze", async (requ
     return reply.status(400).send({ error: message });
   }
 });
+server.get("/reviews/findings", async (request, reply) => {
+  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  if (!session) {
+    return reply.status(401).send({ error: "Not logged in" });
+  }
+
+  try {
+    const context = requestContextSchema.parse({
+      userId: session.userId,
+      tenantId: session.tenantId,
+      role: session.role,
+      correlationId: randomUUID(),
+    });
+    requireFindingReviewAuthority(context);
+  } catch (err) {
+    if (err instanceof AuthorizationError) {
+      return reply.status(403).send({ error: err.message });
+    }
+    return reply.status(400).send({ error: "Invalid session context" });
+  }
+
+  const findings = await prisma.controlFinding.findMany({
+    where: { tenantId: session.tenantId, requiresHumanReview: true },
+    select: {
+      id: true,
+      status: true,
+      confidence: true,
+      gaps: true,
+      recommendations: true,
+      createdAt: true,
+      vendor: { select: { id: true, legalName: true } },
+      assessment: { select: { id: true } },
+      control: { select: { id: true, controlId: true, title: true } },
+    },
+    orderBy: { createdAt: "asc" },
+  });
+
+  return reply.status(200).send({ findings });
+});
+
 server.post("/assessments/:id/findings/:findingId/review", async (request, reply) => {
   const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
   if (!session) {
     return reply.status(401).send({ error: "Not logged in" });
+  }
+
+  // RBAC: viewing a finding must never imply authority to review it.
+  try {
+    const context = requestContextSchema.parse({
+      userId: session.userId,
+      tenantId: session.tenantId,
+      role: session.role,
+      correlationId: randomUUID(),
+    });
+    requireFindingReviewAuthority(context);
+  } catch (err) {
+    if (err instanceof AuthorizationError) {
+      return reply.status(403).send({ error: err.message });
+    }
+    return reply.status(400).send({ error: "Invalid session context" });
   }
   const { id: assessmentId, findingId } = request.params as { id: string; findingId: string };
   const body = request.body as {
@@ -273,6 +330,73 @@ server.post("/assessments/:id/findings/:findingId/review", async (request, reply
   });
   return reply.status(200).send({ reviewDecision, finding: updatedFinding });
 });
+server.post("/vendors/:id/risk-acceptance", async (request, reply) => {
+  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  if (!session) {
+    return reply.status(401).send({ error: "Not logged in" });
+  }
+
+  // Accepting business risk is a higher bar than accepting a finding -
+  // only ADMIN and REVIEWER roles, enforced server-side.
+  try {
+    const context = requestContextSchema.parse({
+      userId: session.userId,
+      tenantId: session.tenantId,
+      role: session.role,
+      correlationId: randomUUID(),
+    });
+    requireRiskAcceptanceAuthority(context);
+  } catch (err) {
+    if (err instanceof AuthorizationError) {
+      return reply.status(403).send({ error: err.message });
+    }
+    return reply.status(400).send({ error: "Invalid session context" });
+  }
+
+  const { id: vendorId } = request.params as { id: string };
+  const body = request.body as {
+    justification?: string;
+    assessmentId?: string;
+    expiresAt?: string;
+  };
+  if (!body.justification || !body.justification.trim()) {
+    return reply.status(400).send({ error: "justification is required" });
+  }
+
+  const vendor = await prisma.vendor.findFirst({
+    where: { id: vendorId, tenantId: session.tenantId },
+  });
+  if (!vendor) {
+    return reply.status(404).send({ error: "Vendor not found" });
+  }
+
+  const riskAcceptance = await prisma.riskAcceptance.create({
+    data: {
+      tenantId: session.tenantId,
+      vendorId: vendor.id,
+      assessmentId: body.assessmentId,
+      approvedByUserId: session.userId,
+      justification: body.justification,
+      expiresAt: body.expiresAt ? new Date(body.expiresAt) : undefined,
+    },
+  });
+
+  return reply.status(200).send({ riskAcceptance });
+});
+
+server.get("/vendors/:id/risk-acceptance", async (request, reply) => {
+  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  if (!session) {
+    return reply.status(401).send({ error: "Not logged in" });
+  }
+  const { id: vendorId } = request.params as { id: string };
+  const riskAcceptances = await prisma.riskAcceptance.findMany({
+    where: { vendorId, tenantId: session.tenantId },
+    orderBy: { createdAt: "desc" },
+  });
+  return reply.status(200).send({ riskAcceptances });
+});
+
 server.get("/evidence/:evidenceDocumentId", async (request, reply) => {
   const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
   if (!session) {
@@ -1474,7 +1598,9 @@ const start = async () => {
   }
 };
 
-start();
+if (process.env.NODE_ENV !== "test") {
+  start();
+}
 
 
 
