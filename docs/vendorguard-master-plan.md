@@ -42,7 +42,7 @@ Before touching anything new, confirm the full 12-milestone core is genuinely so
 
 ### Phase A - Production Security Blockers (P0)
 1. Fix production dev-login guard
-2. Revalidate tenant isolation across every resource type
+2. Revalidate tenant isolation across every resource type - DONE. Audited all 41 API routes; found 9 real cross-tenant vulnerabilities (GET /assessments, GET /assessments/:id, GET /assessments/:id/framework-mapping, GET /questionnaires/:id, PATCH /remediations/:id, GET /ai-inventory, GET /vendors, GET /vendors/:id, GET /vendors/:id/risk-score - the last two had no auth check at all). Fixed by wiring in packages/auth's existing but previously-unused assertOwnedByTenant guard (findUnique routes) and adding tenantId to Prisma where clauses (findMany routes). Widened assertOwnedByTenant's context param type from full RequestContext to { tenantId: string } so it accepts the actual dev-mode SessionCookie shape - no behavior change, all 25 auth package tests plus full app test suite still pass. Branch: polish/tenant-isolation-audit.
 3. Revalidate RBAC against an explicit permission matrix
 4. Test M12 approval-bypass scenarios
 5. Test MCP authorization regression

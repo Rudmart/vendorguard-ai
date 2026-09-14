@@ -112,7 +112,7 @@ export async function resolveRequestContext(
  */
 export function assertOwnedByTenant(
   record: { tenantId: string } | null | undefined,
-  context: RequestContext,
+  context: { tenantId: string },
   resourceLabel = "resource",
 ): asserts record is { tenantId: string } {
   if (!record) {

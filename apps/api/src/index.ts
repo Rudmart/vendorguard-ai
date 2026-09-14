@@ -16,7 +16,7 @@ import { renderExecutiveReportPdf } from "./executiveReportPdf.js";
 import { askAssistant } from "@vendorguard/ai-client";
 import { buildAssistantContext } from "./assistantContext.js";
 import { registerAuthRoutes } from "./auth-routes.js";
-import { getSessionFromCookie, COOKIE_NAME, requireFindingReviewAuthority, requireRiskAcceptanceAuthority, AuthorizationError, requestContextSchema } from "@vendorguard/auth";
+import { getSessionFromCookie, COOKIE_NAME, requireFindingReviewAuthority, requireRiskAcceptanceAuthority, AuthorizationError, requestContextSchema, assertOwnedByTenant, TenantContextError } from "@vendorguard/auth";
 import { readdirSync, readFileSync } from "fs";
 import { join, dirname, resolve, sep } from "path";
 import { fileURLToPath } from "url";
@@ -465,6 +465,7 @@ server.get("/assessments", async (request, reply) => {
   }
 
   const assessments = await prisma.assessment.findMany({
+    where: { tenantId: session.tenantId },
     include: { vendor: true },
     orderBy: { createdAt: "desc" },
   });
@@ -525,6 +526,11 @@ server.get("/assessments/:id", async (request, reply) => {
     },
   });
   if (!assessment) {
+    return reply.status(404).send({ error: "Assessment not found" });
+  }
+  try {
+    assertOwnedByTenant(assessment, session, "Assessment");
+  } catch {
     return reply.status(404).send({ error: "Assessment not found" });
   }
 
@@ -673,6 +679,11 @@ server.get("/assessments/:id/framework-mapping", async (request, reply) => {
     },
   });
   if (!assessment) {
+    return reply.status(404).send({ error: "Assessment not found" });
+  }
+  try {
+    assertOwnedByTenant(assessment, session, "Assessment");
+  } catch {
     return reply.status(404).send({ error: "Assessment not found" });
   }
 
@@ -902,6 +913,11 @@ server.get("/questionnaires/:id", async (request, reply) => {
     include: { responses: true },
   });
   if (!questionnaire) {
+    return reply.status(404).send({ error: "Questionnaire not found" });
+  }
+  try {
+    assertOwnedByTenant(questionnaire, session, "Questionnaire");
+  } catch {
     return reply.status(404).send({ error: "Questionnaire not found" });
   }
   return { questionnaire, questions: QUESTIONNAIRE_QUESTIONS };
@@ -1285,7 +1301,7 @@ server.get("/vendors/:id/evidence", async (request, reply) => {
   const { id: vendorId } = request.params as { id: string };
 
   const evidence = await prisma.evidenceDocument.findMany({
-    where: { vendorId, deletedAt: null },
+    where: { vendorId, deletedAt: null, tenantId: session.tenantId },
     orderBy: { createdAt: "desc" },
   });
 
@@ -1347,7 +1363,7 @@ server.get("/vendors/:id/remediations", async (request, reply) => {
   const { id: vendorId } = request.params as { id: string };
 
   const remediations = await prisma.remediationAction.findMany({
-    where: { vendorId },
+    where: { vendorId, tenantId: session.tenantId },
     orderBy: { createdAt: "desc" },
   });
 
@@ -1371,6 +1387,11 @@ server.patch("/remediations/:id", async (request, reply) => {
   if (!existing) {
     return reply.status(404).send({ error: "Remediation not found" });
   }
+  try {
+    assertOwnedByTenant(existing, session, "Remediation");
+  } catch {
+    return reply.status(404).send({ error: "Remediation not found" });
+  }
 
   const updated = await prisma.remediationAction.update({
     where: { id },
@@ -1391,7 +1412,7 @@ server.get("/ai-inventory", async (request, reply) => {
   }
 
   const allVendors = await prisma.vendor.findMany({
-    where: { deletedAt: null },
+    where: { deletedAt: null, tenantId: session.tenantId },
     select: { id: true, legalName: true, serviceCategory: true, aiFunctionality: true },
   });
 
@@ -1410,16 +1431,25 @@ server.get("/vendors", async (request, reply) => {
     return reply.status(401).send({ error: "Not logged in" });
   }
   const vendors = await prisma.vendor.findMany({
-    where: { deletedAt: null },
+    where: { deletedAt: null, tenantId: session.tenantId },
     orderBy: { createdAt: "desc" },
   });
   return { vendors };
 });
 
 server.get("/vendors/:id", async (request, reply) => {
+  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  if (!session) {
+    return reply.status(401).send({ error: "Not logged in" });
+  }
   const { id } = request.params as { id: string };
   const vendor = await prisma.vendor.findUnique({ where: { id } });
   if (!vendor) {
+    return reply.status(404).send({ error: "Vendor not found" });
+  }
+  try {
+    assertOwnedByTenant(vendor, session, "Vendor");
+  } catch {
     return reply.status(404).send({ error: "Vendor not found" });
   }
   return vendor;
@@ -1486,10 +1516,19 @@ server.post("/vendors", async (request, reply) => {
 });
 
 server.get("/vendors/:id/risk-score", async (request, reply) => {
+  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  if (!session) {
+    return reply.status(401).send({ error: "Not logged in" });
+  }
   const { id } = request.params as { id: string };
   const vendor = await prisma.vendor.findUnique({ where: { id } });
 
   if (!vendor) {
+    return reply.status(404).send({ error: "Vendor not found" });
+  }
+  try {
+    assertOwnedByTenant(vendor, session, "Vendor");
+  } catch {
     return reply.status(404).send({ error: "Vendor not found" });
   }
 
