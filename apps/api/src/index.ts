@@ -16,7 +16,7 @@ import { renderExecutiveReportPdf } from "./executiveReportPdf.js";
 import { askAssistant } from "@vendorguard/ai-client";
 import { buildAssistantContext } from "./assistantContext.js";
 import { registerAuthRoutes } from "./auth-routes.js";
-import { getSessionFromCookie, COOKIE_NAME, requireFindingReviewAuthority, requireRiskAcceptanceAuthority, AuthorizationError, requestContextSchema, assertOwnedByTenant, TenantContextError } from "@vendorguard/auth";
+import { getSessionFromCookie, COOKIE_NAME, requireFindingReviewAuthority, requireRiskAcceptanceAuthority, AuthorizationError, requestContextSchema, assertOwnedByTenant } from "@vendorguard/auth";
 import { readdirSync, readFileSync } from "fs";
 import { join, dirname, resolve, sep } from "path";
 import { fileURLToPath } from "url";
