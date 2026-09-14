@@ -48,6 +48,20 @@ Before touching anything new, confirm the full 12-milestone core is genuinely so
 5. Test MCP authorization regression
 6. Fix AI citation relevance
 
+## PHASE A.5 - GRC Workflow Guide (NEW)
+
+A teaching/learning sidebar page for users new to GRC, placed near the top of the sidebar (right under Executive Dashboard), not grouped with the P1 workflow items below.
+
+Purpose: help users understand that GRC is a connected process, not a set of separate screens.
+
+Content: a short intro paragraph, a compact progress-strip visual of the 9-step sequence at the top, then a vertical walkthrough of 9 numbered steps (Dashboard, Vendors, Assessments, Risk, Controls, Evidence, Findings, Remediation, Reports), each with a short plain-English explanation and a button linking to the real existing page that handles that part of the lifecycle. Risk and Findings both link into Assessment Workspace; Controls links to Framework Explorer.
+
+Explicitly out of scope for v1: no fake completion tracking, no new backend endpoints - every button routes to a page that already exists.
+
+Placement rationale: this is a UX/education addition, sits alongside Phase A/B polish work rather than blocking it, and does not affect the P0 security blockers ahead of it.
+
+---
+
 ### Phase B - Workflow and UX (P1)
 7. Reorder sidebar (AI Assistant to its own standalone spot at the end)
 8. Implement real global search or remove placeholder
