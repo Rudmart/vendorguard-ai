@@ -3,6 +3,13 @@ import { prisma } from "@vendorguard/database";
 import { COOKIE_NAME } from "@vendorguard/auth";
 
 export async function registerAuthRoutes(server: FastifyInstance) {
+  // Fail closed: this passwordless dev-only login must never be reachable
+  // in production. Failing at startup (not just per-request) guarantees the
+  // app cannot silently run in an unsafe state.
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("Refusing to start: passwordless dev login is registered but NODE_ENV is production. Remove registerAuthRoutes from the production build or gate it behind a real authentication provider.");
+  }
+
   server.post("/auth/login", async (request, reply) => {
     const body = request.body as { displayName?: string; email?: string };
 
