@@ -3,7 +3,7 @@ import type { RequestContext } from "./tenant-context.js";
 
 /**
  * Server-side authorization guard. A hidden button in the UI is NOT
- * authorization (spec §6) - every mutating or sensitive-read service
+ * authorization (spec Â§6) - every mutating or sensitive-read service
  * function must call one of these guards using the RequestContext
  * resolved by tenant-context.ts, never trust a role passed in a request
  * body.
@@ -20,7 +20,7 @@ export class AuthorizationError extends Error {
 }
 
 /** Throws AuthorizationError if the context's role lacks the given permission. */
-export function requirePermission(context: RequestContext, permission: string): void {
+export function requirePermission(context: { tenantId: string; role: Role }, permission: string): void {
   if (!roleHasPermission(context.role, permission)) {
     throw new AuthorizationError(
       `Role ${context.role} does not have permission '${permission}'`,
@@ -39,10 +39,10 @@ export function requireRole(context: RequestContext, allowedRoles: readonly Role
 }
 
 /**
- * Risk acceptance requires REVIEWER or ADMIN (spec §6, §10). This is
+ * Risk acceptance requires REVIEWER or ADMIN (spec Â§6, Â§10). This is
  * intentionally its own named guard, not just a requirePermission call,
  * because risk acceptance is also deliberately NOT exposed as an
- * autonomous MCP tool (spec §15) - keeping this guard distinct makes it
+ * autonomous MCP tool (spec Â§15) - keeping this guard distinct makes it
  * easy to grep for every place risk can be accepted and confirm a human
  * with the right role is always in the loop.
  */
