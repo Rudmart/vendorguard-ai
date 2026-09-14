@@ -15,7 +15,6 @@ const overviewItems: NavItem[] = [
   { label: "Executive dashboard", href: "/", built: true, icon: "\u2637" },
   { label: "Third-party risk", href: "/third-party-risk", built: false, icon: "\uD83D\uDEE1" },
   { label: "Vendor inventory", href: "/vendors-list", built: true, icon: "\uD83C\uDFE2" },
-  { label: "Vendor detail", href: "/vendors-list", built: true, icon: "\uD83D\uDC64" },
 ];
 
 const assessmentItems: NavItem[] = [
