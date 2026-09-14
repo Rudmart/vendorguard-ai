@@ -9,6 +9,7 @@ type NavItem = {
   built: boolean;
   icon: string;
   badge?: string;
+  color?: string;
 };
 
 const overviewItems: NavItem[] = [
@@ -115,6 +116,7 @@ function NavSection({ items, pathname }: { items: NavItem[]; pathname: string })
             style={{
               ...styles.item,
               ...(isActive ? styles.itemActive : {}),
+              ...(item.color ? { color: item.color } : {}),
               cursor: item.built ? "pointer" : "default",
               textDecoration: "none",
             }}
@@ -185,7 +187,7 @@ export default function Sidebar() {
       <NavSection items={governanceItems} pathname={pathname} />
 
       <div style={{ borderTop: "1px solid #2e3d63", margin: "12px 10px" }} />
-      <NavSection items={[{ label: "AI assistant", href: lastVendorId ? `/vendors/${lastVendorId}/assistant` : "/vendors-list", built: true, icon: "\uD83D\uDCAC" }]} pathname={pathname} />
+      <NavSection items={[{ label: "GRC Workflow Guide", href: "/grc-guide", built: true, icon: "\uD83C\uDF93", color: "#86efac" }, { label: "AI assistant", href: lastVendorId ? `/vendors/${lastVendorId}/assistant` : "/vendors-list", built: true, icon: "\uD83D\uDCAC" }]} pathname={pathname} />
       <div style={styles.footer}>
         <div style={styles.avatar}>RM</div>
         <div>
