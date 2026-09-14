@@ -1487,6 +1487,11 @@ server.post("/vendors", async (request, reply) => {
   if (!session) {
     return reply.status(401).send({ error: "Not logged in" });
   }
+  try {
+    requirePermission({ tenantId: session.tenantId, role: session.role as Role }, "vendor:create");
+  } catch {
+    return reply.status(403).send({ error: "Not authorized to create vendors" });
+  }
 
   const body = request.body as {
     legalName?: string;
@@ -1580,6 +1585,16 @@ server.patch("/vendors/:id", async (request, reply) => {
   const existing = await prisma.vendor.findUnique({ where: { id } });
   if (!existing) {
     return reply.status(404).send({ error: "Vendor not found" });
+  }
+  try {
+    assertOwnedByTenant(existing, session, "Vendor");
+  } catch {
+    return reply.status(404).send({ error: "Vendor not found" });
+  }
+  try {
+    requirePermission({ tenantId: session.tenantId, role: session.role as Role }, "vendor:update");
+  } catch {
+    return reply.status(403).send({ error: "Not authorized to update vendors" });
   }
   const body = request.body as {
     legalName?: string;
