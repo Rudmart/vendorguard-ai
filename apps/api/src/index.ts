@@ -16,7 +16,8 @@ import { renderExecutiveReportPdf } from "./executiveReportPdf.js";
 import { askAssistant } from "@vendorguard/ai-client";
 import { buildAssistantContext } from "./assistantContext.js";
 import { registerAuthRoutes } from "./auth-routes.js";
-import { getSessionFromCookie, COOKIE_NAME, requireFindingReviewAuthority, requireRiskAcceptanceAuthority, AuthorizationError, requestContextSchema, assertOwnedByTenant } from "@vendorguard/auth";
+import { getSessionFromCookie, COOKIE_NAME, requireFindingReviewAuthority, requireRiskAcceptanceAuthority, AuthorizationError, requestContextSchema, assertOwnedByTenant, requirePermission } from "@vendorguard/auth";
+import type { Role } from "@vendorguard/shared";
 import { readdirSync, readFileSync } from "fs";
 import { join, dirname, resolve, sep } from "path";
 import { fileURLToPath } from "url";
@@ -1044,6 +1045,19 @@ server.post("/questionnaires/:id/review", async (request, reply) => {
   if (!questionnaire) {
     return reply.status(404).send({ error: "Questionnaire not found" });
   }
+  try {
+    assertOwnedByTenant(questionnaire, session, "Questionnaire");
+  } catch {
+    return reply.status(404).send({ error: "Questionnaire not found" });
+  }
+  try {
+    requirePermission({ tenantId: session.tenantId, role: session.role as Role }, "questionnaire:review");
+  } catch {
+    return reply.status(403).send({ error: "Not authorized to review questionnaires" });
+  }
+  if (questionnaire.submittedByUserId === session.userId) {
+    return reply.status(403).send({ error: "Cannot review your own submission" });
+  }
 
   const updated = await prisma.questionnaire.update({
     where: { id },
@@ -1073,6 +1087,19 @@ server.post("/questionnaires/:id/approve", async (request, reply) => {
   const questionnaire = await prisma.questionnaire.findUnique({ where: { id } });
   if (!questionnaire) {
     return reply.status(404).send({ error: "Questionnaire not found" });
+  }
+  try {
+    assertOwnedByTenant(questionnaire, session, "Questionnaire");
+  } catch {
+    return reply.status(404).send({ error: "Questionnaire not found" });
+  }
+  try {
+    requirePermission({ tenantId: session.tenantId, role: session.role as Role }, "questionnaire:review");
+  } catch {
+    return reply.status(403).send({ error: "Not authorized to approve questionnaires" });
+  }
+  if (questionnaire.submittedByUserId === session.userId) {
+    return reply.status(403).send({ error: "Cannot approve your own submission" });
   }
 
   const updated = await prisma.questionnaire.update({
