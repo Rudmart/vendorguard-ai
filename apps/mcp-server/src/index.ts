@@ -13,7 +13,7 @@ import { prisma } from "@vendorguard/database";
 import { getSessionFromCookie, COOKIE_NAME, requestContextSchema, type RequestContext } from "@vendorguard/auth";
 import { analyzeEvidence, detectPromptInjection } from "@vendorguard/ai-client";
 
-// Explicit tool allowlist (spec §16). Even though the handler below only
+// Explicit tool allowlist (spec Â§16). Even though the handler below only
 // recognizes these exact names anyway, this makes the allowlist a named,
 // checkable thing rather than an implicit side effect of an if-chain -
 // any tool call outside this set is denied and audited before any other
@@ -449,11 +449,15 @@ server.post("/mcp", async (request, reply) => {
   await transport.handleRequest(request.raw, reply.raw, request.body);
 });
 
-const PORT = Number(process.env.MCP_PORT || 4100);
-server.listen({ port: PORT, host: "0.0.0.0" }, (err) => {
-  if (err) {
-    server.log.error(err);
-    process.exit(1);
-  }
-  console.log(`VendorGuard MCP server running on http://0.0.0.0:${PORT}`);
-});
+export { server };
+
+if (process.env.NODE_ENV !== "test") {
+  const PORT = Number(process.env.MCP_PORT || 4100);
+  server.listen({ port: PORT, host: "0.0.0.0" }, (err) => {
+    if (err) {
+      server.log.error(err);
+      process.exit(1);
+    }
+    console.log(`VendorGuard MCP server running on http://0.0.0.0:${PORT}`);
+  });
+}
