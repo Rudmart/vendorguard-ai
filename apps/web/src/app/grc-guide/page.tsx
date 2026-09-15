@@ -35,7 +35,7 @@ const steps: Step[] = [
   {
     number: 4,
     title: "Risk",
-    description: "Score inherent and residual risk based on assessment answers.",
+    description: "Review the vendor's inherent and residual risk results.",
     buttonLabel: "Go to Assessment Workspace",
     href: "/assessments",
   },
@@ -56,7 +56,7 @@ const steps: Step[] = [
   {
     number: 7,
     title: "Findings",
-    description: "Flag where evidence falls short of what a control requires.",
+    description: "Identify and document gaps where requirements or controls are not adequately met.",
     buttonLabel: "Go to Assessment Workspace",
     href: "/assessments",
   },
@@ -84,11 +84,10 @@ export default function GRCGuidePage() {
     <main style={{ maxWidth: 760, margin: "0 auto", padding: "32px 24px" }}>
       <h1 style={{ fontSize: 24, marginBottom: 4 }}>GRC Workflow Guide</h1>
       <p style={{ color: "#8b96ac", fontSize: 13.5, marginBottom: 28, lineHeight: 1.6 }}>
-        GRC (Governance, Risk, and Compliance) is a connected process, not a set of
-        separate screens. Each step below feeds into the next: vendors get assessed,
-        assessments produce risk scores and control mappings, controls need evidence,
-        evidence gaps become findings, findings drive remediation, and the whole
-        lifecycle rolls up into reporting.
+        GRC (Governance, Risk, and Compliance) is a connected process. This guide shows
+        how work moves through VendorGuard AI - from identifying vendors and assessing
+        risk to reviewing evidence, managing findings, tracking remediation, and
+        reporting results.
       </p>
 
       <div

@@ -187,7 +187,7 @@ export default function Sidebar() {
       <NavSection items={governanceItems} pathname={pathname} />
 
       <div style={{ borderTop: "1px solid #2e3d63", margin: "12px 10px" }} />
-      <NavSection items={[{ label: "GRC Workflow Guide", href: "/grc-guide", built: true, icon: "\uD83C\uDF93", color: "#86efac" }, { label: "AI assistant", href: lastVendorId ? `/vendors/${lastVendorId}/assistant` : "/vendors-list", built: true, icon: "\uD83D\uDCAC" }]} pathname={pathname} />
+      <NavSection items={[{ label: "GRC Workflow Guide", href: "/grc-guide", built: true, icon: "\uD83C\uDF93", color: "#86efac" }, { label: "TPRM Workflow Guide", href: "/tprm-guide", built: true, icon: "\uD83D\uDCDA", color: "#86efac" }, { label: "AI assistant", href: lastVendorId ? `/vendors/${lastVendorId}/assistant` : "/vendors-list", built: true, icon: "\uD83D\uDCAC" }]} pathname={pathname} />
       <div style={styles.footer}>
         <div style={styles.avatar}>RM</div>
         <div>
