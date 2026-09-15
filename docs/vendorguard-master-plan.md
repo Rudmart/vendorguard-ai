@@ -63,7 +63,32 @@ Placement rationale: this is a UX/education addition, sits alongside Phase A/B p
 ---
 
 ### Phase B - Workflow and UX (P1)
-7. Reorder sidebar (AI Assistant to its own standalone spot at the end)
+7. Reorder sidebar - full plan (from user's own audit of the application, saved verbatim):
+
+TPRM WORKFLOW
+1. Executive Dashboard - The landing/control-tower view showing the overall vendor risk posture.
+2. Vendor Inventory - The master list of all third-party vendors being tracked.
+3. Assessment Workspace - Where the user evaluates a vendor, checks controls, answers assessment questions and determines the risk score.
+4. Pending Reviews - Where AI-generated findings or recommendations requiring human judgment are reviewed and approved, rejected, or challenged.
+5. Remediation Tracker - Where identified issues and required corrective actions are tracked through to completion.
+6. Vendor Reports - Where the final assessment and risk information can be presented to management, auditors, clients, etc.
+
+GOVERNANCE and REFERENCE
+7. Evidence Library - The repository for contracts, certificates, security reports, policies and other evidence supporting the assessment.
+8. Framework Explorer - The reference area for NIST, ISO, HIPAA and other frameworks against which the vendors are assessed.
+9. Audit Logs - The permanent record of activities, decisions, approvals and changes for accountability and auditability.
+10. AI Agents - The registry of the organization's own AI systems, kept separate from the vendor workflow since these are internally developed or deployed AI systems rather than third-party vendors. Depends on Phase 4.5 (Agent Registry) being built first - show as "soon" until then.
+
+SYSTEM
+11. Administration - Users, roles, permissions and platform configuration.
+
+AI Assistant should NOT be a numbered sidebar item - it is not a step in the process, it is a helper accessible at any point. Make it a persistent/global feature (header button or floating assistant) instead.
+
+Pending Reviews should visually demonstrate the core governance principle: AI Recommendation -> Human Review -> Human Decision -> Decision Recorded -> Remediation, if required. This should be shown in the UI, not just described in documentation.
+
+Terminology suggestions for a first-time user: "Assessment Workspace" -> "Vendor Assessments"; "Framework Explorer" -> "Compliance Frameworks".
+
+Guiding principle: the sidebar should reflect the user's journey through the process, rather than simply listing all the features available in the application.
 8. Implement real global search or remove placeholder
 9. Standardize status vocabulary
 10. Standardize page layouts
