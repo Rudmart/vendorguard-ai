@@ -111,6 +111,16 @@ server.post("/vendors/:id/assessments", async (request, reply) => {
   if (!vendor) {
     return reply.status(404).send({ error: "Vendor not found" });
   }
+  try {
+    assertOwnedByTenant(vendor, session, "Vendor");
+  } catch {
+    return reply.status(404).send({ error: "Vendor not found" });
+  }
+  try {
+    requirePermission({ tenantId: session.tenantId, role: session.role as Role }, "assessment:create");
+  } catch {
+    return reply.status(403).send({ error: "Not authorized to create assessments" });
+  }
 
   const assessment = await prisma.assessment.create({
     data: {
@@ -174,6 +184,16 @@ server.post("/assessments/:id/findings", async (request, reply) => {
   const assessment = await prisma.assessment.findUnique({ where: { id: assessmentId } });
   if (!assessment) {
     return reply.status(404).send({ error: "Assessment not found" });
+  }
+  try {
+    assertOwnedByTenant(assessment, session, "Assessment");
+  } catch {
+    return reply.status(404).send({ error: "Assessment not found" });
+  }
+  try {
+    requirePermission({ tenantId: session.tenantId, role: session.role as Role }, "finding:propose");
+  } catch {
+    return reply.status(403).send({ error: "Not authorized to propose findings" });
   }
 
   const control = await prisma.control.findFirst({ where: { id: body.controlId } });
@@ -1351,6 +1371,16 @@ server.post("/vendors/:id/remediations", async (request, reply) => {
   if (!vendor) {
     return reply.status(404).send({ error: "Vendor not found" });
   }
+  try {
+    assertOwnedByTenant(vendor, session, "Vendor");
+  } catch {
+    return reply.status(404).send({ error: "Vendor not found" });
+  }
+  try {
+    requirePermission({ tenantId: session.tenantId, role: session.role as Role }, "remediation:create");
+  } catch {
+    return reply.status(403).send({ error: "Not authorized to create remediations" });
+  }
 
   const remediation = await prisma.remediationAction.create({
     data: {
@@ -1419,6 +1449,11 @@ server.patch("/remediations/:id", async (request, reply) => {
   } catch {
     return reply.status(404).send({ error: "Remediation not found" });
   }
+  try {
+    requirePermission({ tenantId: session.tenantId, role: session.role as Role }, "remediation:update");
+  } catch {
+    return reply.status(403).send({ error: "Not authorized to update remediations" });
+  }
 
   const updated = await prisma.remediationAction.update({
     where: { id },
@@ -1486,6 +1521,11 @@ server.post("/vendors", async (request, reply) => {
   const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
   if (!session) {
     return reply.status(401).send({ error: "Not logged in" });
+  }
+  try {
+    requirePermission({ tenantId: session.tenantId, role: session.role as Role }, "vendor:create");
+  } catch {
+    return reply.status(403).send({ error: "Not authorized to create vendors" });
   }
 
   const body = request.body as {
@@ -1581,6 +1621,16 @@ server.patch("/vendors/:id", async (request, reply) => {
   if (!existing) {
     return reply.status(404).send({ error: "Vendor not found" });
   }
+  try {
+    assertOwnedByTenant(existing, session, "Vendor");
+  } catch {
+    return reply.status(404).send({ error: "Vendor not found" });
+  }
+  try {
+    requirePermission({ tenantId: session.tenantId, role: session.role as Role }, "vendor:update");
+  } catch {
+    return reply.status(403).send({ error: "Not authorized to update vendors" });
+  }
   const body = request.body as {
     legalName?: string;
     serviceDescription?: string;
@@ -1638,6 +1688,16 @@ server.delete("/vendors/:id", async (request, reply) => {
   const existing = await prisma.vendor.findUnique({ where: { id } });
   if (!existing) {
     return reply.status(404).send({ error: "Vendor not found" });
+  }
+  try {
+    assertOwnedByTenant(existing, session, "Vendor");
+  } catch {
+    return reply.status(404).send({ error: "Vendor not found" });
+  }
+  try {
+    requirePermission({ tenantId: session.tenantId, role: session.role as Role }, "vendor:delete");
+  } catch {
+    return reply.status(403).send({ error: "Not authorized to delete vendors" });
   }
   await prisma.vendor.update({ where: { id }, data: { deletedAt: new Date() } });
 
