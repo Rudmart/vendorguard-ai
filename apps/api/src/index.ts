@@ -898,6 +898,16 @@ server.post("/assessments/:id/questionnaire", async (request, reply) => {
   if (!assessment) {
     return reply.status(404).send({ error: "Assessment not found" });
   }
+  try {
+    assertOwnedByTenant(assessment, session, "Assessment");
+  } catch {
+    return reply.status(404).send({ error: "Assessment not found" });
+  }
+  try {
+    requirePermission({ tenantId: session.tenantId, role: session.role as Role }, "assessment:create");
+  } catch {
+    return reply.status(403).send({ error: "Not authorized to create questionnaires" });
+  }
 
   const questionnaire = await prisma.questionnaire.create({
     data: {
@@ -956,6 +966,16 @@ server.patch("/questionnaires/:id/responses", async (request, reply) => {
   if (!questionnaire) {
     return reply.status(404).send({ error: "Questionnaire not found" });
   }
+  try {
+    assertOwnedByTenant(questionnaire, session, "Questionnaire");
+  } catch {
+    return reply.status(404).send({ error: "Questionnaire not found" });
+  }
+  try {
+    requirePermission({ tenantId: session.tenantId, role: session.role as Role }, "assessment:create");
+  } catch {
+    return reply.status(403).send({ error: "Not authorized to answer questionnaires" });
+  }
 
   for (const [questionKey, value] of Object.entries(body.answers ?? {})) {
     const existing = await prisma.questionnaireResponse.findFirst({
@@ -1011,6 +1031,16 @@ server.post("/questionnaires/:id/submit", async (request, reply) => {
   });
   if (!questionnaire) {
     return reply.status(404).send({ error: "Questionnaire not found" });
+  }
+  try {
+    assertOwnedByTenant(questionnaire, session, "Questionnaire");
+  } catch {
+    return reply.status(404).send({ error: "Questionnaire not found" });
+  }
+  try {
+    requirePermission({ tenantId: session.tenantId, role: session.role as Role }, "assessment:create");
+  } catch {
+    return reply.status(403).send({ error: "Not authorized to submit questionnaires" });
   }
 
   const answers: QuestionnaireAnswers = {};
@@ -1222,6 +1252,16 @@ server.post("/vendors/:id/evidence", async (request, reply) => {
   if (!vendor) {
     return reply.status(404).send({ error: "Vendor not found" });
   }
+  try {
+    assertOwnedByTenant(vendor, session, "Vendor");
+  } catch {
+    return reply.status(404).send({ error: "Vendor not found" });
+  }
+  try {
+    requirePermission({ tenantId: session.tenantId, role: session.role as Role }, "evidence:upload");
+  } catch {
+    return reply.status(403).send({ error: "Not authorized to upload evidence" });
+  }
 
   const evidence = await prisma.evidenceDocument.create({
     data: {
@@ -1263,6 +1303,16 @@ server.post("/vendors/:id/evidence/upload", async (request, reply) => {
   const vendor = await prisma.vendor.findUnique({ where: { id: vendorId } });
   if (!vendor) {
     return reply.status(404).send({ error: "Vendor not found" });
+  }
+  try {
+    assertOwnedByTenant(vendor, session, "Vendor");
+  } catch {
+    return reply.status(404).send({ error: "Vendor not found" });
+  }
+  try {
+    requirePermission({ tenantId: session.tenantId, role: session.role as Role }, "evidence:upload");
+  } catch {
+    return reply.status(403).send({ error: "Not authorized to upload evidence" });
   }
 
   const data = await request.file();
