@@ -46,6 +46,14 @@ export const MAPPING_STRENGTHS = ["EXACT", "PARTIAL", "RELATED"] as const;
 export type MappingStrength = (typeof MAPPING_STRENGTHS)[number];
 
 /**
+ * Controlled whitelist for AiSystem.dataCategories (Slice 1). Keeps values
+ * consistent (e.g. never "PII" vs "Personal Information") without requiring
+ * a migration every time the list grows, unlike a Prisma enum would.
+ */
+export const DATA_CATEGORIES = ["PII", "FINANCIAL", "HEALTH", "BIOMETRIC", "CHILDREN", "OTHER"] as const;
+export type DataCategory = (typeof DATA_CATEGORIES)[number];
+
+/**
  * Minimum role required to perform risk acceptance. Enforced server-side
  * in both the API and the MCP server (risk acceptance is intentionally
  * NOT exposed as an autonomous MCP tool at all - see docs/mcp-security.md).
@@ -58,6 +66,7 @@ export const ROLE_PERMISSIONS: Record<Role, readonly string[]> = {
     "tenant:manage",
     "framework:manage",
     "vendor:*",
+    "ai-system:*",
     "assessment:*",
     "finding:*",
     "questionnaire:review",
@@ -69,6 +78,10 @@ export const ROLE_PERMISSIONS: Record<Role, readonly string[]> = {
     "vendor:create",
     "vendor:read",
     "vendor:update",
+    "ai-system:create",
+    "ai-system:read",
+    "ai-system:update",
+    "ai-system:link-vendor",
     "evidence:upload",
     "evidence:read",
     "assessment:create",
@@ -79,6 +92,7 @@ export const ROLE_PERMISSIONS: Record<Role, readonly string[]> = {
   ],
   REVIEWER: [
     "vendor:read",
+    "ai-system:read",
     "assessment:read",
     "finding:read",
     "finding:review",
@@ -89,13 +103,14 @@ export const ROLE_PERMISSIONS: Record<Role, readonly string[]> = {
   ],
   AUDITOR: [
     "vendor:read",
+    "ai-system:read",
     "assessment:read",
     "finding:read",
     "evidence:read-metadata",
     "audit:read",
     "remediation:read",
   ],
-  READ_ONLY: ["vendor:read", "assessment:read", "finding:read"],
+  READ_ONLY: ["vendor:read", "ai-system:read", "assessment:read", "finding:read"],
 };
 
 export function roleHasPermission(role: Role, permission: string): boolean {

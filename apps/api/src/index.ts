@@ -18,6 +18,7 @@ import { buildAssistantContext } from "./assistantContext.js";
 import { registerAuthRoutes } from "./auth-routes.js";
 import { getSessionFromCookie, COOKIE_NAME, requireFindingReviewAuthority, requireRiskAcceptanceAuthority, AuthorizationError, requestContextSchema, assertOwnedByTenant, requirePermission } from "@vendorguard/auth";
 import type { Role } from "@vendorguard/shared";
+import { DATA_CATEGORIES } from "@vendorguard/shared";
 import { readdirSync, readFileSync } from "fs";
 import { join, dirname, resolve, sep } from "path";
 import { fileURLToPath } from "url";
@@ -1763,6 +1764,398 @@ server.delete("/vendors/:id", async (request, reply) => {
   });
   return reply.status(204).send();
 });
+// ---------------------------------------------------------------------------
+// AI Systems (Slice 1) - a first-class platform object distinct from Vendor.
+// See docs/VENDORGUARD_MIGRATION_PLAN.md for the approved design. Vendor
+// represents an external organization; AiSystem represents an AI system or
+// use of AI being governed. An AiSystem may be INTERNAL (organization owns
+// and operates it, though it may still depend on third-party providers) or
+// THIRD_PARTY (the AI capability itself is primarily externally provided).
+// ---------------------------------------------------------------------------
+
+const AI_SYSTEM_CATEGORIES = ["GENERATIVE", "PREDICTIVE_ML", "DECISION_SUPPORT", "EMBEDDED", "AGENT", "OTHER"];
+const AI_SYSTEM_LIFECYCLE_STATUSES = ["PROPOSED", "DEVELOPMENT", "TESTING", "ASSESSMENT", "PENDING_APPROVAL", "APPROVED", "PRODUCTION", "SUSPENDED", "RETIRED"];
+const AI_SYSTEM_VENDOR_ROLES = ["PRIMARY_PROVIDER", "MODEL_PROVIDER", "PLATFORM_PROVIDER", "AI_SERVICE_PROVIDER", "DATA_PROVIDER", "DEVELOPMENT_PROVIDER", "OTHER"];
+const RISK_TIERS = ["LOW", "MODERATE", "HIGH", "CRITICAL"];
+
+server.post("/ai-systems", async (request, reply) => {
+  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  if (!session) {
+    return reply.status(401).send({ error: "Not logged in" });
+  }
+  try {
+    requirePermission({ tenantId: session.tenantId, role: session.role as Role }, "ai-system:create");
+  } catch {
+    return reply.status(403).send({ error: "Not authorized to create AI systems" });
+  }
+
+  const body = request.body as {
+    name?: string;
+    description?: string;
+    origin?: string;
+    category?: string;
+    ownerUserId?: string;
+    dataCategories?: string[];
+    riskTier?: string;
+  };
+
+  if (!body.name) {
+    return reply.status(400).send({ error: "name is required" });
+  }
+  if (body.origin !== "INTERNAL" && body.origin !== "THIRD_PARTY") {
+    return reply.status(400).send({ error: "origin must be INTERNAL or THIRD_PARTY" });
+  }
+  const category = body.category ?? "OTHER";
+  if (!AI_SYSTEM_CATEGORIES.includes(category)) {
+    return reply.status(400).send({ error: "Invalid category" });
+  }
+  const dataCategories = body.dataCategories ?? [];
+  const invalidDataCategories = dataCategories.filter((c) => !(DATA_CATEGORIES as readonly string[]).includes(c));
+  if (invalidDataCategories.length > 0) {
+    return reply.status(400).send({ error: `Invalid dataCategories: ${invalidDataCategories.join(", ")}` });
+  }
+  if (body.riskTier && !RISK_TIERS.includes(body.riskTier)) {
+    return reply.status(400).send({ error: "Invalid riskTier" });
+  }
+
+  let ownerUserId: string | null = null;
+  if (body.ownerUserId) {
+    const membership = await prisma.tenantMembership.findFirst({
+      where: { userId: body.ownerUserId, tenantId: session.tenantId },
+    });
+    if (!membership) {
+      return reply.status(400).send({ error: "ownerUserId must belong to a user in this tenant" });
+    }
+    ownerUserId = body.ownerUserId;
+  }
+
+  const aiSystem = await prisma.aiSystem.create({
+    data: {
+      tenantId: session.tenantId,
+      name: body.name,
+      description: body.description ?? null,
+      origin: body.origin as "INTERNAL" | "THIRD_PARTY",
+      category: category as never,
+      ownerUserId,
+      dataCategories,
+      riskTier: (body.riskTier as never) ?? null,
+    },
+  });
+
+  await prisma.auditEvent.create({
+    data: {
+      tenantId: session.tenantId,
+      actorUserId: session.userId,
+      action: "ai_system.created",
+      targetType: "AiSystem",
+      targetId: aiSystem.id,
+      outcome: "SUCCESS",
+    },
+  });
+
+  return reply.status(201).send(aiSystem);
+});
+
+server.get("/ai-systems", async (request, reply) => {
+  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  if (!session) {
+    return reply.status(401).send({ error: "Not logged in" });
+  }
+  try {
+    requirePermission({ tenantId: session.tenantId, role: session.role as Role }, "ai-system:read");
+  } catch {
+    return reply.status(403).send({ error: "Not authorized to view AI systems" });
+  }
+
+  const aiSystems = await prisma.aiSystem.findMany({
+    where: { tenantId: session.tenantId },
+    orderBy: { createdAt: "desc" },
+  });
+  return reply.send({ aiSystems });
+});
+
+server.get("/ai-systems/:id", async (request, reply) => {
+  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  if (!session) {
+    return reply.status(401).send({ error: "Not logged in" });
+  }
+  try {
+    requirePermission({ tenantId: session.tenantId, role: session.role as Role }, "ai-system:read");
+  } catch {
+    return reply.status(403).send({ error: "Not authorized to view AI systems" });
+  }
+
+  const { id } = request.params as { id: string };
+  const aiSystem = await prisma.aiSystem.findUnique({ where: { id } });
+  if (!aiSystem) {
+    return reply.status(404).send({ error: "AI system not found" });
+  }
+  try {
+    assertOwnedByTenant(aiSystem, { tenantId: session.tenantId }, "AI system");
+  } catch {
+    return reply.status(404).send({ error: "AI system not found" });
+  }
+  return reply.send(aiSystem);
+});
+
+server.patch("/ai-systems/:id", async (request, reply) => {
+  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  if (!session) {
+    return reply.status(401).send({ error: "Not logged in" });
+  }
+  try {
+    requirePermission({ tenantId: session.tenantId, role: session.role as Role }, "ai-system:update");
+  } catch {
+    return reply.status(403).send({ error: "Not authorized to update AI systems" });
+  }
+
+  const { id } = request.params as { id: string };
+  const existing = await prisma.aiSystem.findUnique({ where: { id } });
+  if (!existing) {
+    return reply.status(404).send({ error: "AI system not found" });
+  }
+  try {
+    assertOwnedByTenant(existing, { tenantId: session.tenantId }, "AI system");
+  } catch {
+    return reply.status(404).send({ error: "AI system not found" });
+  }
+
+  const body = request.body as {
+    name?: string;
+    description?: string;
+    category?: string;
+    lifecycleStatus?: string;
+    ownerUserId?: string | null;
+    dataCategories?: string[];
+    riskTier?: string | null;
+  };
+
+  if (body.category !== undefined && !AI_SYSTEM_CATEGORIES.includes(body.category)) {
+    return reply.status(400).send({ error: "Invalid category" });
+  }
+  if (body.lifecycleStatus !== undefined && !AI_SYSTEM_LIFECYCLE_STATUSES.includes(body.lifecycleStatus)) {
+    return reply.status(400).send({ error: "Invalid lifecycleStatus" });
+  }
+  if (body.dataCategories !== undefined) {
+    const invalidDataCategories = body.dataCategories.filter((c) => !(DATA_CATEGORIES as readonly string[]).includes(c));
+    if (invalidDataCategories.length > 0) {
+      return reply.status(400).send({ error: `Invalid dataCategories: ${invalidDataCategories.join(", ")}` });
+    }
+  }
+  if (body.riskTier !== undefined && body.riskTier !== null && !RISK_TIERS.includes(body.riskTier)) {
+    return reply.status(400).send({ error: "Invalid riskTier" });
+  }
+
+  let ownerUserId = existing.ownerUserId;
+  if (body.ownerUserId !== undefined) {
+    if (body.ownerUserId === null) {
+      ownerUserId = null;
+    } else {
+      const membership = await prisma.tenantMembership.findFirst({
+        where: { userId: body.ownerUserId, tenantId: session.tenantId },
+      });
+      if (!membership) {
+        return reply.status(400).send({ error: "ownerUserId must belong to a user in this tenant" });
+      }
+      ownerUserId = body.ownerUserId;
+    }
+  }
+
+  if (
+    body.lifecycleStatus !== undefined &&
+    body.lifecycleStatus !== "PROPOSED" &&
+    existing.origin === "THIRD_PARTY"
+  ) {
+    const linkCount = await prisma.aiSystemVendor.count({ where: { aiSystemId: existing.id } });
+    if (linkCount === 0) {
+      return reply.status(400).send({
+        error: "A THIRD_PARTY AI system must have at least one vendor relationship before leaving PROPOSED status",
+      });
+    }
+  }
+
+  const lifecycleChanged = body.lifecycleStatus !== undefined && body.lifecycleStatus !== existing.lifecycleStatus;
+
+  const updated = await prisma.aiSystem.update({
+    where: { id: existing.id },
+    data: {
+      name: body.name ?? undefined,
+      description: body.description !== undefined ? body.description : undefined,
+      category: (body.category as never) ?? undefined,
+      lifecycleStatus: (body.lifecycleStatus as never) ?? undefined,
+      ownerUserId,
+      dataCategories: body.dataCategories ?? undefined,
+      riskTier: body.riskTier !== undefined ? (body.riskTier as never) : undefined,
+    },
+  });
+
+  await prisma.auditEvent.create({
+    data: {
+      tenantId: session.tenantId,
+      actorUserId: session.userId,
+      action: lifecycleChanged ? "ai_system.lifecycle_changed" : "ai_system.updated",
+      targetType: "AiSystem",
+      targetId: updated.id,
+      outcome: "SUCCESS",
+    },
+  });
+
+  if (body.lifecycleStatus === "RETIRED" && existing.lifecycleStatus !== "RETIRED") {
+    await prisma.auditEvent.create({
+      data: {
+        tenantId: session.tenantId,
+        actorUserId: session.userId,
+        action: "ai_system.retired",
+        targetType: "AiSystem",
+        targetId: updated.id,
+        outcome: "SUCCESS",
+      },
+    });
+  }
+
+  return reply.send(updated);
+});
+
+server.post("/ai-systems/:id/vendors", async (request, reply) => {
+  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  if (!session) {
+    return reply.status(401).send({ error: "Not logged in" });
+  }
+  try {
+    requirePermission({ tenantId: session.tenantId, role: session.role as Role }, "ai-system:link-vendor");
+  } catch {
+    return reply.status(403).send({ error: "Not authorized to link vendors to AI systems" });
+  }
+
+  const { id } = request.params as { id: string };
+  const aiSystem = await prisma.aiSystem.findUnique({ where: { id } });
+  if (!aiSystem) {
+    return reply.status(404).send({ error: "AI system not found" });
+  }
+  try {
+    assertOwnedByTenant(aiSystem, { tenantId: session.tenantId }, "AI system");
+  } catch {
+    return reply.status(404).send({ error: "AI system not found" });
+  }
+
+  const body = request.body as { vendorId?: string; role?: string };
+  if (!body.vendorId) {
+    return reply.status(400).send({ error: "vendorId is required" });
+  }
+  const role = body.role ?? "OTHER";
+  if (!AI_SYSTEM_VENDOR_ROLES.includes(role)) {
+    return reply.status(400).send({ error: "Invalid vendor role" });
+  }
+
+  const vendor = await prisma.vendor.findUnique({ where: { id: body.vendorId } });
+  if (!vendor) {
+    return reply.status(404).send({ error: "Vendor not found" });
+  }
+  try {
+    assertOwnedByTenant(vendor, { tenantId: session.tenantId }, "Vendor");
+  } catch {
+    return reply.status(404).send({ error: "Vendor not found" });
+  }
+
+  let link;
+  try {
+    link = await prisma.aiSystemVendor.create({
+      data: {
+        tenantId: session.tenantId,
+        aiSystemId: aiSystem.id,
+        vendorId: vendor.id,
+        role: role as never,
+      },
+    });
+  } catch (err: unknown) {
+    const prismaErr = err as { code?: string };
+    if (prismaErr?.code === "P2002") {
+      return reply.status(409).send({ error: "This vendor is already linked to this AI system with that role" });
+    }
+    throw err;
+  }
+
+  await prisma.auditEvent.create({
+    data: {
+      tenantId: session.tenantId,
+      actorUserId: session.userId,
+      action: "ai_system.vendor_linked",
+      targetType: "AiSystem",
+      targetId: aiSystem.id,
+      outcome: "SUCCESS",
+    },
+  });
+
+  return reply.status(201).send(link);
+});
+
+server.get("/ai-systems/:id/vendors", async (request, reply) => {
+  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  if (!session) {
+    return reply.status(401).send({ error: "Not logged in" });
+  }
+  try {
+    requirePermission({ tenantId: session.tenantId, role: session.role as Role }, "ai-system:read");
+  } catch {
+    return reply.status(403).send({ error: "Not authorized to view AI systems" });
+  }
+
+  const { id } = request.params as { id: string };
+  const aiSystem = await prisma.aiSystem.findUnique({ where: { id } });
+  if (!aiSystem) {
+    return reply.status(404).send({ error: "AI system not found" });
+  }
+  try {
+    assertOwnedByTenant(aiSystem, { tenantId: session.tenantId }, "AI system");
+  } catch {
+    return reply.status(404).send({ error: "AI system not found" });
+  }
+
+  const links = await prisma.aiSystemVendor.findMany({
+    where: { aiSystemId: aiSystem.id, tenantId: session.tenantId },
+    include: { vendor: true },
+  });
+  return reply.send({ vendorLinks: links });
+});
+
+server.delete("/ai-systems/:id/vendors/:linkId", async (request, reply) => {
+  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  if (!session) {
+    return reply.status(401).send({ error: "Not logged in" });
+  }
+  try {
+    requirePermission({ tenantId: session.tenantId, role: session.role as Role }, "ai-system:link-vendor");
+  } catch {
+    return reply.status(403).send({ error: "Not authorized to unlink vendors from AI systems" });
+  }
+
+  const { id, linkId } = request.params as { id: string; linkId: string };
+  const link = await prisma.aiSystemVendor.findUnique({ where: { id: linkId } });
+  if (!link || link.aiSystemId !== id) {
+    return reply.status(404).send({ error: "Vendor link not found" });
+  }
+  try {
+    assertOwnedByTenant(link, { tenantId: session.tenantId }, "Vendor link");
+  } catch {
+    return reply.status(404).send({ error: "Vendor link not found" });
+  }
+
+  await prisma.aiSystemVendor.delete({ where: { id: link.id } });
+
+  await prisma.auditEvent.create({
+    data: {
+      tenantId: session.tenantId,
+      actorUserId: session.userId,
+      action: "ai_system.vendor_unlinked",
+      targetType: "AiSystem",
+      targetId: id,
+      outcome: "SUCCESS",
+    },
+  });
+
+  return reply.status(204).send();
+});
+
 const start = async () => {
   try {
     const port = process.env.PORT ? parseInt(process.env.PORT) : 4000;
