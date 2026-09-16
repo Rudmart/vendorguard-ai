@@ -12,25 +12,28 @@ type NavItem = {
   color?: string;
 };
 
-const overviewItems: NavItem[] = [
-  { label: "Executive dashboard", href: "/", built: true, icon: "\u2637" },
-  { label: "Third-party risk", href: "/third-party-risk", built: false, icon: "\uD83D\uDEE1" },
-  { label: "Vendor inventory", href: "/vendors-list", built: true, icon: "\uD83C\uDFE2" },
-];
-
-const assessmentItems: NavItem[] = [
-  { label: "Assessment workspace", href: "/assessments", built: true, icon: "\u2705" },
-  { label: "Evidence library", href: "/evidence", built: true, icon: "\uD83D\uDCC4", badge: "3" },
-  { label: "AI inventory", href: "/ai-inventory", built: true, icon: "\u2728" },
-  { label: "Framework explorer", href: "/frameworks", built: true, icon: "\uD83D\uDCD8" },
-  { label: "Remediation tracker", href: "/remediation", built: true, icon: "\u2705", badge: undefined },
-];
-
-const governanceItems: NavItem[] = [
+const tprmWorkflowItems: NavItem[] = [
+  { label: "Executive Dashboard", href: "/", built: true, icon: "\u2637" },
+  { label: "Vendor Inventory", href: "/vendors-list", built: true, icon: "\uD83C\uDFE2" },
+  { label: "Vendor Assessments", href: "/assessments", built: true, icon: "\u2705" },
   { label: "Pending Reviews", href: "/governance/reviews", built: true, icon: "\u2611" },
-{ label: "Vendor Reports", href: "/reports", built: false, icon: "\uD83D\uDCC8" },
+  { label: "Remediation Tracker", href: "/remediation", built: true, icon: "\u2705" },
+  { label: "Vendor Reports", href: "/reports", built: false, icon: "\uD83D\uDCC8" },
+];
+
+const governanceReferenceItems: NavItem[] = [
+  { label: "Evidence Library", href: "/evidence", built: true, icon: "\uD83D\uDCC4", badge: "3" },
+  { label: "Compliance Frameworks", href: "/frameworks", built: true, icon: "\uD83D\uDCD8" },
+  { label: "AI inventory", href: "/ai-inventory", built: true, icon: "\u2728" },
+  { label: "AI Agents", href: "/ai-agents", built: false, icon: "\uD83E\uDD16" },
+  { label: "Third-party risk", href: "/third-party-risk", built: false, icon: "\uD83D\uDEE1" },
   { label: "Audit Logs", href: "/audit-log", built: false, icon: "\uD83D\uDCC4" },
   { label: "Administration", href: "/administration", built: false, icon: "\u2699" },
+];
+
+const educationItems: NavItem[] = [
+  { label: "GRC Workflow Guide", href: "/grc-guide", built: true, icon: "\uD83C\uDF93", color: "#86efac" },
+  { label: "TPRM Workflow Guide", href: "/tprm-guide", built: true, icon: "\uD83D\uDCDA", color: "#86efac" },
 ];
 
 const styles = {
@@ -53,13 +56,23 @@ const styles = {
   },
   brandName: { fontSize: 14.5, fontWeight: 700 },
   brandTag: { fontSize: 9.5, color: "#5d6786", letterSpacing: 0.3 },
-  sectionLabel: {
-    fontSize: 11,
+  sectionLabelFirst: {
+    fontSize: 11.5,
     textTransform: "uppercase" as const,
     letterSpacing: 0.5,
-    color: "#5d6786",
-    fontWeight: 600,
-    padding: "16px 10px 6px 10px",
+    color: "#86efac",
+    fontWeight: 700,
+    padding: "4px 10px 6px 10px",
+  },
+  sectionLabel: {
+    fontSize: 11.5,
+    textTransform: "uppercase" as const,
+    letterSpacing: 0.5,
+    color: "#86efac",
+    fontWeight: 700,
+    padding: "28px 10px 6px 10px",
+    marginTop: 6,
+    borderTop: "1px solid #2e3d63",
   },
   item: {
     display: "flex",
@@ -68,7 +81,7 @@ const styles = {
     padding: "8px 10px",
     borderRadius: 8,
     fontSize: 13.5,
-    color: "#8b96ac",
+    color: "#c7cee2",
     marginBottom: 2,
   },
   itemActive: { background: "rgba(59,130,246,0.14)", color: "#3b82f6" },
@@ -139,20 +152,6 @@ function NavSection({ items, pathname }: { items: NavItem[]; pathname: string })
 export default function Sidebar() {
   const pathname = usePathname();
   const [remediationBadge, setRemediationBadge] = useState<string | undefined>(undefined);
-  const [lastVendorId, setLastVendorId] = useState<string | null>(null);
-
-  useEffect(() => {
-    const stored = localStorage.getItem("vg_last_vendor_id");
-    if (stored) setLastVendorId(stored);
-  }, []);
-
-  useEffect(() => {
-    const match = pathname.match(/^\/vendors\/([^/]+)/);
-    if (match) {
-      setLastVendorId(match[1]);
-      localStorage.setItem("vg_last_vendor_id", match[1]);
-    }
-  }, [pathname]);
 
   useEffect(() => {
     fetch(`${process.env.NEXT_PUBLIC_API_URL}/remediations`, { credentials: "include" })
@@ -177,17 +176,15 @@ export default function Sidebar() {
         </div>
       </div>
 
-      <div style={styles.sectionLabel}>Overview</div>
-      <NavSection items={overviewItems} pathname={pathname} />
+      <div style={styles.sectionLabelFirst}>TPRM Workflow</div>
+      <NavSection items={tprmWorkflowItems.map((item) => item.label === "Remediation Tracker" ? { ...item, badge: remediationBadge } : item)} pathname={pathname} />
 
-      <div style={styles.sectionLabel}>Assessment</div>
-      <NavSection items={assessmentItems.map((item) => item.label === "Remediation tracker" ? { ...item, badge: remediationBadge } : item)} pathname={pathname} />
+      <div style={styles.sectionLabel}>Governance &amp; Reference</div>
+      <NavSection items={governanceReferenceItems} pathname={pathname} />
 
-      <div style={styles.sectionLabel}>Governance</div>
-      <NavSection items={governanceItems} pathname={pathname} />
+      <div style={styles.sectionLabel}>Education</div>
+      <NavSection items={educationItems} pathname={pathname} />
 
-      <div style={{ borderTop: "1px solid #2e3d63", margin: "12px 10px" }} />
-      <NavSection items={[{ label: "GRC Workflow Guide", href: "/grc-guide", built: true, icon: "\uD83C\uDF93", color: "#86efac" }, { label: "TPRM Workflow Guide", href: "/tprm-guide", built: true, icon: "\uD83D\uDCDA", color: "#86efac" }, { label: "AI assistant", href: lastVendorId ? `/vendors/${lastVendorId}/assistant` : "/vendors-list", built: true, icon: "\uD83D\uDCAC" }]} pathname={pathname} />
       <div style={styles.footer}>
         <div style={styles.avatar}>RM</div>
         <div>
@@ -198,5 +195,3 @@ export default function Sidebar() {
     </aside>
   );
 }
-
-
