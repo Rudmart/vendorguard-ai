@@ -18,7 +18,7 @@ import { buildAssistantContext } from "./assistantContext.js";
 import { registerAuthRoutes } from "./auth-routes.js";
 import { getSessionFromCookie, COOKIE_NAME, requireFindingReviewAuthority, requireRiskAcceptanceAuthority, AuthorizationError, requestContextSchema, assertOwnedByTenant, requirePermission } from "@vendorguard/auth";
 import type { Role } from "@vendorguard/shared";
-import { DATA_CATEGORIES } from "@vendorguard/shared";
+import { DATA_CATEGORIES, AFFECTED_POPULATIONS, REGULATORY_RELEVANCE_TAGS } from "@vendorguard/shared";
 import { readdirSync, readFileSync } from "fs";
 import { join, dirname, resolve, sep } from "path";
 import { fileURLToPath } from "url";
@@ -1778,6 +1778,14 @@ const AI_SYSTEM_LIFECYCLE_STATUSES = ["PROPOSED", "DEVELOPMENT", "TESTING", "ASS
 const AI_SYSTEM_VENDOR_ROLES = ["PRIMARY_PROVIDER", "MODEL_PROVIDER", "PLATFORM_PROVIDER", "AI_SERVICE_PROVIDER", "DATA_PROVIDER", "DEVELOPMENT_PROVIDER", "OTHER"];
 const RISK_TIERS = ["LOW", "MODERATE", "HIGH", "CRITICAL"];
 
+// Step 5 - AI System Governance Profile classification value sets
+const BUSINESS_CRITICALITY_VALUES = ["LOW", "MEDIUM", "HIGH", "CRITICAL"];
+const DECISION_ROLE_VALUES = ["ADVISORY", "RECOMMENDS", "DECIDES", "EXECUTES"];
+const HUMAN_OVERSIGHT_VALUES = ["REQUIRED", "OPTIONAL", "NOT_APPLICABLE"];
+const IMPACT_LEVEL_VALUES = ["LOW", "MODERATE", "HIGH"];
+const DATA_SENSITIVITY_VALUES = ["PUBLIC", "INTERNAL", "CONFIDENTIAL", "RESTRICTED"];
+const ASSESSMENT_STATUS_VALUES = ["NOT_ASSESSED", "ASSESSMENT_REQUIRED", "ASSESSED"];
+
 server.post("/ai-systems", async (request, reply) => {
   const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
   if (!session) {
@@ -1886,7 +1894,10 @@ server.get("/ai-systems/:id", async (request, reply) => {
   }
 
   const { id } = request.params as { id: string };
-  const aiSystem = await prisma.aiSystem.findUnique({ where: { id } });
+  const aiSystem = await prisma.aiSystem.findUnique({
+    where: { id },
+    include: { owner: { select: { id: true, displayName: true, email: true } } },
+  });
   if (!aiSystem) {
     return reply.status(404).send({ error: "AI system not found" });
   }
@@ -1928,6 +1939,15 @@ server.patch("/ai-systems/:id", async (request, reply) => {
     ownerUserId?: string | null;
     dataCategories?: string[];
     riskTier?: string | null;
+    businessCriticality?: string | null;
+    decisionRole?: string | null;
+    humanOversight?: string | null;
+    impactLevel?: string | null;
+    dataSensitivity?: string | null;
+    affectedPopulation?: string[];
+    externalImpact?: boolean | null;
+    regulatoryRelevance?: string[];
+    assessmentStatus?: string;
   };
 
   if (body.category !== undefined && !AI_SYSTEM_CATEGORIES.includes(body.category)) {
@@ -1945,6 +1965,36 @@ server.patch("/ai-systems/:id", async (request, reply) => {
   if (body.riskTier !== undefined && body.riskTier !== null && !RISK_TIERS.includes(body.riskTier)) {
     return reply.status(400).send({ error: "Invalid riskTier" });
   }
+  if (body.businessCriticality !== undefined && body.businessCriticality !== null && !BUSINESS_CRITICALITY_VALUES.includes(body.businessCriticality)) {
+    return reply.status(400).send({ error: "Invalid businessCriticality" });
+  }
+  if (body.decisionRole !== undefined && body.decisionRole !== null && !DECISION_ROLE_VALUES.includes(body.decisionRole)) {
+    return reply.status(400).send({ error: "Invalid decisionRole" });
+  }
+  if (body.humanOversight !== undefined && body.humanOversight !== null && !HUMAN_OVERSIGHT_VALUES.includes(body.humanOversight)) {
+    return reply.status(400).send({ error: "Invalid humanOversight" });
+  }
+  if (body.impactLevel !== undefined && body.impactLevel !== null && !IMPACT_LEVEL_VALUES.includes(body.impactLevel)) {
+    return reply.status(400).send({ error: "Invalid impactLevel" });
+  }
+  if (body.dataSensitivity !== undefined && body.dataSensitivity !== null && !DATA_SENSITIVITY_VALUES.includes(body.dataSensitivity)) {
+    return reply.status(400).send({ error: "Invalid dataSensitivity" });
+  }
+  if (body.affectedPopulation !== undefined) {
+    const invalidPops = body.affectedPopulation.filter((p) => !(AFFECTED_POPULATIONS as readonly string[]).includes(p));
+    if (invalidPops.length > 0) {
+      return reply.status(400).send({ error: `Invalid affectedPopulation: ${invalidPops.join(", ")}` });
+    }
+  }
+  if (body.regulatoryRelevance !== undefined) {
+    const invalidTags = body.regulatoryRelevance.filter((t) => !(REGULATORY_RELEVANCE_TAGS as readonly string[]).includes(t));
+    if (invalidTags.length > 0) {
+      return reply.status(400).send({ error: `Invalid regulatoryRelevance: ${invalidTags.join(", ")}` });
+    }
+  }
+  if (body.assessmentStatus !== undefined && !ASSESSMENT_STATUS_VALUES.includes(body.assessmentStatus)) {
+    return reply.status(400).send({ error: "Invalid assessmentStatus" });
+  }
 
   let ownerUserId = existing.ownerUserId;
   if (body.ownerUserId !== undefined) {
@@ -1958,6 +2008,21 @@ server.patch("/ai-systems/:id", async (request, reply) => {
         return reply.status(400).send({ error: "ownerUserId must belong to a user in this tenant" });
       }
       ownerUserId = body.ownerUserId;
+    }
+  }
+
+  const ownerChanged = body.ownerUserId !== undefined && ownerUserId !== existing.ownerUserId;
+
+  const CLASSIFICATION_FIELDS = ["businessCriticality", "decisionRole", "humanOversight", "impactLevel", "dataSensitivity", "affectedPopulation", "externalImpact", "regulatoryRelevance", "assessmentStatus"] as const;
+  const classificationChanges: Record<string, { from: unknown; to: unknown }> = {};
+  for (const field of CLASSIFICATION_FIELDS) {
+    const value = (body as Record<string, unknown>)[field];
+    if (value !== undefined) {
+      const before = (existing as unknown as Record<string, unknown>)[field];
+      const changed = Array.isArray(before) || Array.isArray(value) ? JSON.stringify(before) !== JSON.stringify(value) : before !== value;
+      if (changed) {
+        classificationChanges[field] = { from: before, to: value };
+      }
     }
   }
 
@@ -1986,7 +2051,17 @@ server.patch("/ai-systems/:id", async (request, reply) => {
       ownerUserId,
       dataCategories: body.dataCategories ?? undefined,
       riskTier: body.riskTier !== undefined ? (body.riskTier as never) : undefined,
+      businessCriticality: body.businessCriticality !== undefined ? (body.businessCriticality as never) : undefined,
+      decisionRole: body.decisionRole !== undefined ? (body.decisionRole as never) : undefined,
+      humanOversight: body.humanOversight !== undefined ? (body.humanOversight as never) : undefined,
+      impactLevel: body.impactLevel !== undefined ? (body.impactLevel as never) : undefined,
+      dataSensitivity: body.dataSensitivity !== undefined ? (body.dataSensitivity as never) : undefined,
+      affectedPopulation: body.affectedPopulation ?? undefined,
+      externalImpact: body.externalImpact !== undefined ? body.externalImpact : undefined,
+      regulatoryRelevance: body.regulatoryRelevance ?? undefined,
+      assessmentStatus: (body.assessmentStatus as never) ?? undefined,
     },
+    include: { owner: { select: { id: true, displayName: true, email: true } } },
   });
 
   await prisma.auditEvent.create({
@@ -2009,6 +2084,34 @@ server.patch("/ai-systems/:id", async (request, reply) => {
         targetType: "AiSystem",
         targetId: updated.id,
         outcome: "SUCCESS",
+      },
+    });
+  }
+
+  if (ownerChanged) {
+    await prisma.auditEvent.create({
+      data: {
+        tenantId: session.tenantId,
+        actorUserId: session.userId,
+        action: "ai_system.owner_changed",
+        targetType: "AiSystem",
+        targetId: updated.id,
+        outcome: "SUCCESS",
+        metadataJson: { previousOwnerUserId: existing.ownerUserId, newOwnerUserId: ownerUserId },
+      },
+    });
+  }
+
+  if (Object.keys(classificationChanges).length > 0) {
+    await prisma.auditEvent.create({
+      data: {
+        tenantId: session.tenantId,
+        actorUserId: session.userId,
+        action: "ai_system.classification_changed",
+        targetType: "AiSystem",
+        targetId: updated.id,
+        outcome: "SUCCESS",
+        metadataJson: classificationChanges as never,
       },
     });
   }
@@ -2154,6 +2257,26 @@ server.delete("/ai-systems/:id/vendors/:linkId", async (request, reply) => {
   });
 
   return reply.status(204).send();
+});
+
+
+server.get("/tenant-users", async (request, reply) => {
+  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  if (!session) {
+    return reply.status(401).send({ error: "Not logged in" });
+  }
+  try {
+    requirePermission({ tenantId: session.tenantId, role: session.role as Role }, "ai-system:update");
+  } catch {
+    return reply.status(403).send({ error: "Not authorized to view tenant users" });
+  }
+
+  const memberships = await prisma.tenantMembership.findMany({
+    where: { tenantId: session.tenantId },
+    include: { user: { select: { id: true, displayName: true, email: true } } },
+  });
+  const users = memberships.map((m) => m.user);
+  return reply.send({ users });
 });
 
 const start = async () => {

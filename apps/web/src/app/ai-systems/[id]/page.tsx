@@ -2,6 +2,8 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 
+type TenantUser = { id: string; displayName: string; email: string };
+
 type AiSystem = {
   id: string;
   name: string;
@@ -10,8 +12,18 @@ type AiSystem = {
   category: string;
   lifecycleStatus: string;
   ownerUserId: string | null;
+  owner: TenantUser | null;
   dataCategories: string[];
   riskTier: string | null;
+  businessCriticality: string | null;
+  decisionRole: string | null;
+  humanOversight: string | null;
+  impactLevel: string | null;
+  dataSensitivity: string | null;
+  affectedPopulation: string[];
+  externalImpact: boolean | null;
+  regulatoryRelevance: string[];
+  assessmentStatus: string;
   createdAt: string;
   updatedAt: string;
 };
@@ -27,6 +39,21 @@ type Vendor = { id: string; legalName: string };
 
 const LIFECYCLE_OPTIONS = ["PROPOSED", "DEVELOPMENT", "TESTING", "ASSESSMENT", "PENDING_APPROVAL", "APPROVED", "PRODUCTION", "SUSPENDED", "RETIRED"];
 const VENDOR_ROLES = ["PRIMARY_PROVIDER", "MODEL_PROVIDER", "PLATFORM_PROVIDER", "AI_SERVICE_PROVIDER", "DATA_PROVIDER", "DEVELOPMENT_PROVIDER", "OTHER"];
+const BUSINESS_CRITICALITY_OPTIONS = ["LOW", "MEDIUM", "HIGH", "CRITICAL"];
+const DECISION_ROLE_OPTIONS = ["ADVISORY", "RECOMMENDS", "DECIDES", "EXECUTES"];
+const HUMAN_OVERSIGHT_OPTIONS = ["REQUIRED", "OPTIONAL", "NOT_APPLICABLE"];
+const IMPACT_LEVEL_OPTIONS = ["LOW", "MODERATE", "HIGH"];
+const DATA_SENSITIVITY_OPTIONS = ["PUBLIC", "INTERNAL", "CONFIDENTIAL", "RESTRICTED"];
+const AFFECTED_POPULATION_OPTIONS = ["EMPLOYEES", "CUSTOMERS", "PUBLIC", "OTHER"];
+const REGULATORY_RELEVANCE_OPTIONS = ["EU_AI_ACT", "PRIVACY", "INDUSTRY_SPECIFIC", "OTHER"];
+const ASSESSMENT_STATUS_OPTIONS = ["NOT_ASSESSED", "ASSESSMENT_REQUIRED", "ASSESSED"];
+
+const DECISION_ROLE_HELP: Record<string, string> = {
+  ADVISORY: "Provides information only.",
+  RECOMMENDS: "Produces recommendations that humans evaluate.",
+  DECIDES: "Makes decisions.",
+  EXECUTES: "Can perform actions or transactions.",
+};
 
 export default function AiSystemDetailPage() {
   const params = useParams();
@@ -35,6 +62,7 @@ export default function AiSystemDetailPage() {
   const [aiSystem, setAiSystem] = useState<AiSystem | null>(null);
   const [vendorLinks, setVendorLinks] = useState<VendorLink[] | null>(null);
   const [allVendors, setAllVendors] = useState<Vendor[]>([]);
+  const [tenantUsers, setTenantUsers] = useState<TenantUser[]>([]);
   const [notFound, setNotFound] = useState(false);
 
   const [lifecycleDraft, setLifecycleDraft] = useState("");
@@ -46,6 +74,19 @@ export default function AiSystemDetailPage() {
   const [linkError, setLinkError] = useState("");
   const [linking, setLinking] = useState(false);
 
+  const [govOwnerUserId, setGovOwnerUserId] = useState("");
+  const [govBusinessCriticality, setGovBusinessCriticality] = useState("");
+  const [govDecisionRole, setGovDecisionRole] = useState("");
+  const [govHumanOversight, setGovHumanOversight] = useState("");
+  const [govImpactLevel, setGovImpactLevel] = useState("");
+  const [govDataSensitivity, setGovDataSensitivity] = useState("");
+  const [govAffectedPopulation, setGovAffectedPopulation] = useState<string[]>([]);
+  const [govExternalImpact, setGovExternalImpact] = useState(false);
+  const [govRegulatoryRelevance, setGovRegulatoryRelevance] = useState<string[]>([]);
+  const [govAssessmentStatus, setGovAssessmentStatus] = useState("NOT_ASSESSED");
+  const [govError, setGovError] = useState("");
+  const [govSaving, setGovSaving] = useState(false);
+
   function loadAiSystem() {
     fetch(`${process.env.NEXT_PUBLIC_API_URL}/ai-systems/${id}`, { credentials: "include" })
       .then((res) => {
@@ -56,10 +97,20 @@ export default function AiSystemDetailPage() {
         if (!res.ok) throw new Error("Failed to load");
         return res.json();
       })
-      .then((d) => {
+      .then((d: AiSystem | null) => {
         if (d) {
           setAiSystem(d);
           setLifecycleDraft(d.lifecycleStatus);
+          setGovOwnerUserId(d.ownerUserId ?? "");
+          setGovBusinessCriticality(d.businessCriticality ?? "");
+          setGovDecisionRole(d.decisionRole ?? "");
+          setGovHumanOversight(d.humanOversight ?? "");
+          setGovImpactLevel(d.impactLevel ?? "");
+          setGovDataSensitivity(d.dataSensitivity ?? "");
+          setGovAffectedPopulation(d.affectedPopulation ?? []);
+          setGovExternalImpact(d.externalImpact ?? false);
+          setGovRegulatoryRelevance(d.regulatoryRelevance ?? []);
+          setGovAssessmentStatus(d.assessmentStatus ?? "NOT_ASSESSED");
         }
       })
       .catch(() => setNotFound(true));
@@ -80,7 +131,11 @@ export default function AiSystemDetailPage() {
       .then((res) => (res.ok ? res.json() : { vendors: [] }))
       .then((d) => setAllVendors(d.vendors))
       .catch(() => setAllVendors([]));
-      }, [id]);
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/tenant-users`, { credentials: "include" })
+      .then((res) => (res.ok ? res.json() : { users: [] }))
+      .then((d) => setTenantUsers(d.users))
+      .catch(() => setTenantUsers([]));
+  }, [id]);
 
   async function handleLifecycleUpdate() {
     setLifecycleSaving(true);
@@ -106,6 +161,51 @@ export default function AiSystemDetailPage() {
       setLifecycleError("Something went wrong updating the lifecycle status.");
     } finally {
       setLifecycleSaving(false);
+    }
+  }
+
+  function toggleAffectedPopulation(val: string) {
+    setGovAffectedPopulation((prev) => (prev.includes(val) ? prev.filter((v) => v !== val) : [...prev, val]));
+  }
+  function toggleRegulatoryRelevance(val: string) {
+    setGovRegulatoryRelevance((prev) => (prev.includes(val) ? prev.filter((v) => v !== val) : [...prev, val]));
+  }
+
+  async function handleGovernanceSave() {
+    setGovSaving(true);
+    setGovError("");
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/ai-systems/${id}`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ownerUserId: govOwnerUserId || null,
+          businessCriticality: govBusinessCriticality || null,
+          decisionRole: govDecisionRole || null,
+          humanOversight: govHumanOversight || null,
+          impactLevel: govImpactLevel || null,
+          dataSensitivity: govDataSensitivity || null,
+          affectedPopulation: govAffectedPopulation,
+          externalImpact: govExternalImpact,
+          regulatoryRelevance: govRegulatoryRelevance,
+          assessmentStatus: govAssessmentStatus,
+        }),
+      });
+      if (res.status === 403) {
+        setGovError("You don't have permission to edit this AI system's governance profile.");
+        return;
+      }
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        setGovError(body?.error || "Something went wrong saving the governance profile.");
+        return;
+      }
+      loadAiSystem();
+    } catch {
+      setGovError("Something went wrong saving the governance profile.");
+    } finally {
+      setGovSaving(false);
     }
   }
 
@@ -173,7 +273,9 @@ export default function AiSystemDetailPage() {
   const cardStyle = { background: "#1a2340", border: "1px solid #2e3d63", borderRadius: 10, padding: 20, marginBottom: 20 };
   const labelStyle = { color: "#5d6786", fontSize: 11.5, textTransform: "uppercase" as const, letterSpacing: 0.5, marginBottom: 4 };
   const valueStyle = { color: "#e6e9f0", fontSize: 14, marginBottom: 14 };
-  const selectStyle = { padding: "8px 12px", borderRadius: 8, border: "1px solid #2e3d63", background: "#0a0f1a", color: "#e6e9f0", fontSize: 13 };
+  const selectStyle = { padding: "8px 12px", borderRadius: 8, border: "1px solid #2e3d63", background: "#0a0f1a", color: "#e6e9f0", fontSize: 13, width: "100%" };
+  const fieldLabelStyle = { fontSize: 13, color: "#8b96ac", display: "block", marginBottom: 4 };
+  const helpTextStyle = { fontSize: 11.5, color: "#5d6786", marginTop: 4, marginBottom: 0 };
 
   return (
     <main style={{ maxWidth: 760, margin: "0 auto", padding: "32px 24px" }}>
@@ -199,21 +301,117 @@ export default function AiSystemDetailPage() {
       </div>
 
       <div style={cardStyle}>
-        <h2 style={{ fontSize: 15, marginTop: 0, marginBottom: 16 }}>Governance</h2>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-          <div>
-            <div style={labelStyle}>Owner</div>
-            <div style={{ ...valueStyle, color: "#5d6786", fontStyle: "italic" }}>
-              Owner assignment picker not available in this version.
-            </div>
-          </div>
-          <div>
-            <div style={labelStyle}>Risk Tier</div>
-            <div style={valueStyle}>{aiSystem.riskTier || "Not set"}</div>
+        <h2 style={{ fontSize: 15, marginTop: 0, marginBottom: 4 }}>Governance</h2>
+        <p style={{ color: "#8b96ac", fontSize: 12.5, marginTop: 0, marginBottom: 16 }}>
+          This is the authoritative governance record for this AI system: who is accountable for it, and how it&apos;s classified for oversight purposes.
+        </p>
+
+        <label style={fieldLabelStyle}>
+          Owner
+          <select style={selectStyle} value={govOwnerUserId} onChange={(e) => setGovOwnerUserId(e.target.value)}>
+            <option value="">Not assigned</option>
+            {tenantUsers.map((u) => (
+              <option key={u.id} value={u.id}>{u.displayName} ({u.email})</option>
+            ))}
+          </select>
+        </label>
+        <p style={helpTextStyle}>The person accountable for this AI system's governance.</p>
+
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginTop: 16 }}>
+          <label style={fieldLabelStyle}>
+            Business Criticality
+            <select style={selectStyle} value={govBusinessCriticality} onChange={(e) => setGovBusinessCriticality(e.target.value)}>
+              <option value="">Not set</option>
+              {BUSINESS_CRITICALITY_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
+            </select>
+            <p style={helpTextStyle}>How important this system is to business operations.</p>
+          </label>
+
+          <label style={fieldLabelStyle}>
+            Decision Role
+            <select style={selectStyle} value={govDecisionRole} onChange={(e) => setGovDecisionRole(e.target.value)}>
+              <option value="">Not set</option>
+              {DECISION_ROLE_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
+            </select>
+            <p style={helpTextStyle}>{govDecisionRole ? DECISION_ROLE_HELP[govDecisionRole] : "How much authority this system has."}</p>
+          </label>
+
+          <label style={fieldLabelStyle}>
+            Human Oversight
+            <select style={selectStyle} value={govHumanOversight} onChange={(e) => setGovHumanOversight(e.target.value)}>
+              <option value="">Not set</option>
+              {HUMAN_OVERSIGHT_OPTIONS.map((o) => <option key={o} value={o}>{o.replace(/_/g, " ")}</option>)}
+            </select>
+            <p style={helpTextStyle}>Whether a human must review or approve this system's outputs.</p>
+          </label>
+
+          <label style={fieldLabelStyle}>
+            Impact Level
+            <select style={selectStyle} value={govImpactLevel} onChange={(e) => setGovImpactLevel(e.target.value)}>
+              <option value="">Not set</option>
+              {IMPACT_LEVEL_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
+            </select>
+            <p style={helpTextStyle}>Potential significance of adverse impact if things go wrong.</p>
+          </label>
+
+          <label style={fieldLabelStyle}>
+            Data Sensitivity
+            <select style={selectStyle} value={govDataSensitivity} onChange={(e) => setGovDataSensitivity(e.target.value)}>
+              <option value="">Not set</option>
+              {DATA_SENSITIVITY_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
+            </select>
+            <p style={helpTextStyle}>Highest sensitivity of data this system is expected to process.</p>
+          </label>
+
+          <label style={fieldLabelStyle}>
+            Assessment Status
+            <select style={selectStyle} value={govAssessmentStatus} onChange={(e) => setGovAssessmentStatus(e.target.value)}>
+              {ASSESSMENT_STATUS_OPTIONS.map((o) => <option key={o} value={o}>{o.replace(/_/g, " ")}</option>)}
+            </select>
+            <p style={helpTextStyle}>Governance assessment status only - not the assessment itself.</p>
+          </label>
+        </div>
+
+        <div style={{ marginTop: 16 }}>
+          <div style={fieldLabelStyle}>Affected Population</div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
+            {AFFECTED_POPULATION_OPTIONS.map((p) => (
+              <label key={p} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "#8b96ac" }}>
+                <input type="checkbox" checked={govAffectedPopulation.includes(p)} onChange={() => toggleAffectedPopulation(p)} />
+                {p}
+              </label>
+            ))}
           </div>
         </div>
-        <div style={labelStyle}>Data Categories</div>
-        <div style={valueStyle}>{aiSystem.dataCategories.length > 0 ? aiSystem.dataCategories.join(", ") : "None recorded"}</div>
+
+        <div style={{ marginTop: 16 }}>
+          <div style={fieldLabelStyle}>Regulatory Relevance</div>
+          <p style={helpTextStyle}>Flags areas for further governance review - not a legal determination.</p>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginTop: 8 }}>
+            {REGULATORY_RELEVANCE_OPTIONS.map((r) => (
+              <label key={r} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "#8b96ac" }}>
+                <input type="checkbox" checked={govRegulatoryRelevance.includes(r)} onChange={() => toggleRegulatoryRelevance(r)} />
+                {r.replace(/_/g, " ")}
+              </label>
+            ))}
+          </div>
+        </div>
+
+        <label style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 16, fontSize: 13, color: "#8b96ac" }}>
+          <input type="checkbox" checked={govExternalImpact} onChange={(e) => setGovExternalImpact(e.target.checked)} />
+          This system's outputs or actions can materially affect people outside the organization
+        </label>
+
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginTop: 16 }}>
+          <div>
+            <div style={labelStyle}>Existing Risk Tier</div>
+            <div style={valueStyle}>{aiSystem.riskTier || "Not set"}</div>
+          </div>
+          <div>
+            <div style={labelStyle}>Data Categories</div>
+            <div style={valueStyle}>{aiSystem.dataCategories.length > 0 ? aiSystem.dataCategories.join(", ") : "None recorded"}</div>
+          </div>
+        </div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
           <div>
             <div style={labelStyle}>Created</div>
@@ -224,12 +422,29 @@ export default function AiSystemDetailPage() {
             <div style={valueStyle}>{new Date(aiSystem.updatedAt).toLocaleDateString()}</div>
           </div>
         </div>
+
+        <button
+          onClick={handleGovernanceSave}
+          disabled={govSaving}
+          style={{
+            background: "#3b82f6", color: "#fff", border: "none", borderRadius: 8,
+            padding: "10px 18px", fontSize: 13.5, fontWeight: 700,
+            cursor: govSaving ? "not-allowed" : "pointer", opacity: govSaving ? 0.6 : 1,
+          }}
+        >
+          {govSaving ? "Saving..." : "Save Governance Profile"}
+        </button>
+        {govError && (
+          <div style={{ background: "#2a1a1a", border: "1px solid #ef4444", borderRadius: 8, padding: "10px 14px", color: "#f87171", fontSize: 12.5, marginTop: 10 }}>
+            {govError}
+          </div>
+        )}
       </div>
 
       <div style={cardStyle}>
         <h2 style={{ fontSize: 15, marginTop: 0, marginBottom: 16 }}>Lifecycle</h2>
         <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 8 }}>
-          <select style={selectStyle} value={lifecycleDraft} onChange={(e) => setLifecycleDraft(e.target.value)}>
+          <select style={{ ...selectStyle, width: "auto" }} value={lifecycleDraft} onChange={(e) => setLifecycleDraft(e.target.value)}>
             {LIFECYCLE_OPTIONS.map((l) => (
               <option key={l} value={l}>{l.replace(/_/g, " ")}</option>
             ))}
@@ -292,13 +507,13 @@ export default function AiSystemDetailPage() {
         )}
 
         <form onSubmit={handleLinkVendor} style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-          <select style={selectStyle} value={linkVendorId} onChange={(e) => setLinkVendorId(e.target.value)} required>
+          <select style={{ ...selectStyle, width: "auto" }} value={linkVendorId} onChange={(e) => setLinkVendorId(e.target.value)} required>
             <option value="">Select a vendor...</option>
             {allVendors.map((v) => (
               <option key={v.id} value={v.id}>{v.legalName}</option>
             ))}
           </select>
-          <select style={selectStyle} value={linkRole} onChange={(e) => setLinkRole(e.target.value)}>
+          <select style={{ ...selectStyle, width: "auto" }} value={linkRole} onChange={(e) => setLinkRole(e.target.value)}>
             {VENDOR_ROLES.map((r) => (
               <option key={r} value={r}>{r.replace(/_/g, " ")}</option>
             ))}

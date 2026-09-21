@@ -54,6 +54,19 @@ export const DATA_CATEGORIES = ["PII", "FINANCIAL", "HEALTH", "BIOMETRIC", "CHIL
 export type DataCategory = (typeof DATA_CATEGORIES)[number];
 
 /**
+ * Controlled whitelist for AiSystem.affectedPopulation (Step 5).
+ */
+export const AFFECTED_POPULATIONS = ["EMPLOYEES", "CUSTOMERS", "PUBLIC", "OTHER"] as const;
+export type AffectedPopulation = (typeof AFFECTED_POPULATIONS)[number];
+
+/**
+ * Controlled whitelist for AiSystem.regulatoryRelevance (Step 5). Flags areas
+ * for further governance review - not a legal determination.
+ */
+export const REGULATORY_RELEVANCE_TAGS = ["EU_AI_ACT", "PRIVACY", "INDUSTRY_SPECIFIC", "OTHER"] as const;
+export type RegulatoryRelevanceTag = (typeof REGULATORY_RELEVANCE_TAGS)[number];
+
+/**
  * Minimum role required to perform risk acceptance. Enforced server-side
  * in both the API and the MCP server (risk acceptance is intentionally
  * NOT exposed as an autonomous MCP tool at all - see docs/mcp-security.md).
