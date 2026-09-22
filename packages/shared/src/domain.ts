@@ -80,6 +80,7 @@ export const ROLE_PERMISSIONS: Record<Role, readonly string[]> = {
     "framework:manage",
     "vendor:*",
     "ai-system:*",
+    "ai-risk-assessment:review",
     "assessment:*",
     "finding:*",
     "questionnaire:review",
@@ -106,6 +107,7 @@ export const ROLE_PERMISSIONS: Record<Role, readonly string[]> = {
   REVIEWER: [
     "vendor:read",
     "ai-system:read",
+    "ai-risk-assessment:review",
     "assessment:read",
     "finding:read",
     "finding:review",
