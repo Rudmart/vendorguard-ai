@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 
 type TenantUser = { id: string; displayName: string; email: string };
+type RiskAssessmentSummary = { id: string; name: string; status: string; risks: { inherentScore: number; residualScore: number | null }[] };
 
 type AiSystem = {
   id: string;
@@ -74,6 +75,8 @@ export default function AiSystemDetailPage() {
   const [linkError, setLinkError] = useState("");
   const [linking, setLinking] = useState(false);
 
+  const [riskAssessments, setRiskAssessments] = useState<RiskAssessmentSummary[] | null>(null);
+
   const [govOwnerUserId, setGovOwnerUserId] = useState("");
   const [govBusinessCriticality, setGovBusinessCriticality] = useState("");
   const [govDecisionRole, setGovDecisionRole] = useState("");
@@ -135,7 +138,24 @@ export default function AiSystemDetailPage() {
       .then((res) => (res.ok ? res.json() : { users: [] }))
       .then((d) => setTenantUsers(d.users))
       .catch(() => setTenantUsers([]));
+    fetch(`/ai-systems/${id}/risk-assessments`, { credentials: "include" })
+      .then((res) => (res.ok ? res.json() : { assessments: [] }))
+      .then((d) => setRiskAssessments(d.assessments))
+      .catch(() => setRiskAssessments([]));
   }, [id]);
+
+  async function handleStartAssessment() {
+    const res = await fetch(`/ai-systems/${id}/risk-assessments`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "Risk Assessment - " + new Date().toLocaleDateString() }),
+    });
+    if (res.ok) {
+      const created = await res.json();
+      window.location.href = `/ai-risk-assessments/${created.id}`;
+    }
+  }
 
   async function handleLifecycleUpdate() {
     setLifecycleSaving(true);
@@ -515,7 +535,8 @@ export default function AiSystemDetailPage() {
           </select>
           <select style={{ ...selectStyle, width: "auto" }} value={linkRole} onChange={(e) => setLinkRole(e.target.value)}>
             {VENDOR_ROLES.map((r) => (
-              <option key={r} value={r}>{r.replace(/_/g, " ")}</option>
+              <option key={r} value={r}>{r.replace(/_/g, " "
+    )}</option>
             ))}
           </select>
           <button
@@ -533,6 +554,45 @@ export default function AiSystemDetailPage() {
         {linkError && (
           <div style={{ background: "#2a1a1a", border: "1px solid #ef4444", borderRadius: 8, padding: "10px 14px", color: "#f87171", fontSize: 12.5, marginTop: 10 }}>
             {linkError}
+          </div>
+        )}
+      </div>
+    
+      <div style={cardStyle}>
+        <h2 style={{ fontSize: 15, marginTop: 0, marginBottom: 4 }}>AI Risk Assessment</h2>
+        <p style={{ color: "#8b96ac", fontSize: 12.5, marginTop: 0, marginBottom: 16 }}>
+          Structured risk identification, inherent/residual scoring, controls, treatment, and human review for this AI system.
+        </p>
+        {riskAssessments === null ? (
+          <p style={{ color: "#8b96ac", fontSize: 13 }}>Loading...</p>
+        ) : riskAssessments.length === 0 ? (
+          <>
+            <p style={{ color: "#8b96ac", fontSize: 13, marginBottom: 16 }}>No risk assessment has been started yet.</p>
+            <button
+              onClick={handleStartAssessment}
+              style={{ background: "#3b82f6", color: "#fff", border: "none", borderRadius: 8, padding: "10px 18px", fontSize: 13.5, fontWeight: 700, cursor: "pointer" }}
+            >
+              Start Risk Assessment
+            </button>
+          </>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {riskAssessments.map((a: RiskAssessmentSummary) => {
+              const risks = a.risks || [];
+              return (
+                <a key={a.id} href={`/ai-risk-assessments/${a.id}`} style={{ textDecoration: "none", color: "inherit" }}>
+                  <div style={{ background: "#0a0f1a", border: "1px solid #233150", borderRadius: 8, padding: "14px 16px" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span style={{ fontWeight: 600, fontSize: 13.5 }}>{a.name}</span>
+                      <span style={{ fontSize: 11, color: "#8b96ac" }}>{a.status.replace(/_/g, " ")}</span>
+                    </div>
+                    <div style={{ fontSize: 12, color: "#8b96ac", marginTop: 6 }}>
+                      {risks.length} risk{risks.length === 1 ? "" : "s"} identified
+                    </div>
+                  </div>
+                </a>
+              );
+            })}
           </div>
         )}
       </div>
