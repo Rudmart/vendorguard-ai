@@ -138,14 +138,14 @@ export default function AiSystemDetailPage() {
       .then((res) => (res.ok ? res.json() : { users: [] }))
       .then((d) => setTenantUsers(d.users))
       .catch(() => setTenantUsers([]));
-    fetch(`/ai-systems/${id}/risk-assessments`, { credentials: "include" })
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/ai-systems/${id}/risk-assessments`, { credentials: "include" })
       .then((res) => (res.ok ? res.json() : { assessments: [] }))
       .then((d) => setRiskAssessments(d.assessments))
       .catch(() => setRiskAssessments([]));
   }, [id]);
 
   async function handleStartAssessment() {
-    const res = await fetch(`/ai-systems/${id}/risk-assessments`, {
+    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/ai-systems/${id}/risk-assessments`, {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
