@@ -129,6 +129,8 @@ model Tenant {
   aiSystemVendors      AiSystemVendor[]
   aiRiskAssessments    AiRiskAssessment[]
   aiImpactAssessments  AiImpactAssessment[]
+  aiSystemFrameworkApplicability AiSystemFrameworkApplicability[]
+  aiSystemControls               AiSystemControl[]
   aiImpacts            AiImpact[]
   aiRisks              AiRisk[]
 
@@ -157,6 +159,9 @@ model User {
   aiRisksAsTreatmentOwner AiRisk[] @relation("AiRiskTreatmentOwner")
   aiImpactAssessmentsAsAssessor AiImpactAssessment[] @relation("AiImpactAssessmentAssessor")
   aiImpactAssessmentsAsReviewer AiImpactAssessment[] @relation("AiImpactAssessmentReviewer")
+  frameworkApplicabilityDetermined AiSystemFrameworkApplicability[] @relation("AiFrameworkApplicabilityDeterminedBy")
+  aiSystemControlsOwned            AiSystemControl[]                @relation("AiSystemControlOwner")
+  aiSystemControlsMapped           AiSystemControl[]                @relation("AiSystemControlMappedBy")
 
   @@map("users")
 }
@@ -495,6 +500,7 @@ model Framework {
   tenant  Tenant?               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   versions FrameworkVersion[]
   assessmentFrameworks AssessmentFramework[]
+  aiSystemApplicability AiSystemFrameworkApplicability[]
 
   @@index([tenantId])
   @@map("frameworks")
@@ -535,6 +541,7 @@ model Control {
   aiRisks          AiRisk[]
   mappingsFrom     ControlMapping[] @relation("MappingFrom")
   mappingsTo       ControlMapping[] @relation("MappingTo")
+  aiSystemControls AiSystemControl[]
 
   @@unique([frameworkVersionId, controlId])
   @@map("controls")
@@ -924,6 +931,8 @@ model AiSystem {
   vendorLinks     AiSystemVendor[]
   riskAssessments AiRiskAssessment[]
   impactAssessments AiImpactAssessment[]
+  frameworkApplicability AiSystemFrameworkApplicability[]
+  controls               AiSystemControl[]
 
   createdAt       DateTime                @default(now())
   updatedAt       DateTime                @updatedAt
@@ -1137,4 +1146,88 @@ model AiImpact {
   @@index([tenantId])
   @@index([tenantId, assessmentId])
   @@map("ai_impacts")
+}
+
+// ---------------------------------------------------------------------------
+// Step 8 - Framework Applicability & AI Control Set (AiSystem-level governance).
+// Framework and Control are the authoritative, globally seeded library and are
+// referenced, never copied. Applicability is a HUMAN governance determination;
+// AiSystem.regulatoryRelevance is display-only context and never sets it.
+// Mapping != implementation != effectiveness != compliance. No control testing here.
+// ---------------------------------------------------------------------------
+
+enum AiFrameworkApplicabilityStatus {
+  APPLICABLE
+  PARTIALLY_APPLICABLE
+  NOT_APPLICABLE
+  NEEDS_REVIEW
+}
+
+enum AiControlApplicability {
+  NOT_ASSESSED
+  APPLICABLE
+  PARTIALLY_APPLICABLE
+  NOT_APPLICABLE
+}
+
+// Organization-reported implementation claim only - not validated, not effectiveness.
+enum AiControlImplementationStatus {
+  NOT_STARTED
+  PLANNED
+  IMPLEMENTED
+}
+
+model AiSystemFrameworkApplicability {
+  id                 String                         @id @default(uuid())
+  tenantId           String
+  aiSystemId         String
+  frameworkId        String
+  status             AiFrameworkApplicabilityStatus
+  rationale          String // required for every determination
+  determinedByUserId String?
+  determinedAt       DateTime
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant       Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  aiSystem     AiSystem          @relation(fields: [aiSystemId], references: [id], onDelete: Cascade)
+  framework    Framework         @relation(fields: [frameworkId], references: [id], onDelete: Restrict)
+  determinedBy User?             @relation("AiFrameworkApplicabilityDeterminedBy", fields: [determinedByUserId], references: [id])
+  controls     AiSystemControl[]
+
+  @@unique([aiSystemId, frameworkId])
+  @@index([tenantId])
+  @@index([tenantId, aiSystemId])
+  @@map("ai_system_framework_applicability")
+}
+
+model AiSystemControl {
+  id                    String                        @id @default(uuid())
+  tenantId              String
+  aiSystemId            String
+  controlId             String // the authoritative Control row (never copied)
+  sourceApplicabilityId String // the framework determination this control was mapped under
+
+  applicability        AiControlApplicability        @default(NOT_ASSESSED)
+  rationale            String? // required by the API for NOT_APPLICABLE and PARTIALLY_APPLICABLE
+  ownerUserId          String?
+  implementationStatus AiControlImplementationStatus @default(NOT_STARTED)
+  mappedByUserId       String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant              Tenant                         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  aiSystem            AiSystem                       @relation(fields: [aiSystemId], references: [id], onDelete: Cascade)
+  control             Control                        @relation(fields: [controlId], references: [id], onDelete: Restrict)
+  sourceApplicability AiSystemFrameworkApplicability @relation(fields: [sourceApplicabilityId], references: [id], onDelete: Restrict)
+  owner               User?                          @relation("AiSystemControlOwner", fields: [ownerUserId], references: [id])
+  mappedBy            User?                          @relation("AiSystemControlMappedBy", fields: [mappedByUserId], references: [id])
+
+  @@unique([aiSystemId, controlId])
+  @@index([tenantId])
+  @@index([tenantId, aiSystemId])
+  @@index([tenantId, ownerUserId])
+  @@map("ai_system_controls")
 }
