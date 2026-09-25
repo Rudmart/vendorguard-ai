@@ -444,6 +444,38 @@ describe("AI Risk Assessment - human review (separation of duties)", () => {
     });
     expect(JSON.parse(res.body).status).toBe("IN_PROGRESS");
   });
+
+  it("records the creator as the assessor when no assessorUserId is provided", async () => {
+    const sysId = await createAiSystem(tenantAId, "ADMIN", adminUserId);
+    const assessmentId = await createAssessment(sysId, tenantAId, "ANALYST", analystUserId, "Default Assessor Test");
+    const saved = await prisma.aiRiskAssessment.findUnique({ where: { id: assessmentId } });
+    expect(saved?.assessorUserId).toBe(analystUserId);
+  });
+
+  it("rejects the creator reviewing their own assessment when no assessor was explicitly set", async () => {
+    const sysId = await createAiSystem(tenantAId, "ADMIN", adminUserId);
+    const assessmentId = await createAssessment(sysId, tenantAId, "ADMIN", adminUserId, "Implicit Self Review Test");
+    const res = await server.inject({
+      method: "POST", url: `/ai-risk-assessments/${assessmentId}/review`,
+      cookies: { vg_session: cookieFor(adminUserId, "ADMIN", tenantAId) },
+      payload: { decision: "APPROVED", rationale: "Approving my own work" },
+    });
+    expect(res.statusCode).toBe(403);
+  });
+
+  it("fails closed: rejects any review when no assessor is recorded", async () => {
+    const sysId = await createAiSystem(tenantAId, "ADMIN", adminUserId);
+    const assessmentId = await createAssessment(sysId, tenantAId, "ANALYST", analystUserId, "Missing Assessor Test");
+    await prisma.aiRiskAssessment.update({ where: { id: assessmentId }, data: { assessorUserId: null } });
+    const res = await server.inject({
+      method: "POST", url: `/ai-risk-assessments/${assessmentId}/review`,
+      cookies: { vg_session: cookieFor(reviewerUserId, "REVIEWER", tenantAId) },
+      payload: { decision: "APPROVED", rationale: "No assessor on record" },
+    });
+    expect(res.statusCode).toBe(403);
+    const after = await prisma.aiRiskAssessment.findUnique({ where: { id: assessmentId } });
+    expect(after?.status).not.toBe("COMPLETED");
+  });
 });
 
 describe("AiRisk -> RemediationAction (mitigation work)", () => {
