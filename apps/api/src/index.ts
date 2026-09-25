@@ -2332,7 +2332,7 @@ server.post("/ai-systems/:id/risk-assessments", async (request, reply) => {
     return reply.status(400).send({ error: "name is required" });
   }
 
-  let assessorUserId: string | null = null;
+  let assessorUserId: string | null = session.userId ?? null;
   if (body.assessorUserId) {
     const membership = await prisma.tenantMembership.findFirst({
       where: { userId: body.assessorUserId, tenantId: session.tenantId },
@@ -2818,7 +2818,7 @@ server.post("/ai-risk-assessments/:id/review", async (request, reply) => {
   if (!body.rationale) {
     return reply.status(400).send({ error: "rationale is required" });
   }
-  if (assessment.assessorUserId && assessment.assessorUserId === session.userId) {
+  if (!assessment.assessorUserId || assessment.assessorUserId === session.userId) {
     return reply.status(403).send({ error: "The assessor cannot also review their own assessment" });
   }
 
