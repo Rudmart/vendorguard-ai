@@ -128,6 +128,8 @@ model Tenant {
   aiSystems            AiSystem[]
   aiSystemVendors      AiSystemVendor[]
   aiRiskAssessments    AiRiskAssessment[]
+  aiImpactAssessments  AiImpactAssessment[]
+  aiImpacts            AiImpact[]
   aiRisks              AiRisk[]
 
   @@map("tenants")
@@ -153,6 +155,8 @@ model User {
   aiRiskAssessmentsAsAssessor AiRiskAssessment[] @relation("AiRiskAssessmentAssessor")
   aiRiskAssessmentsAsReviewer AiRiskAssessment[] @relation("AiRiskAssessmentReviewer")
   aiRisksAsTreatmentOwner AiRisk[] @relation("AiRiskTreatmentOwner")
+  aiImpactAssessmentsAsAssessor AiImpactAssessment[] @relation("AiImpactAssessmentAssessor")
+  aiImpactAssessmentsAsReviewer AiImpactAssessment[] @relation("AiImpactAssessmentReviewer")
 
   @@map("users")
 }
@@ -919,6 +923,7 @@ model AiSystem {
 
   vendorLinks     AiSystemVendor[]
   riskAssessments AiRiskAssessment[]
+  impactAssessments AiImpactAssessment[]
 
   createdAt       DateTime                @default(now())
   updatedAt       DateTime                @updatedAt
@@ -1023,4 +1028,113 @@ model AiRisk {
   @@index([tenantId])
   @@index([tenantId, assessmentId])
   @@map("ai_risks")
+}
+
+// ---------------------------------------------------------------------------
+// Step 7 - AI Impact Assessment (AiSystem-level governance record).
+// Separate from the vendor Assessment impact score (Milestone 3) and from
+// AI Risk Assessment. Severity is a 1-5 magnitude, not likelihood x impact.
+// Never writes AiSystem.impactLevel / humanOversight / riskTier / assessmentStatus.
+// ---------------------------------------------------------------------------
+
+enum AiImpactCategory {
+  FAIRNESS
+  PRIVACY
+  INDIVIDUAL_RIGHTS
+  ACCESSIBILITY
+  SAFETY
+  HUMAN_AUTONOMY
+  TRANSPARENCY
+  ECONOMIC
+  OPERATIONAL
+  SOCIETAL
+}
+
+enum AiImpactDirection {
+  BENEFICIAL
+  ADVERSE
+}
+
+enum AiImpactScale {
+  LIMITED
+  MODERATE
+  BROAD
+  MASS
+}
+
+enum AiImpactReversibility {
+  REVERSIBLE
+  PARTIALLY_REVERSIBLE
+  DIFFICULT_TO_REVERSE
+  IRREVERSIBLE
+}
+
+model AiImpactAssessment {
+  id         String                 @id @default(uuid())
+  tenantId   String
+  aiSystemId String
+  name       String
+  version    Int
+  status     AiRiskAssessmentStatus @default(DRAFT)
+
+  assessorUserId String?
+  completedAt    DateTime?
+
+  reviewedAt      DateTime?
+  reviewerUserId  String?
+  reviewDecision  AiAssessmentReviewDecision?
+  reviewRationale String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant   Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  aiSystem AiSystem   @relation(fields: [aiSystemId], references: [id], onDelete: Cascade)
+  assessor User?      @relation("AiImpactAssessmentAssessor", fields: [assessorUserId], references: [id])
+  reviewer User?      @relation("AiImpactAssessmentReviewer", fields: [reviewerUserId], references: [id])
+  impacts  AiImpact[]
+
+  @@unique([aiSystemId, version])
+  @@index([tenantId])
+  @@index([tenantId, aiSystemId])
+  @@index([tenantId, status])
+  @@map("ai_impact_assessments")
+}
+
+model AiImpact {
+  id           String @id @default(uuid())
+  tenantId     String
+  assessmentId String
+
+  title       String
+  category    AiImpactCategory
+  direction   AiImpactDirection
+  description String
+
+  affectedPopulation       String // validated against AFFECTED_POPULATIONS in @vendorguard/shared
+  affectedGroupDescription String?
+
+  severity      Int // 1-5 magnitude of consequence (not likelihood x impact)
+  scale         AiImpactScale
+  reversibility AiImpactReversibility
+
+  vulnerablePopulations            Boolean @default(false)
+  vulnerablePopulationsExplanation String? // required by the API when vulnerablePopulations is true
+
+  oversightRequirement AiSystemHumanOversight?
+  oversightDescription String?
+  escalationMechanism  String?
+  humanCanOverride     Boolean?
+
+  safeguards String? // descriptive in Step 7; formal control mapping is Step 8
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant     Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  assessment AiImpactAssessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([tenantId, assessmentId])
+  @@map("ai_impacts")
 }
