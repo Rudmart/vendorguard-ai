@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
+import ImpactAssessmentCard from "./impact-assessment-card";
 
 type TenantUser = { id: string; displayName: string; email: string };
 type RiskAssessmentSummary = { id: string; name: string; status: string; risks: { inherentScore: number; residualScore: number | null }[] };
@@ -596,6 +597,7 @@ export default function AiSystemDetailPage() {
           </div>
         )}
       </div>
+      <ImpactAssessmentCard aiSystemId={String(id)} />
     </main>
   );
 }
