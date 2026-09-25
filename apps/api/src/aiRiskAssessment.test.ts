@@ -476,6 +476,79 @@ describe("AI Risk Assessment - human review (separation of duties)", () => {
     const after = await prisma.aiRiskAssessment.findUnique({ where: { id: assessmentId } });
     expect(after?.status).not.toBe("COMPLETED");
   });
+
+  it("blocks a second review once approved and preserves the original review", async () => {
+    const sysId = await createAiSystem(tenantAId, "ADMIN", adminUserId);
+    const assessmentId = await createAssessment(sysId, tenantAId, "ANALYST", analystUserId, "Second Review Test");
+    const first = await server.inject({
+      method: "POST", url: `/ai-risk-assessments/${assessmentId}/review`,
+      cookies: { vg_session: cookieFor(reviewerUserId, "REVIEWER", tenantAId) },
+      payload: { decision: "APPROVED", rationale: "Original approval" },
+    });
+    expect(first.statusCode).toBe(200);
+    const before = await prisma.aiRiskAssessment.findUnique({ where: { id: assessmentId } });
+    const second = await server.inject({
+      method: "POST", url: `/ai-risk-assessments/${assessmentId}/review`,
+      cookies: { vg_session: cookieFor(adminUserId, "ADMIN", tenantAId) },
+      payload: { decision: "REJECTED", rationale: "Attempted overwrite" },
+    });
+    expect(second.statusCode).toBe(409);
+    const after = await prisma.aiRiskAssessment.findUnique({ where: { id: assessmentId } });
+    expect(after?.reviewerUserId).toBe(reviewerUserId);
+    expect(after?.reviewDecision).toBe("APPROVED");
+    expect(after?.reviewRationale).toBe("Original approval");
+    expect(after?.reviewedAt?.getTime()).toBe(before?.reviewedAt?.getTime());
+    expect(after?.status).toBe("COMPLETED");
+    const denied = await prisma.auditEvent.findFirst({ where: { tenantId: tenantAId, action: "ai_risk_assessment.review_denied", targetId: assessmentId, outcome: "DENIED" } });
+    expect(denied).not.toBeNull();
+    expect((denied?.metadataJson as { reason?: string } | null)?.reason).toBe("already_completed");
+  });
+
+  it("audits a denied self-review with outcome DENIED and records no decision", async () => {
+    const sysId = await createAiSystem(tenantAId, "ADMIN", adminUserId);
+    const assessmentId = await createAssessment(sysId, tenantAId, "ADMIN", adminUserId, "Denied Self Review Audit Test");
+    const res = await server.inject({
+      method: "POST", url: `/ai-risk-assessments/${assessmentId}/review`,
+      cookies: { vg_session: cookieFor(adminUserId, "ADMIN", tenantAId) },
+      payload: { decision: "APPROVED", rationale: "Self approval attempt" },
+    });
+    expect(res.statusCode).toBe(403);
+    const denied = await prisma.auditEvent.findFirst({ where: { tenantId: tenantAId, action: "ai_risk_assessment.review_denied", targetId: assessmentId, outcome: "DENIED" } });
+    expect(denied).not.toBeNull();
+    expect((denied?.metadataJson as { reason?: string } | null)?.reason).toBe("self_review");
+    const after = await prisma.aiRiskAssessment.findUnique({ where: { id: assessmentId } });
+    expect(after?.reviewDecision).toBeNull();
+  });
+
+  it("audits a review attempt by a user without review permission", async () => {
+    const sysId = await createAiSystem(tenantAId, "ADMIN", adminUserId);
+    const assessmentId = await createAssessment(sysId, tenantAId, "ANALYST", analystUserId, "Denied Permission Audit Test");
+    const res = await server.inject({
+      method: "POST", url: `/ai-risk-assessments/${assessmentId}/review`,
+      cookies: { vg_session: cookieFor(analystUserId, "ANALYST", tenantAId) },
+      payload: { decision: "APPROVED", rationale: "No permission" },
+    });
+    expect(res.statusCode).toBe(403);
+    const denied = await prisma.auditEvent.findFirst({ where: { tenantId: tenantAId, action: "ai_risk_assessment.review_denied", targetId: assessmentId, outcome: "DENIED" } });
+    expect(denied).not.toBeNull();
+    expect((denied?.metadataJson as { reason?: string } | null)?.reason).toBe("missing_permission");
+  });
+
+  it("explains that no assessor is assigned and audits the denied attempt", async () => {
+    const sysId = await createAiSystem(tenantAId, "ADMIN", adminUserId);
+    const assessmentId = await createAssessment(sysId, tenantAId, "ANALYST", analystUserId, "No Assessor Message Test");
+    await prisma.aiRiskAssessment.update({ where: { id: assessmentId }, data: { assessorUserId: null } });
+    const res = await server.inject({
+      method: "POST", url: `/ai-risk-assessments/${assessmentId}/review`,
+      cookies: { vg_session: cookieFor(reviewerUserId, "REVIEWER", tenantAId) },
+      payload: { decision: "APPROVED", rationale: "No assessor" },
+    });
+    expect(res.statusCode).toBe(403);
+    expect(JSON.parse(res.body).error).toContain("an assessor has not been assigned");
+    const denied = await prisma.auditEvent.findFirst({ where: { tenantId: tenantAId, action: "ai_risk_assessment.review_denied", targetId: assessmentId, outcome: "DENIED" } });
+    expect(denied).not.toBeNull();
+    expect((denied?.metadataJson as { reason?: string } | null)?.reason).toBe("no_assessor_assigned");
+  });
 });
 
 describe("AiRisk -> RemediationAction (mitigation work)", () => {

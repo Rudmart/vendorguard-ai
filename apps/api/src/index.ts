@@ -2794,13 +2794,28 @@ server.post("/ai-risk-assessments/:id/review", async (request, reply) => {
   if (!session) {
     return reply.status(401).send({ error: "Not logged in" });
   }
+  const { id } = request.params as { id: string };
+  const alreadyReviewedMessage = "This assessment has already been reviewed and approved. The original review decision cannot be overwritten.";
+  const auditDenied = (reason: string) =>
+    prisma.auditEvent.create({
+      data: {
+        tenantId: session.tenantId,
+        actorUserId: session.userId,
+        action: "ai_risk_assessment.review_denied",
+        targetType: "AiRiskAssessment",
+        targetId: id,
+        outcome: "DENIED",
+        metadataJson: { reason } as never,
+      },
+    });
+
   try {
     requirePermission({ tenantId: session.tenantId, role: session.role as Role }, "ai-risk-assessment:review");
   } catch {
+    await auditDenied("missing_permission");
     return reply.status(403).send({ error: "Not authorized to review AI risk assessments" });
   }
 
-  const { id } = request.params as { id: string };
   const assessment = await prisma.aiRiskAssessment.findUnique({ where: { id } });
   if (!assessment) {
     return reply.status(404).send({ error: "AI risk assessment not found" });
@@ -2818,14 +2833,29 @@ server.post("/ai-risk-assessments/:id/review", async (request, reply) => {
   if (!body.rationale) {
     return reply.status(400).send({ error: "rationale is required" });
   }
-  if (!assessment.assessorUserId || assessment.assessorUserId === session.userId) {
+  if (assessment.status === "COMPLETED" || assessment.reviewDecision === "APPROVED") {
+    await auditDenied("already_completed");
+    return reply.status(409).send({ error: alreadyReviewedMessage });
+  }
+  if (!assessment.assessorUserId) {
+    await auditDenied("no_assessor_assigned");
+    return reply.status(403).send({ error: "Review cannot proceed because an assessor has not been assigned to this assessment." });
+  }
+  if (assessment.assessorUserId === session.userId) {
+    await auditDenied("self_review");
     return reply.status(403).send({ error: "The assessor cannot also review their own assessment" });
   }
 
   const newStatus = body.decision === "APPROVED" ? "COMPLETED" : "IN_PROGRESS";
 
-  const updated = await prisma.aiRiskAssessment.update({
-    where: { id: assessment.id },
+  // Conditional update: only succeeds if the assessment is still not approved (guards against a race between two reviewers)
+  const result = await prisma.aiRiskAssessment.updateMany({
+    where: {
+      id: assessment.id,
+      tenantId: session.tenantId,
+      status: { not: "COMPLETED" as never },
+      OR: [{ reviewDecision: null }, { reviewDecision: { not: "APPROVED" as never } }],
+    },
     data: {
       reviewedAt: new Date(),
       reviewerUserId: session.userId,
@@ -2835,6 +2865,11 @@ server.post("/ai-risk-assessments/:id/review", async (request, reply) => {
       completedAt: body.decision === "APPROVED" ? new Date() : undefined,
     },
   });
+  if (result.count === 0) {
+    await auditDenied("already_completed");
+    return reply.status(409).send({ error: alreadyReviewedMessage });
+  }
+  const updated = await prisma.aiRiskAssessment.findUnique({ where: { id: assessment.id } });
 
   await prisma.auditEvent.create({
     data: {
@@ -2842,7 +2877,7 @@ server.post("/ai-risk-assessments/:id/review", async (request, reply) => {
       actorUserId: session.userId,
       action: "ai_risk_assessment.review_recorded",
       targetType: "AiRiskAssessment",
-      targetId: updated.id,
+      targetId: assessment.id,
       outcome: "SUCCESS",
       metadataJson: { decision: body.decision } as never,
     },
