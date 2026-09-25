@@ -18,6 +18,7 @@ import { buildAssistantContext } from "./assistantContext.js";
 import { registerAuthRoutes } from "./auth-routes.js";
 import { getSessionFromCookie, COOKIE_NAME, requireFindingReviewAuthority, requireRiskAcceptanceAuthority, AuthorizationError, requestContextSchema, assertOwnedByTenant, requirePermission } from "@vendorguard/auth";
 import type { Role } from "@vendorguard/shared";
+import { DATA_CATEGORIES, AFFECTED_POPULATIONS, REGULATORY_RELEVANCE_TAGS } from "@vendorguard/shared";
 import { readdirSync, readFileSync } from "fs";
 import { join, dirname, resolve, sep } from "path";
 import { fileURLToPath } from "url";
@@ -1763,6 +1764,1183 @@ server.delete("/vendors/:id", async (request, reply) => {
   });
   return reply.status(204).send();
 });
+// ---------------------------------------------------------------------------
+// AI Systems (Slice 1) - a first-class platform object distinct from Vendor.
+// See docs/VENDORGUARD_MIGRATION_PLAN.md for the approved design. Vendor
+// represents an external organization; AiSystem represents an AI system or
+// use of AI being governed. An AiSystem may be INTERNAL (organization owns
+// and operates it, though it may still depend on third-party providers) or
+// THIRD_PARTY (the AI capability itself is primarily externally provided).
+// ---------------------------------------------------------------------------
+
+const AI_SYSTEM_CATEGORIES = ["GENERATIVE", "PREDICTIVE_ML", "DECISION_SUPPORT", "EMBEDDED", "AGENT", "OTHER"];
+const AI_SYSTEM_LIFECYCLE_STATUSES = ["PROPOSED", "DEVELOPMENT", "TESTING", "ASSESSMENT", "PENDING_APPROVAL", "APPROVED", "PRODUCTION", "SUSPENDED", "RETIRED"];
+const AI_SYSTEM_VENDOR_ROLES = ["PRIMARY_PROVIDER", "MODEL_PROVIDER", "PLATFORM_PROVIDER", "AI_SERVICE_PROVIDER", "DATA_PROVIDER", "DEVELOPMENT_PROVIDER", "OTHER"];
+const RISK_TIERS = ["LOW", "MODERATE", "HIGH", "CRITICAL"];
+
+// Step 5 - AI System Governance Profile classification value sets
+const BUSINESS_CRITICALITY_VALUES = ["LOW", "MEDIUM", "HIGH", "CRITICAL"];
+const DECISION_ROLE_VALUES = ["ADVISORY", "RECOMMENDS", "DECIDES", "EXECUTES"];
+const HUMAN_OVERSIGHT_VALUES = ["REQUIRED", "OPTIONAL", "NOT_APPLICABLE"];
+const IMPACT_LEVEL_VALUES = ["LOW", "MODERATE", "HIGH"];
+const DATA_SENSITIVITY_VALUES = ["PUBLIC", "INTERNAL", "CONFIDENTIAL", "RESTRICTED"];
+const ASSESSMENT_STATUS_VALUES = ["NOT_ASSESSED", "ASSESSMENT_REQUIRED", "ASSESSED"];
+
+server.post("/ai-systems", async (request, reply) => {
+  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  if (!session) {
+    return reply.status(401).send({ error: "Not logged in" });
+  }
+  try {
+    requirePermission({ tenantId: session.tenantId, role: session.role as Role }, "ai-system:create");
+  } catch {
+    return reply.status(403).send({ error: "Not authorized to create AI systems" });
+  }
+
+  const body = request.body as {
+    name?: string;
+    description?: string;
+    origin?: string;
+    category?: string;
+    ownerUserId?: string;
+    dataCategories?: string[];
+    riskTier?: string;
+  };
+
+  if (!body.name) {
+    return reply.status(400).send({ error: "name is required" });
+  }
+  if (body.origin !== "INTERNAL" && body.origin !== "THIRD_PARTY") {
+    return reply.status(400).send({ error: "origin must be INTERNAL or THIRD_PARTY" });
+  }
+  const category = body.category ?? "OTHER";
+  if (!AI_SYSTEM_CATEGORIES.includes(category)) {
+    return reply.status(400).send({ error: "Invalid category" });
+  }
+  const dataCategories = body.dataCategories ?? [];
+  const invalidDataCategories = dataCategories.filter((c) => !(DATA_CATEGORIES as readonly string[]).includes(c));
+  if (invalidDataCategories.length > 0) {
+    return reply.status(400).send({ error: `Invalid dataCategories: ${invalidDataCategories.join(", ")}` });
+  }
+  if (body.riskTier && !RISK_TIERS.includes(body.riskTier)) {
+    return reply.status(400).send({ error: "Invalid riskTier" });
+  }
+
+  let ownerUserId: string | null = null;
+  if (body.ownerUserId) {
+    const membership = await prisma.tenantMembership.findFirst({
+      where: { userId: body.ownerUserId, tenantId: session.tenantId },
+    });
+    if (!membership) {
+      return reply.status(400).send({ error: "ownerUserId must belong to a user in this tenant" });
+    }
+    ownerUserId = body.ownerUserId;
+  }
+
+  const aiSystem = await prisma.aiSystem.create({
+    data: {
+      tenantId: session.tenantId,
+      name: body.name,
+      description: body.description ?? null,
+      origin: body.origin as "INTERNAL" | "THIRD_PARTY",
+      category: category as never,
+      ownerUserId,
+      dataCategories,
+      riskTier: (body.riskTier as never) ?? null,
+    },
+  });
+
+  await prisma.auditEvent.create({
+    data: {
+      tenantId: session.tenantId,
+      actorUserId: session.userId,
+      action: "ai_system.created",
+      targetType: "AiSystem",
+      targetId: aiSystem.id,
+      outcome: "SUCCESS",
+    },
+  });
+
+  return reply.status(201).send(aiSystem);
+});
+
+server.get("/ai-systems", async (request, reply) => {
+  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  if (!session) {
+    return reply.status(401).send({ error: "Not logged in" });
+  }
+  try {
+    requirePermission({ tenantId: session.tenantId, role: session.role as Role }, "ai-system:read");
+  } catch {
+    return reply.status(403).send({ error: "Not authorized to view AI systems" });
+  }
+
+  const aiSystems = await prisma.aiSystem.findMany({
+    where: { tenantId: session.tenantId },
+    orderBy: { createdAt: "desc" },
+  });
+  return reply.send({ aiSystems });
+});
+
+server.get("/ai-systems/:id", async (request, reply) => {
+  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  if (!session) {
+    return reply.status(401).send({ error: "Not logged in" });
+  }
+  try {
+    requirePermission({ tenantId: session.tenantId, role: session.role as Role }, "ai-system:read");
+  } catch {
+    return reply.status(403).send({ error: "Not authorized to view AI systems" });
+  }
+
+  const { id } = request.params as { id: string };
+  const aiSystem = await prisma.aiSystem.findUnique({
+    where: { id },
+    include: { owner: { select: { id: true, displayName: true, email: true } } },
+  });
+  if (!aiSystem) {
+    return reply.status(404).send({ error: "AI system not found" });
+  }
+  try {
+    assertOwnedByTenant(aiSystem, { tenantId: session.tenantId }, "AI system");
+  } catch {
+    return reply.status(404).send({ error: "AI system not found" });
+  }
+  return reply.send(aiSystem);
+});
+
+server.patch("/ai-systems/:id", async (request, reply) => {
+  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  if (!session) {
+    return reply.status(401).send({ error: "Not logged in" });
+  }
+  try {
+    requirePermission({ tenantId: session.tenantId, role: session.role as Role }, "ai-system:update");
+  } catch {
+    return reply.status(403).send({ error: "Not authorized to update AI systems" });
+  }
+
+  const { id } = request.params as { id: string };
+  const existing = await prisma.aiSystem.findUnique({ where: { id } });
+  if (!existing) {
+    return reply.status(404).send({ error: "AI system not found" });
+  }
+  try {
+    assertOwnedByTenant(existing, { tenantId: session.tenantId }, "AI system");
+  } catch {
+    return reply.status(404).send({ error: "AI system not found" });
+  }
+
+  const body = request.body as {
+    name?: string;
+    description?: string;
+    category?: string;
+    lifecycleStatus?: string;
+    ownerUserId?: string | null;
+    dataCategories?: string[];
+    riskTier?: string | null;
+    businessCriticality?: string | null;
+    decisionRole?: string | null;
+    humanOversight?: string | null;
+    impactLevel?: string | null;
+    dataSensitivity?: string | null;
+    affectedPopulation?: string[];
+    externalImpact?: boolean | null;
+    regulatoryRelevance?: string[];
+    assessmentStatus?: string;
+  };
+
+  if (body.category !== undefined && !AI_SYSTEM_CATEGORIES.includes(body.category)) {
+    return reply.status(400).send({ error: "Invalid category" });
+  }
+  if (body.lifecycleStatus !== undefined && !AI_SYSTEM_LIFECYCLE_STATUSES.includes(body.lifecycleStatus)) {
+    return reply.status(400).send({ error: "Invalid lifecycleStatus" });
+  }
+  if (body.dataCategories !== undefined) {
+    const invalidDataCategories = body.dataCategories.filter((c) => !(DATA_CATEGORIES as readonly string[]).includes(c));
+    if (invalidDataCategories.length > 0) {
+      return reply.status(400).send({ error: `Invalid dataCategories: ${invalidDataCategories.join(", ")}` });
+    }
+  }
+  if (body.riskTier !== undefined && body.riskTier !== null && !RISK_TIERS.includes(body.riskTier)) {
+    return reply.status(400).send({ error: "Invalid riskTier" });
+  }
+  if (body.businessCriticality !== undefined && body.businessCriticality !== null && !BUSINESS_CRITICALITY_VALUES.includes(body.businessCriticality)) {
+    return reply.status(400).send({ error: "Invalid businessCriticality" });
+  }
+  if (body.decisionRole !== undefined && body.decisionRole !== null && !DECISION_ROLE_VALUES.includes(body.decisionRole)) {
+    return reply.status(400).send({ error: "Invalid decisionRole" });
+  }
+  if (body.humanOversight !== undefined && body.humanOversight !== null && !HUMAN_OVERSIGHT_VALUES.includes(body.humanOversight)) {
+    return reply.status(400).send({ error: "Invalid humanOversight" });
+  }
+  if (body.impactLevel !== undefined && body.impactLevel !== null && !IMPACT_LEVEL_VALUES.includes(body.impactLevel)) {
+    return reply.status(400).send({ error: "Invalid impactLevel" });
+  }
+  if (body.dataSensitivity !== undefined && body.dataSensitivity !== null && !DATA_SENSITIVITY_VALUES.includes(body.dataSensitivity)) {
+    return reply.status(400).send({ error: "Invalid dataSensitivity" });
+  }
+  if (body.affectedPopulation !== undefined) {
+    const invalidPops = body.affectedPopulation.filter((p) => !(AFFECTED_POPULATIONS as readonly string[]).includes(p));
+    if (invalidPops.length > 0) {
+      return reply.status(400).send({ error: `Invalid affectedPopulation: ${invalidPops.join(", ")}` });
+    }
+  }
+  if (body.regulatoryRelevance !== undefined) {
+    const invalidTags = body.regulatoryRelevance.filter((t) => !(REGULATORY_RELEVANCE_TAGS as readonly string[]).includes(t));
+    if (invalidTags.length > 0) {
+      return reply.status(400).send({ error: `Invalid regulatoryRelevance: ${invalidTags.join(", ")}` });
+    }
+  }
+  if (body.assessmentStatus !== undefined && !ASSESSMENT_STATUS_VALUES.includes(body.assessmentStatus)) {
+    return reply.status(400).send({ error: "Invalid assessmentStatus" });
+  }
+
+  let ownerUserId = existing.ownerUserId;
+  if (body.ownerUserId !== undefined) {
+    if (body.ownerUserId === null) {
+      ownerUserId = null;
+    } else {
+      const membership = await prisma.tenantMembership.findFirst({
+        where: { userId: body.ownerUserId, tenantId: session.tenantId },
+      });
+      if (!membership) {
+        return reply.status(400).send({ error: "ownerUserId must belong to a user in this tenant" });
+      }
+      ownerUserId = body.ownerUserId;
+    }
+  }
+
+  const ownerChanged = body.ownerUserId !== undefined && ownerUserId !== existing.ownerUserId;
+
+  const CLASSIFICATION_FIELDS = ["businessCriticality", "decisionRole", "humanOversight", "impactLevel", "dataSensitivity", "affectedPopulation", "externalImpact", "regulatoryRelevance", "assessmentStatus"] as const;
+  const classificationChanges: Record<string, { from: unknown; to: unknown }> = {};
+  for (const field of CLASSIFICATION_FIELDS) {
+    const value = (body as Record<string, unknown>)[field];
+    if (value !== undefined) {
+      const before = (existing as unknown as Record<string, unknown>)[field];
+      const changed = Array.isArray(before) || Array.isArray(value) ? JSON.stringify(before) !== JSON.stringify(value) : before !== value;
+      if (changed) {
+        classificationChanges[field] = { from: before, to: value };
+      }
+    }
+  }
+
+  if (
+    body.lifecycleStatus !== undefined &&
+    body.lifecycleStatus !== "PROPOSED" &&
+    existing.origin === "THIRD_PARTY"
+  ) {
+    const linkCount = await prisma.aiSystemVendor.count({ where: { aiSystemId: existing.id } });
+    if (linkCount === 0) {
+      return reply.status(400).send({
+        error: "A THIRD_PARTY AI system must have at least one vendor relationship before leaving PROPOSED status",
+      });
+    }
+  }
+
+  const lifecycleChanged = body.lifecycleStatus !== undefined && body.lifecycleStatus !== existing.lifecycleStatus;
+
+  const updated = await prisma.aiSystem.update({
+    where: { id: existing.id },
+    data: {
+      name: body.name ?? undefined,
+      description: body.description !== undefined ? body.description : undefined,
+      category: (body.category as never) ?? undefined,
+      lifecycleStatus: (body.lifecycleStatus as never) ?? undefined,
+      ownerUserId,
+      dataCategories: body.dataCategories ?? undefined,
+      riskTier: body.riskTier !== undefined ? (body.riskTier as never) : undefined,
+      businessCriticality: body.businessCriticality !== undefined ? (body.businessCriticality as never) : undefined,
+      decisionRole: body.decisionRole !== undefined ? (body.decisionRole as never) : undefined,
+      humanOversight: body.humanOversight !== undefined ? (body.humanOversight as never) : undefined,
+      impactLevel: body.impactLevel !== undefined ? (body.impactLevel as never) : undefined,
+      dataSensitivity: body.dataSensitivity !== undefined ? (body.dataSensitivity as never) : undefined,
+      affectedPopulation: body.affectedPopulation ?? undefined,
+      externalImpact: body.externalImpact !== undefined ? body.externalImpact : undefined,
+      regulatoryRelevance: body.regulatoryRelevance ?? undefined,
+      assessmentStatus: (body.assessmentStatus as never) ?? undefined,
+    },
+    include: { owner: { select: { id: true, displayName: true, email: true } } },
+  });
+
+  await prisma.auditEvent.create({
+    data: {
+      tenantId: session.tenantId,
+      actorUserId: session.userId,
+      action: lifecycleChanged ? "ai_system.lifecycle_changed" : "ai_system.updated",
+      targetType: "AiSystem",
+      targetId: updated.id,
+      outcome: "SUCCESS",
+    },
+  });
+
+  if (body.lifecycleStatus === "RETIRED" && existing.lifecycleStatus !== "RETIRED") {
+    await prisma.auditEvent.create({
+      data: {
+        tenantId: session.tenantId,
+        actorUserId: session.userId,
+        action: "ai_system.retired",
+        targetType: "AiSystem",
+        targetId: updated.id,
+        outcome: "SUCCESS",
+      },
+    });
+  }
+
+  if (ownerChanged) {
+    await prisma.auditEvent.create({
+      data: {
+        tenantId: session.tenantId,
+        actorUserId: session.userId,
+        action: "ai_system.owner_changed",
+        targetType: "AiSystem",
+        targetId: updated.id,
+        outcome: "SUCCESS",
+        metadataJson: { previousOwnerUserId: existing.ownerUserId, newOwnerUserId: ownerUserId },
+      },
+    });
+  }
+
+  if (Object.keys(classificationChanges).length > 0) {
+    await prisma.auditEvent.create({
+      data: {
+        tenantId: session.tenantId,
+        actorUserId: session.userId,
+        action: "ai_system.classification_changed",
+        targetType: "AiSystem",
+        targetId: updated.id,
+        outcome: "SUCCESS",
+        metadataJson: classificationChanges as never,
+      },
+    });
+  }
+
+  return reply.send(updated);
+});
+
+server.post("/ai-systems/:id/vendors", async (request, reply) => {
+  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  if (!session) {
+    return reply.status(401).send({ error: "Not logged in" });
+  }
+  try {
+    requirePermission({ tenantId: session.tenantId, role: session.role as Role }, "ai-system:link-vendor");
+  } catch {
+    return reply.status(403).send({ error: "Not authorized to link vendors to AI systems" });
+  }
+
+  const { id } = request.params as { id: string };
+  const aiSystem = await prisma.aiSystem.findUnique({ where: { id } });
+  if (!aiSystem) {
+    return reply.status(404).send({ error: "AI system not found" });
+  }
+  try {
+    assertOwnedByTenant(aiSystem, { tenantId: session.tenantId }, "AI system");
+  } catch {
+    return reply.status(404).send({ error: "AI system not found" });
+  }
+
+  const body = request.body as { vendorId?: string; role?: string };
+  if (!body.vendorId) {
+    return reply.status(400).send({ error: "vendorId is required" });
+  }
+  const role = body.role ?? "OTHER";
+  if (!AI_SYSTEM_VENDOR_ROLES.includes(role)) {
+    return reply.status(400).send({ error: "Invalid vendor role" });
+  }
+
+  const vendor = await prisma.vendor.findUnique({ where: { id: body.vendorId } });
+  if (!vendor) {
+    return reply.status(404).send({ error: "Vendor not found" });
+  }
+  try {
+    assertOwnedByTenant(vendor, { tenantId: session.tenantId }, "Vendor");
+  } catch {
+    return reply.status(404).send({ error: "Vendor not found" });
+  }
+
+  let link;
+  try {
+    link = await prisma.aiSystemVendor.create({
+      data: {
+        tenantId: session.tenantId,
+        aiSystemId: aiSystem.id,
+        vendorId: vendor.id,
+        role: role as never,
+      },
+    });
+  } catch (err: unknown) {
+    const prismaErr = err as { code?: string };
+    if (prismaErr?.code === "P2002") {
+      return reply.status(409).send({ error: "This vendor is already linked to this AI system with that role" });
+    }
+    throw err;
+  }
+
+  await prisma.auditEvent.create({
+    data: {
+      tenantId: session.tenantId,
+      actorUserId: session.userId,
+      action: "ai_system.vendor_linked",
+      targetType: "AiSystem",
+      targetId: aiSystem.id,
+      outcome: "SUCCESS",
+    },
+  });
+
+  return reply.status(201).send(link);
+});
+
+server.get("/ai-systems/:id/vendors", async (request, reply) => {
+  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  if (!session) {
+    return reply.status(401).send({ error: "Not logged in" });
+  }
+  try {
+    requirePermission({ tenantId: session.tenantId, role: session.role as Role }, "ai-system:read");
+  } catch {
+    return reply.status(403).send({ error: "Not authorized to view AI systems" });
+  }
+
+  const { id } = request.params as { id: string };
+  const aiSystem = await prisma.aiSystem.findUnique({ where: { id } });
+  if (!aiSystem) {
+    return reply.status(404).send({ error: "AI system not found" });
+  }
+  try {
+    assertOwnedByTenant(aiSystem, { tenantId: session.tenantId }, "AI system");
+  } catch {
+    return reply.status(404).send({ error: "AI system not found" });
+  }
+
+  const links = await prisma.aiSystemVendor.findMany({
+    where: { aiSystemId: aiSystem.id, tenantId: session.tenantId },
+    include: { vendor: true },
+  });
+  return reply.send({ vendorLinks: links });
+});
+
+server.delete("/ai-systems/:id/vendors/:linkId", async (request, reply) => {
+  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  if (!session) {
+    return reply.status(401).send({ error: "Not logged in" });
+  }
+  try {
+    requirePermission({ tenantId: session.tenantId, role: session.role as Role }, "ai-system:link-vendor");
+  } catch {
+    return reply.status(403).send({ error: "Not authorized to unlink vendors from AI systems" });
+  }
+
+  const { id, linkId } = request.params as { id: string; linkId: string };
+  const link = await prisma.aiSystemVendor.findUnique({ where: { id: linkId } });
+  if (!link || link.aiSystemId !== id) {
+    return reply.status(404).send({ error: "Vendor link not found" });
+  }
+  try {
+    assertOwnedByTenant(link, { tenantId: session.tenantId }, "Vendor link");
+  } catch {
+    return reply.status(404).send({ error: "Vendor link not found" });
+  }
+
+  await prisma.aiSystemVendor.delete({ where: { id: link.id } });
+
+  await prisma.auditEvent.create({
+    data: {
+      tenantId: session.tenantId,
+      actorUserId: session.userId,
+      action: "ai_system.vendor_unlinked",
+      targetType: "AiSystem",
+      targetId: id,
+      outcome: "SUCCESS",
+    },
+  });
+
+  return reply.status(204).send();
+});
+
+
+server.get("/tenant-users", async (request, reply) => {
+  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  if (!session) {
+    return reply.status(401).send({ error: "Not logged in" });
+  }
+  try {
+    requirePermission({ tenantId: session.tenantId, role: session.role as Role }, "ai-system:update");
+  } catch {
+    return reply.status(403).send({ error: "Not authorized to view tenant users" });
+  }
+
+  const memberships = await prisma.tenantMembership.findMany({
+    where: { tenantId: session.tenantId },
+    include: { user: { select: { id: true, displayName: true, email: true } } },
+  });
+  const users = memberships.map((m) => m.user);
+  return reply.send({ users });
+});
+
+
+// ---------------------------------------------------------------------------
+// AI Risk Assessment (Step 6) - a governance risk register attached to an
+// AiSystem. Scores are always calculated server-side; the frontend never
+// submits a score directly. Risk and Finding remain conceptually separate -
+// this step does not create findings, only risks, controls, and (where a
+// risk needs mitigation work) a linked RemediationAction.
+// ---------------------------------------------------------------------------
+
+const AI_RISK_ASSESSMENT_STATUSES = ["DRAFT", "IN_PROGRESS", "READY_FOR_REVIEW", "COMPLETED"];
+const AI_RISK_CATEGORIES = ["DATA", "PRIVACY", "FAIRNESS", "TRANSPARENCY", "RELIABILITY", "SAFETY", "SECURITY", "HUMAN_OVERSIGHT", "THIRD_PARTY", "LEGAL_COMPLIANCE", "OPERATIONAL"];
+const AI_CONTROL_EFFECTIVENESS_VALUES = ["NOT_ASSESSED", "INEFFECTIVE", "PARTIALLY_EFFECTIVE", "EFFECTIVE"];
+const AI_RISK_TREATMENT_VALUES = ["ACCEPT", "MITIGATE", "AVOID", "TRANSFER"];
+const AI_ASSESSMENT_REVIEW_DECISIONS = ["APPROVED", "REJECTED", "CHANGES_REQUESTED"];
+
+function scoreToRiskBand(score: number): "LOW" | "MODERATE" | "HIGH" | "CRITICAL" {
+  if (score <= 4) return "LOW";
+  if (score <= 9) return "MODERATE";
+  if (score <= 16) return "HIGH";
+  return "CRITICAL";
+}
+
+function isValidScale(n: unknown): n is number {
+  return typeof n === "number" && Number.isInteger(n) && n >= 1 && n <= 5;
+}
+
+server.post("/ai-systems/:id/risk-assessments", async (request, reply) => {
+  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  if (!session) {
+    return reply.status(401).send({ error: "Not logged in" });
+  }
+  try {
+    requirePermission({ tenantId: session.tenantId, role: session.role as Role }, "ai-system:update");
+  } catch {
+    return reply.status(403).send({ error: "Not authorized to create AI risk assessments" });
+  }
+
+  const { id } = request.params as { id: string };
+  const aiSystem = await prisma.aiSystem.findUnique({ where: { id } });
+  if (!aiSystem) {
+    return reply.status(404).send({ error: "AI system not found" });
+  }
+  try {
+    assertOwnedByTenant(aiSystem, { tenantId: session.tenantId }, "AI system");
+  } catch {
+    return reply.status(404).send({ error: "AI system not found" });
+  }
+
+  const body = request.body as { name?: string; assessorUserId?: string };
+  if (!body.name) {
+    return reply.status(400).send({ error: "name is required" });
+  }
+
+  let assessorUserId: string | null = session.userId ?? null;
+  if (body.assessorUserId) {
+    const membership = await prisma.tenantMembership.findFirst({
+      where: { userId: body.assessorUserId, tenantId: session.tenantId },
+    });
+    if (!membership) {
+      return reply.status(400).send({ error: "assessorUserId must belong to a user in this tenant" });
+    }
+    assessorUserId = body.assessorUserId;
+  }
+
+  const assessment = await prisma.aiRiskAssessment.create({
+    data: {
+      tenantId: session.tenantId,
+      aiSystemId: aiSystem.id,
+      name: body.name,
+      assessorUserId,
+    },
+  });
+
+  await prisma.auditEvent.create({
+    data: {
+      tenantId: session.tenantId,
+      actorUserId: session.userId,
+      action: "ai_risk_assessment.created",
+      targetType: "AiRiskAssessment",
+      targetId: assessment.id,
+      outcome: "SUCCESS",
+    },
+  });
+
+  return reply.status(201).send(assessment);
+});
+
+server.get("/ai-systems/:id/risk-assessments", async (request, reply) => {
+  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  if (!session) {
+    return reply.status(401).send({ error: "Not logged in" });
+  }
+  try {
+    requirePermission({ tenantId: session.tenantId, role: session.role as Role }, "ai-system:read");
+  } catch {
+    return reply.status(403).send({ error: "Not authorized to view AI risk assessments" });
+  }
+
+  const { id } = request.params as { id: string };
+  const aiSystem = await prisma.aiSystem.findUnique({ where: { id } });
+  if (!aiSystem) {
+    return reply.status(404).send({ error: "AI system not found" });
+  }
+  try {
+    assertOwnedByTenant(aiSystem, { tenantId: session.tenantId }, "AI system");
+  } catch {
+    return reply.status(404).send({ error: "AI system not found" });
+  }
+
+  const assessments = await prisma.aiRiskAssessment.findMany({
+    where: { aiSystemId: aiSystem.id, tenantId: session.tenantId },
+    orderBy: { createdAt: "desc" },
+    include: { risks: true },
+  });
+  return reply.send({ assessments });
+});
+
+server.get("/ai-risk-assessments/:id", async (request, reply) => {
+  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  if (!session) {
+    return reply.status(401).send({ error: "Not logged in" });
+  }
+  try {
+    requirePermission({ tenantId: session.tenantId, role: session.role as Role }, "ai-system:read");
+  } catch {
+    return reply.status(403).send({ error: "Not authorized to view AI risk assessments" });
+  }
+
+  const { id } = request.params as { id: string };
+  const assessment = await prisma.aiRiskAssessment.findUnique({
+    where: { id },
+    include: {
+      risks: { include: { control: true } },
+      assessor: { select: { id: true, displayName: true, email: true } },
+      reviewer: { select: { id: true, displayName: true, email: true } },
+    },
+  });
+  if (!assessment) {
+    return reply.status(404).send({ error: "AI risk assessment not found" });
+  }
+  try {
+    assertOwnedByTenant(assessment, { tenantId: session.tenantId }, "AI risk assessment");
+  } catch {
+    return reply.status(404).send({ error: "AI risk assessment not found" });
+  }
+  return reply.send(assessment);
+});
+
+server.patch("/ai-risk-assessments/:id", async (request, reply) => {
+  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  if (!session) {
+    return reply.status(401).send({ error: "Not logged in" });
+  }
+  try {
+    requirePermission({ tenantId: session.tenantId, role: session.role as Role }, "ai-system:update");
+  } catch {
+    return reply.status(403).send({ error: "Not authorized to update AI risk assessments" });
+  }
+
+  const { id } = request.params as { id: string };
+  const existing = await prisma.aiRiskAssessment.findUnique({ where: { id } });
+  if (!existing) {
+    return reply.status(404).send({ error: "AI risk assessment not found" });
+  }
+  try {
+    assertOwnedByTenant(existing, { tenantId: session.tenantId }, "AI risk assessment");
+  } catch {
+    return reply.status(404).send({ error: "AI risk assessment not found" });
+  }
+
+  const body = request.body as { name?: string; status?: string; assessorUserId?: string | null };
+
+  if (body.status !== undefined && !AI_RISK_ASSESSMENT_STATUSES.includes(body.status)) {
+    return reply.status(400).send({ error: "Invalid status" });
+  }
+
+  let assessorUserId = existing.assessorUserId;
+  if (body.assessorUserId !== undefined) {
+    if (body.assessorUserId === null) {
+      assessorUserId = null;
+    } else {
+      const membership = await prisma.tenantMembership.findFirst({
+        where: { userId: body.assessorUserId, tenantId: session.tenantId },
+      });
+      if (!membership) {
+        return reply.status(400).send({ error: "assessorUserId must belong to a user in this tenant" });
+      }
+      assessorUserId = body.assessorUserId;
+    }
+  }
+
+  const statusChanged = body.status !== undefined && body.status !== existing.status;
+
+  const updated = await prisma.aiRiskAssessment.update({
+    where: { id: existing.id },
+    data: {
+      name: body.name ?? undefined,
+      status: (body.status as never) ?? undefined,
+      assessorUserId,
+      completedAt: body.status === "COMPLETED" && existing.status !== "COMPLETED" ? new Date() : undefined,
+    },
+  });
+
+  await prisma.auditEvent.create({
+    data: {
+      tenantId: session.tenantId,
+      actorUserId: session.userId,
+      action: statusChanged ? "ai_risk_assessment.status_changed" : "ai_risk_assessment.updated",
+      targetType: "AiRiskAssessment",
+      targetId: updated.id,
+      outcome: "SUCCESS",
+      metadataJson: statusChanged ? ({ from: existing.status, to: updated.status } as never) : undefined,
+    },
+  });
+
+  return reply.send(updated);
+});
+
+server.post("/ai-risk-assessments/:id/risks", async (request, reply) => {
+  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  if (!session) {
+    return reply.status(401).send({ error: "Not logged in" });
+  }
+  try {
+    requirePermission({ tenantId: session.tenantId, role: session.role as Role }, "ai-system:update");
+  } catch {
+    return reply.status(403).send({ error: "Not authorized to add risks to an AI risk assessment" });
+  }
+
+  const { id } = request.params as { id: string };
+  const assessment = await prisma.aiRiskAssessment.findUnique({ where: { id } });
+  if (!assessment) {
+    return reply.status(404).send({ error: "AI risk assessment not found" });
+  }
+  try {
+    assertOwnedByTenant(assessment, { tenantId: session.tenantId }, "AI risk assessment");
+  } catch {
+    return reply.status(404).send({ error: "AI risk assessment not found" });
+  }
+
+  const body = request.body as {
+    title?: string;
+    category?: string;
+    statement?: string;
+    likelihood?: number;
+    impact?: number;
+    controlId?: string;
+  };
+
+  if (!body.title) {
+    return reply.status(400).send({ error: "title is required" });
+  }
+  if (!body.category || !AI_RISK_CATEGORIES.includes(body.category)) {
+    return reply.status(400).send({ error: "Invalid or missing category" });
+  }
+  if (!body.statement) {
+    return reply.status(400).send({ error: "statement is required" });
+  }
+  if (!isValidScale(body.likelihood)) {
+    return reply.status(400).send({ error: "likelihood must be an integer from 1 to 5" });
+  }
+  if (!isValidScale(body.impact)) {
+    return reply.status(400).send({ error: "impact must be an integer from 1 to 5" });
+  }
+
+  let controlId: string | null = null;
+  if (body.controlId) {
+    const control = await prisma.control.findUnique({ where: { id: body.controlId } });
+    if (!control) {
+      return reply.status(400).send({ error: "controlId does not reference an existing control" });
+    }
+    controlId = body.controlId;
+  }
+
+  const inherentScore = body.likelihood * body.impact;
+  const inherentRating = scoreToRiskBand(inherentScore);
+
+  const risk = await prisma.aiRisk.create({
+    data: {
+      tenantId: session.tenantId,
+      assessmentId: assessment.id,
+      title: body.title,
+      category: body.category as never,
+      statement: body.statement,
+      likelihood: body.likelihood,
+      impact: body.impact,
+      inherentScore,
+      inherentRating: inherentRating as never,
+      controlId,
+    },
+  });
+
+  await prisma.auditEvent.create({
+    data: {
+      tenantId: session.tenantId,
+      actorUserId: session.userId,
+      action: "ai_risk.created",
+      targetType: "AiRisk",
+      targetId: risk.id,
+      outcome: "SUCCESS",
+      metadataJson: { inherentScore, inherentRating } as never,
+    },
+  });
+
+  return reply.status(201).send(risk);
+});
+
+server.patch("/ai-risks/:id", async (request, reply) => {
+  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  if (!session) {
+    return reply.status(401).send({ error: "Not logged in" });
+  }
+  try {
+    requirePermission({ tenantId: session.tenantId, role: session.role as Role }, "ai-system:update");
+  } catch {
+    return reply.status(403).send({ error: "Not authorized to update this risk" });
+  }
+
+  const { id } = request.params as { id: string };
+  const existing = await prisma.aiRisk.findUnique({ where: { id } });
+  if (!existing) {
+    return reply.status(404).send({ error: "Risk not found" });
+  }
+  try {
+    assertOwnedByTenant(existing, { tenantId: session.tenantId }, "Risk");
+  } catch {
+    return reply.status(404).send({ error: "Risk not found" });
+  }
+
+  const body = request.body as {
+    title?: string;
+    category?: string;
+    statement?: string;
+    likelihood?: number;
+    impact?: number;
+    existingControls?: string;
+    controlId?: string | null;
+    controlEffectiveness?: string;
+    residualLikelihood?: number;
+    residualImpact?: number;
+    treatment?: string | null;
+    treatmentRationale?: string;
+    treatmentOwnerUserId?: string | null;
+    treatmentTargetDate?: string | null;
+  };
+
+  if (body.category !== undefined && !AI_RISK_CATEGORIES.includes(body.category)) {
+    return reply.status(400).send({ error: "Invalid category" });
+  }
+  if (body.likelihood !== undefined && !isValidScale(body.likelihood)) {
+    return reply.status(400).send({ error: "likelihood must be an integer from 1 to 5" });
+  }
+  if (body.impact !== undefined && !isValidScale(body.impact)) {
+    return reply.status(400).send({ error: "impact must be an integer from 1 to 5" });
+  }
+  if (body.controlEffectiveness !== undefined && !AI_CONTROL_EFFECTIVENESS_VALUES.includes(body.controlEffectiveness)) {
+    return reply.status(400).send({ error: "Invalid controlEffectiveness" });
+  }
+  if (body.residualLikelihood !== undefined && body.residualLikelihood !== null && !isValidScale(body.residualLikelihood)) {
+    return reply.status(400).send({ error: "residualLikelihood must be an integer from 1 to 5" });
+  }
+  if (body.residualImpact !== undefined && body.residualImpact !== null && !isValidScale(body.residualImpact)) {
+    return reply.status(400).send({ error: "residualImpact must be an integer from 1 to 5" });
+  }
+  if (body.treatment !== undefined && body.treatment !== null && !AI_RISK_TREATMENT_VALUES.includes(body.treatment)) {
+    return reply.status(400).send({ error: "Invalid treatment" });
+  }
+
+  let controlId = existing.controlId;
+  if (body.controlId !== undefined) {
+    if (body.controlId === null) {
+      controlId = null;
+    } else {
+      const control = await prisma.control.findUnique({ where: { id: body.controlId } });
+      if (!control) {
+        return reply.status(400).send({ error: "controlId does not reference an existing control" });
+      }
+      controlId = body.controlId;
+    }
+  }
+
+  let treatmentOwnerUserId = existing.treatmentOwnerUserId;
+  if (body.treatmentOwnerUserId !== undefined) {
+    if (body.treatmentOwnerUserId === null) {
+      treatmentOwnerUserId = null;
+    } else {
+      const membership = await prisma.tenantMembership.findFirst({
+        where: { userId: body.treatmentOwnerUserId, tenantId: session.tenantId },
+      });
+      if (!membership) {
+        return reply.status(400).send({ error: "treatmentOwnerUserId must belong to a user in this tenant" });
+      }
+      treatmentOwnerUserId = body.treatmentOwnerUserId;
+    }
+  }
+
+  const newLikelihood = body.likelihood ?? existing.likelihood;
+  const newImpact = body.impact ?? existing.impact;
+  const inherentChanged = body.likelihood !== undefined || body.impact !== undefined;
+  const inherentScore = newLikelihood * newImpact;
+  const inherentRating = scoreToRiskBand(inherentScore);
+
+  const residualLikelihood = body.residualLikelihood !== undefined ? body.residualLikelihood : existing.residualLikelihood;
+  const residualImpact = body.residualImpact !== undefined ? body.residualImpact : existing.residualImpact;
+  const residualChanged = body.residualLikelihood !== undefined || body.residualImpact !== undefined;
+  let residualScore = existing.residualScore;
+  let residualRating: string | null = existing.residualRating;
+  if (residualLikelihood !== null && residualLikelihood !== undefined && residualImpact !== null && residualImpact !== undefined) {
+    residualScore = residualLikelihood * residualImpact;
+    residualRating = scoreToRiskBand(residualScore);
+  }
+
+  const controlEffectivenessChanged = body.controlEffectiveness !== undefined && body.controlEffectiveness !== existing.controlEffectiveness;
+  const treatmentChanged = body.treatment !== undefined && body.treatment !== existing.treatment;
+
+  const updated = await prisma.aiRisk.update({
+    where: { id: existing.id },
+    data: {
+      title: body.title ?? undefined,
+      category: (body.category as never) ?? undefined,
+      statement: body.statement ?? undefined,
+      likelihood: newLikelihood,
+      impact: newImpact,
+      inherentScore,
+      inherentRating: inherentRating as never,
+      existingControls: body.existingControls !== undefined ? body.existingControls : undefined,
+      controlId,
+      controlEffectiveness: (body.controlEffectiveness as never) ?? undefined,
+      residualLikelihood: body.residualLikelihood !== undefined ? body.residualLikelihood : undefined,
+      residualImpact: body.residualImpact !== undefined ? body.residualImpact : undefined,
+      residualScore: residualChanged ? residualScore : undefined,
+      residualRating: residualChanged ? (residualRating as never) : undefined,
+      treatment: body.treatment !== undefined ? (body.treatment as never) : undefined,
+      treatmentRationale: body.treatmentRationale !== undefined ? body.treatmentRationale : undefined,
+      treatmentOwnerUserId,
+      treatmentTargetDate: body.treatmentTargetDate !== undefined ? (body.treatmentTargetDate ? new Date(body.treatmentTargetDate) : null) : undefined,
+    },
+  });
+
+  const auditEvents: { action: string; metadataJson?: unknown }[] = [];
+  if (inherentChanged) {
+    auditEvents.push({ action: "ai_risk.inherent_risk_changed", metadataJson: { from: existing.inherentScore, to: inherentScore } });
+  }
+  if (controlEffectivenessChanged) {
+    auditEvents.push({ action: "ai_risk.control_effectiveness_changed", metadataJson: { from: existing.controlEffectiveness, to: body.controlEffectiveness } });
+  }
+  if (residualChanged) {
+    auditEvents.push({ action: "ai_risk.residual_risk_changed", metadataJson: { from: existing.residualScore, to: residualScore } });
+  }
+  if (treatmentChanged) {
+    auditEvents.push({ action: "ai_risk.treatment_changed", metadataJson: { from: existing.treatment, to: body.treatment } });
+  }
+  if (auditEvents.length === 0) {
+    auditEvents.push({ action: "ai_risk.updated" });
+  }
+  for (const evt of auditEvents) {
+    await prisma.auditEvent.create({
+      data: {
+        tenantId: session.tenantId,
+        actorUserId: session.userId,
+        action: evt.action,
+        targetType: "AiRisk",
+        targetId: updated.id,
+        outcome: "SUCCESS",
+        metadataJson: (evt.metadataJson as never) ?? undefined,
+      },
+    });
+  }
+
+  return reply.send(updated);
+});
+
+server.delete("/ai-risks/:id", async (request, reply) => {
+  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  if (!session) {
+    return reply.status(401).send({ error: "Not logged in" });
+  }
+  try {
+    requirePermission({ tenantId: session.tenantId, role: session.role as Role }, "ai-system:update");
+  } catch {
+    return reply.status(403).send({ error: "Not authorized to delete this risk" });
+  }
+
+  const { id } = request.params as { id: string };
+  const existing = await prisma.aiRisk.findUnique({ where: { id } });
+  if (!existing) {
+    return reply.status(404).send({ error: "Risk not found" });
+  }
+  try {
+    assertOwnedByTenant(existing, { tenantId: session.tenantId }, "Risk");
+  } catch {
+    return reply.status(404).send({ error: "Risk not found" });
+  }
+
+  await prisma.aiRisk.delete({ where: { id: existing.id } });
+
+  await prisma.auditEvent.create({
+    data: {
+      tenantId: session.tenantId,
+      actorUserId: session.userId,
+      action: "ai_risk.deleted",
+      targetType: "AiRisk",
+      targetId: id,
+      outcome: "SUCCESS",
+    },
+  });
+
+  return reply.status(204).send();
+});
+
+server.post("/ai-risk-assessments/:id/review", async (request, reply) => {
+  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  if (!session) {
+    return reply.status(401).send({ error: "Not logged in" });
+  }
+  const { id } = request.params as { id: string };
+  const alreadyReviewedMessage = "This assessment has already been reviewed and approved. The original review decision cannot be overwritten.";
+  const auditDenied = (reason: string) =>
+    prisma.auditEvent.create({
+      data: {
+        tenantId: session.tenantId,
+        actorUserId: session.userId,
+        action: "ai_risk_assessment.review_denied",
+        targetType: "AiRiskAssessment",
+        targetId: id,
+        outcome: "DENIED",
+        metadataJson: { reason } as never,
+      },
+    });
+
+  try {
+    requirePermission({ tenantId: session.tenantId, role: session.role as Role }, "ai-risk-assessment:review");
+  } catch {
+    await auditDenied("missing_permission");
+    return reply.status(403).send({ error: "Not authorized to review AI risk assessments" });
+  }
+
+  const assessment = await prisma.aiRiskAssessment.findUnique({ where: { id } });
+  if (!assessment) {
+    return reply.status(404).send({ error: "AI risk assessment not found" });
+  }
+  try {
+    assertOwnedByTenant(assessment, { tenantId: session.tenantId }, "AI risk assessment");
+  } catch {
+    return reply.status(404).send({ error: "AI risk assessment not found" });
+  }
+
+  const body = request.body as { decision?: string; rationale?: string };
+  if (!body.decision || !AI_ASSESSMENT_REVIEW_DECISIONS.includes(body.decision)) {
+    return reply.status(400).send({ error: "Invalid or missing decision" });
+  }
+  if (!body.rationale) {
+    return reply.status(400).send({ error: "rationale is required" });
+  }
+  if (assessment.status === "COMPLETED" || assessment.reviewDecision === "APPROVED") {
+    await auditDenied("already_completed");
+    return reply.status(409).send({ error: alreadyReviewedMessage });
+  }
+  if (!assessment.assessorUserId) {
+    await auditDenied("no_assessor_assigned");
+    return reply.status(403).send({ error: "Review cannot proceed because an assessor has not been assigned to this assessment." });
+  }
+  if (assessment.assessorUserId === session.userId) {
+    await auditDenied("self_review");
+    return reply.status(403).send({ error: "The assessor cannot also review their own assessment" });
+  }
+
+  const newStatus = body.decision === "APPROVED" ? "COMPLETED" : "IN_PROGRESS";
+
+  // Conditional update: only succeeds if the assessment is still not approved (guards against a race between two reviewers)
+  const result = await prisma.aiRiskAssessment.updateMany({
+    where: {
+      id: assessment.id,
+      tenantId: session.tenantId,
+      status: { not: "COMPLETED" as never },
+      OR: [{ reviewDecision: null }, { reviewDecision: { not: "APPROVED" as never } }],
+    },
+    data: {
+      reviewedAt: new Date(),
+      reviewerUserId: session.userId,
+      reviewDecision: body.decision as never,
+      reviewRationale: body.rationale,
+      status: newStatus as never,
+      completedAt: body.decision === "APPROVED" ? new Date() : undefined,
+    },
+  });
+  if (result.count === 0) {
+    await auditDenied("already_completed");
+    return reply.status(409).send({ error: alreadyReviewedMessage });
+  }
+  const updated = await prisma.aiRiskAssessment.findUnique({ where: { id: assessment.id } });
+
+  await prisma.auditEvent.create({
+    data: {
+      tenantId: session.tenantId,
+      actorUserId: session.userId,
+      action: "ai_risk_assessment.review_recorded",
+      targetType: "AiRiskAssessment",
+      targetId: assessment.id,
+      outcome: "SUCCESS",
+      metadataJson: { decision: body.decision } as never,
+    },
+  });
+
+  return reply.send(updated);
+});
+
+server.post("/ai-risks/:id/remediation", async (request, reply) => {
+  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  if (!session) {
+    return reply.status(401).send({ error: "Not logged in" });
+  }
+  try {
+    requirePermission({ tenantId: session.tenantId, role: session.role as Role }, "ai-system:update");
+  } catch {
+    return reply.status(403).send({ error: "Not authorized to create remediation for this risk" });
+  }
+
+  const { id } = request.params as { id: string };
+  const risk = await prisma.aiRisk.findUnique({ where: { id } });
+  if (!risk) {
+    return reply.status(404).send({ error: "Risk not found" });
+  }
+  try {
+    assertOwnedByTenant(risk, { tenantId: session.tenantId }, "Risk");
+  } catch {
+    return reply.status(404).send({ error: "Risk not found" });
+  }
+
+  const body = request.body as { title?: string; description?: string; ownerUserId?: string; dueDate?: string };
+  if (!body.title) {
+    return reply.status(400).send({ error: "title is required" });
+  }
+  if (!body.description) {
+    return reply.status(400).send({ error: "description is required" });
+  }
+
+  const remediation = await prisma.remediationAction.create({
+    data: {
+      tenantId: session.tenantId,
+      aiRiskId: risk.id,
+      title: body.title,
+      description: body.description,
+      ownerUserId: body.ownerUserId ?? null,
+      dueDate: body.dueDate ? new Date(body.dueDate) : null,
+    },
+  });
+
+  await prisma.auditEvent.create({
+    data: {
+      tenantId: session.tenantId,
+      actorUserId: session.userId,
+      action: "ai_risk.remediation_created",
+      targetType: "RemediationAction",
+      targetId: remediation.id,
+      outcome: "SUCCESS",
+    },
+  });
+
+  return reply.status(201).send(remediation);
+});
+
 const start = async () => {
   try {
     const port = process.env.PORT ? parseInt(process.env.PORT) : 4000;
