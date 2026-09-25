@@ -2941,6 +2941,640 @@ server.post("/ai-risks/:id/remediation", async (request, reply) => {
   return reply.status(201).send(remediation);
 });
 
+// ---------------------------------------------------------------------------
+// Step 7 - AI Impact Assessment (AiSystem-level governance record)
+// Separate from AI Risk Assessment and from the vendor Assessment impact score.
+// Severity is a 1-5 magnitude of consequence (NOT likelihood x impact).
+// Never writes AiSystem.impactLevel / humanOversight / riskTier / assessmentStatus.
+// ---------------------------------------------------------------------------
+const AI_IMPACT_CATEGORIES = ["FAIRNESS", "PRIVACY", "INDIVIDUAL_RIGHTS", "ACCESSIBILITY", "SAFETY", "HUMAN_AUTONOMY", "TRANSPARENCY", "ECONOMIC", "OPERATIONAL", "SOCIETAL"];
+const AI_IMPACT_DIRECTIONS = ["BENEFICIAL", "ADVERSE"];
+const AI_IMPACT_SCALES = ["LIMITED", "MODERATE", "BROAD", "MASS"];
+const AI_IMPACT_REVERSIBILITY_VALUES = ["REVERSIBLE", "PARTIALLY_REVERSIBLE", "DIFFICULT_TO_REVERSE", "IRREVERSIBLE"];
+const AI_IMPACT_OVERSIGHT_VALUES = ["REQUIRED", "OPTIONAL", "NOT_APPLICABLE"];
+const AI_IMPACT_EDITABLE_STATUSES = ["DRAFT", "IN_PROGRESS", "READY_FOR_REVIEW"];
+const AI_IMPACT_LOCKED_MESSAGE = "This impact assessment is completed and cannot be changed. Start a new version to record changes.";
+const AI_IMPACT_ALREADY_REVIEWED_MESSAGE = "This impact assessment has already been reviewed and approved. The original review decision cannot be overwritten.";
+
+type AiImpactInput = {
+  title?: unknown;
+  category?: unknown;
+  direction?: unknown;
+  description?: unknown;
+  affectedPopulation?: unknown;
+  affectedGroupDescription?: unknown;
+  severity?: unknown;
+  scale?: unknown;
+  reversibility?: unknown;
+  vulnerablePopulations?: unknown;
+  vulnerablePopulationsExplanation?: unknown;
+  oversightRequirement?: unknown;
+  oversightDescription?: unknown;
+  escalationMechanism?: unknown;
+  humanCanOverride?: unknown;
+  safeguards?: unknown;
+};
+
+function buildAiImpactData(
+  body: AiImpactInput,
+  existing: { vulnerablePopulations: boolean; vulnerablePopulationsExplanation: string | null } | null,
+): { error: string } | { data: Record<string, unknown> } {
+  const isCreate = existing === null;
+  const data: Record<string, unknown> = {};
+
+  const requiredText: Array<keyof AiImpactInput> = ["title", "description"];
+  for (const key of requiredText) {
+    const value = body[key];
+    if (isCreate || value !== undefined) {
+      if (typeof value !== "string" || !value.trim()) {
+        return { error: `${key} is required` };
+      }
+      data[key] = value.trim();
+    }
+  }
+
+  const enumFields: Array<[keyof AiImpactInput, readonly string[]]> = [
+    ["category", AI_IMPACT_CATEGORIES],
+    ["direction", AI_IMPACT_DIRECTIONS],
+    ["scale", AI_IMPACT_SCALES],
+    ["reversibility", AI_IMPACT_REVERSIBILITY_VALUES],
+    ["affectedPopulation", AFFECTED_POPULATIONS as readonly string[]],
+  ];
+  for (const [key, allowed] of enumFields) {
+    const value = body[key];
+    if (isCreate || value !== undefined) {
+      if (typeof value !== "string" || !allowed.includes(value)) {
+        return { error: `Invalid or missing ${key}` };
+      }
+      data[key] = value;
+    }
+  }
+
+  if (isCreate || body.severity !== undefined) {
+    const severity = body.severity;
+    if (typeof severity !== "number" || !Number.isInteger(severity) || severity < 1 || severity > 5) {
+      return { error: "severity must be a whole number from 1 (Minimal) to 5 (Severe)" };
+    }
+    data.severity = severity;
+  }
+
+  const optionalText: Array<keyof AiImpactInput> = ["affectedGroupDescription", "oversightDescription", "escalationMechanism", "safeguards"];
+  for (const key of optionalText) {
+    const value = body[key];
+    if (value !== undefined) {
+      if (value !== null && typeof value !== "string") {
+        return { error: `${key} must be text` };
+      }
+      data[key] = typeof value === "string" && value.trim() ? value.trim() : null;
+    }
+  }
+
+  if (body.oversightRequirement !== undefined) {
+    const value = body.oversightRequirement;
+    if (value === null || value === "") {
+      data.oversightRequirement = null;
+    } else if (typeof value !== "string" || !AI_IMPACT_OVERSIGHT_VALUES.includes(value)) {
+      return { error: "Invalid oversightRequirement" };
+    } else {
+      data.oversightRequirement = value;
+    }
+  }
+
+  if (body.humanCanOverride !== undefined) {
+    const value = body.humanCanOverride;
+    if (value !== null && typeof value !== "boolean") {
+      return { error: "humanCanOverride must be true, false, or null" };
+    }
+    data.humanCanOverride = value;
+  }
+
+  if (body.vulnerablePopulations !== undefined && typeof body.vulnerablePopulations !== "boolean") {
+    return { error: "vulnerablePopulations must be true or false" };
+  }
+  if (
+    body.vulnerablePopulationsExplanation !== undefined &&
+    body.vulnerablePopulationsExplanation !== null &&
+    typeof body.vulnerablePopulationsExplanation !== "string"
+  ) {
+    return { error: "vulnerablePopulationsExplanation must be text" };
+  }
+  const vulnerable =
+    typeof body.vulnerablePopulations === "boolean" ? body.vulnerablePopulations : (existing?.vulnerablePopulations ?? false);
+  const explanationRaw =
+    body.vulnerablePopulationsExplanation !== undefined
+      ? body.vulnerablePopulationsExplanation
+      : (existing?.vulnerablePopulationsExplanation ?? null);
+  const explanation = typeof explanationRaw === "string" && explanationRaw.trim() ? explanationRaw.trim() : null;
+  if (vulnerable && !explanation) {
+    return { error: "vulnerablePopulationsExplanation is required when vulnerablePopulations is true" };
+  }
+  if (isCreate || body.vulnerablePopulations !== undefined) {
+    data.vulnerablePopulations = vulnerable;
+  }
+  if (isCreate || body.vulnerablePopulationsExplanation !== undefined) {
+    data.vulnerablePopulationsExplanation = explanation;
+  }
+
+  return { data };
+}
+
+function summarizeAiImpacts(
+  impacts: Array<{ direction: string; severity: number; vulnerablePopulations: boolean; reversibility: string }>,
+) {
+  const adverse = impacts.filter((i) => i.direction === "ADVERSE");
+  const highestAdverseSeverity = adverse.reduce((max, i) => Math.max(max, i.severity), 0);
+  return {
+    totalImpacts: impacts.length,
+    beneficialImpacts: impacts.filter((i) => i.direction === "BENEFICIAL").length,
+    adverseImpacts: adverse.length,
+    majorOrSevereAdverseImpacts: adverse.filter((i) => i.severity >= 4).length,
+    vulnerablePopulationImpacts: impacts.filter((i) => i.vulnerablePopulations).length,
+    difficultOrIrreversibleImpacts: impacts.filter(
+      (i) => i.reversibility === "DIFFICULT_TO_REVERSE" || i.reversibility === "IRREVERSIBLE",
+    ).length,
+    highestAdverseSeverity: highestAdverseSeverity > 0 ? highestAdverseSeverity : null,
+  };
+}
+
+async function loadImpactAssessmentForTenant(id: string, tenantId: string) {
+  const assessment = await prisma.aiImpactAssessment.findUnique({ where: { id } });
+  if (!assessment) {
+    return null;
+  }
+  try {
+    assertOwnedByTenant(assessment, { tenantId }, "AI impact assessment");
+  } catch {
+    return null;
+  }
+  return assessment;
+}
+
+server.post("/ai-systems/:id/impact-assessments", async (request, reply) => {
+  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  if (!session) {
+    return reply.status(401).send({ error: "Not logged in" });
+  }
+  try {
+    requirePermission({ tenantId: session.tenantId, role: session.role as Role }, "ai-system:update");
+  } catch {
+    return reply.status(403).send({ error: "Not authorized to create AI impact assessments" });
+  }
+
+  const { id } = request.params as { id: string };
+  const aiSystem = await prisma.aiSystem.findUnique({ where: { id } });
+  if (!aiSystem) {
+    return reply.status(404).send({ error: "AI system not found" });
+  }
+  try {
+    assertOwnedByTenant(aiSystem, { tenantId: session.tenantId }, "AI system");
+  } catch {
+    return reply.status(404).send({ error: "AI system not found" });
+  }
+
+  const body = (request.body ?? {}) as { name?: string; assessorUserId?: string };
+  let assessorUserId: string | null = session.userId ?? null;
+  if (body.assessorUserId) {
+    const membership = await prisma.tenantMembership.findFirst({
+      where: { userId: body.assessorUserId, tenantId: session.tenantId },
+    });
+    if (!membership) {
+      return reply.status(400).send({ error: "assessorUserId must belong to a user in this tenant" });
+    }
+    assessorUserId = body.assessorUserId;
+  }
+
+  // New versions never overwrite earlier assessments. The unique (aiSystemId, version)
+  // constraint protects against two assessments being created at the same moment.
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const latest = await prisma.aiImpactAssessment.findFirst({
+      where: { aiSystemId: aiSystem.id },
+      orderBy: { version: "desc" },
+      select: { version: true },
+    });
+    const version = (latest?.version ?? 0) + 1;
+    try {
+      const assessment = await prisma.aiImpactAssessment.create({
+        data: {
+          tenantId: session.tenantId,
+          aiSystemId: aiSystem.id,
+          name: typeof body.name === "string" && body.name.trim() ? body.name.trim() : `Impact Assessment v${version}`,
+          version,
+          assessorUserId,
+        },
+      });
+      await prisma.auditEvent.create({
+        data: {
+          tenantId: session.tenantId,
+          actorUserId: session.userId,
+          action: "ai_impact_assessment.created",
+          targetType: "AiImpactAssessment",
+          targetId: assessment.id,
+          outcome: "SUCCESS",
+          metadataJson: { aiSystemId: aiSystem.id, version } as never,
+        },
+      });
+      return reply.status(201).send(assessment);
+    } catch (err) {
+      if ((err as { code?: string }).code === "P2002") {
+        continue;
+      }
+      throw err;
+    }
+  }
+  return reply.status(409).send({ error: "Could not allocate a new assessment version. Please retry." });
+});
+
+server.get("/ai-systems/:id/impact-assessments", async (request, reply) => {
+  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  if (!session) {
+    return reply.status(401).send({ error: "Not logged in" });
+  }
+  try {
+    requirePermission({ tenantId: session.tenantId, role: session.role as Role }, "ai-system:read");
+  } catch {
+    return reply.status(403).send({ error: "Not authorized to view AI impact assessments" });
+  }
+
+  const { id } = request.params as { id: string };
+  const aiSystem = await prisma.aiSystem.findUnique({ where: { id } });
+  if (!aiSystem) {
+    return reply.status(404).send({ error: "AI system not found" });
+  }
+  try {
+    assertOwnedByTenant(aiSystem, { tenantId: session.tenantId }, "AI system");
+  } catch {
+    return reply.status(404).send({ error: "AI system not found" });
+  }
+
+  const assessments = await prisma.aiImpactAssessment.findMany({
+    where: { tenantId: session.tenantId, aiSystemId: aiSystem.id },
+    orderBy: { version: "desc" },
+    include: {
+      impacts: { select: { direction: true, severity: true, vulnerablePopulations: true, reversibility: true } },
+    },
+  });
+  return reply.send(assessments.map(({ impacts, ...assessment }) => ({ ...assessment, impactSummary: summarizeAiImpacts(impacts) })));
+});
+
+server.get("/ai-impact-assessments/:id", async (request, reply) => {
+  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  if (!session) {
+    return reply.status(401).send({ error: "Not logged in" });
+  }
+  try {
+    requirePermission({ tenantId: session.tenantId, role: session.role as Role }, "ai-system:read");
+  } catch {
+    return reply.status(403).send({ error: "Not authorized to view AI impact assessments" });
+  }
+
+  const { id } = request.params as { id: string };
+  const assessment = await prisma.aiImpactAssessment.findUnique({
+    where: { id },
+    include: {
+      impacts: { orderBy: { createdAt: "asc" } },
+      aiSystem: {
+        select: {
+          id: true,
+          name: true,
+          impactLevel: true,
+          humanOversight: true,
+          decisionRole: true,
+          affectedPopulation: true,
+          externalImpact: true,
+          regulatoryRelevance: true,
+          riskTier: true,
+        },
+      },
+      assessor: { select: { id: true, displayName: true, email: true } },
+      reviewer: { select: { id: true, displayName: true, email: true } },
+    },
+  });
+  if (!assessment) {
+    return reply.status(404).send({ error: "AI impact assessment not found" });
+  }
+  try {
+    assertOwnedByTenant(assessment, { tenantId: session.tenantId }, "AI impact assessment");
+  } catch {
+    return reply.status(404).send({ error: "AI impact assessment not found" });
+  }
+  return reply.send({ ...assessment, impactSummary: summarizeAiImpacts(assessment.impacts) });
+});
+
+server.patch("/ai-impact-assessments/:id", async (request, reply) => {
+  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  if (!session) {
+    return reply.status(401).send({ error: "Not logged in" });
+  }
+  try {
+    requirePermission({ tenantId: session.tenantId, role: session.role as Role }, "ai-system:update");
+  } catch {
+    return reply.status(403).send({ error: "Not authorized to update AI impact assessments" });
+  }
+
+  const { id } = request.params as { id: string };
+  const assessment = await loadImpactAssessmentForTenant(id, session.tenantId);
+  if (!assessment) {
+    return reply.status(404).send({ error: "AI impact assessment not found" });
+  }
+  if (assessment.status === "COMPLETED") {
+    return reply.status(409).send({ error: AI_IMPACT_LOCKED_MESSAGE });
+  }
+
+  const body = (request.body ?? {}) as { name?: unknown; status?: unknown };
+  const data: { name?: string; status?: string } = {};
+  if (body.name !== undefined) {
+    if (typeof body.name !== "string" || !body.name.trim()) {
+      return reply.status(400).send({ error: "name cannot be empty" });
+    }
+    data.name = body.name.trim();
+  }
+  if (body.status !== undefined) {
+    if (typeof body.status !== "string" || !AI_IMPACT_EDITABLE_STATUSES.includes(body.status)) {
+      return reply.status(400).send({
+        error: "status must be DRAFT, IN_PROGRESS, or READY_FOR_REVIEW. An impact assessment is completed only through independent review.",
+      });
+    }
+    data.status = body.status;
+  }
+  if (Object.keys(data).length === 0) {
+    return reply.status(400).send({ error: "No changes provided" });
+  }
+
+  const result = await prisma.aiImpactAssessment.updateMany({
+    where: { id: assessment.id, tenantId: session.tenantId, status: { not: "COMPLETED" as never } },
+    data: data as never,
+  });
+  if (result.count === 0) {
+    return reply.status(409).send({ error: AI_IMPACT_LOCKED_MESSAGE });
+  }
+  const updated = await prisma.aiImpactAssessment.findUnique({ where: { id: assessment.id } });
+
+  if (data.status !== undefined && data.status !== assessment.status) {
+    await prisma.auditEvent.create({
+      data: {
+        tenantId: session.tenantId,
+        actorUserId: session.userId,
+        action: "ai_impact_assessment.status_changed",
+        targetType: "AiImpactAssessment",
+        targetId: assessment.id,
+        outcome: "SUCCESS",
+        metadataJson: { from: assessment.status, to: data.status } as never,
+      },
+    });
+  }
+  if (data.name !== undefined && data.name !== assessment.name) {
+    await prisma.auditEvent.create({
+      data: {
+        tenantId: session.tenantId,
+        actorUserId: session.userId,
+        action: "ai_impact_assessment.updated",
+        targetType: "AiImpactAssessment",
+        targetId: assessment.id,
+        outcome: "SUCCESS",
+        metadataJson: { fields: ["name"] } as never,
+      },
+    });
+  }
+  return reply.send(updated);
+});
+
+server.post("/ai-impact-assessments/:id/impacts", async (request, reply) => {
+  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  if (!session) {
+    return reply.status(401).send({ error: "Not logged in" });
+  }
+  try {
+    requirePermission({ tenantId: session.tenantId, role: session.role as Role }, "ai-system:update");
+  } catch {
+    return reply.status(403).send({ error: "Not authorized to add AI impacts" });
+  }
+
+  const { id } = request.params as { id: string };
+  const assessment = await loadImpactAssessmentForTenant(id, session.tenantId);
+  if (!assessment) {
+    return reply.status(404).send({ error: "AI impact assessment not found" });
+  }
+  if (assessment.status === "COMPLETED") {
+    return reply.status(409).send({ error: AI_IMPACT_LOCKED_MESSAGE });
+  }
+
+  const result = buildAiImpactData((request.body ?? {}) as AiImpactInput, null);
+  if ("error" in result) {
+    return reply.status(400).send({ error: result.error });
+  }
+
+  const impact = await prisma.aiImpact.create({
+    data: { ...result.data, tenantId: session.tenantId, assessmentId: assessment.id } as never,
+  });
+  await prisma.auditEvent.create({
+    data: {
+      tenantId: session.tenantId,
+      actorUserId: session.userId,
+      action: "ai_impact.added",
+      targetType: "AiImpact",
+      targetId: impact.id,
+      outcome: "SUCCESS",
+      metadataJson: {
+        assessmentId: assessment.id,
+        direction: impact.direction,
+        category: impact.category,
+        severity: impact.severity,
+      } as never,
+    },
+  });
+  return reply.status(201).send(impact);
+});
+
+server.patch("/ai-impacts/:id", async (request, reply) => {
+  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  if (!session) {
+    return reply.status(401).send({ error: "Not logged in" });
+  }
+  try {
+    requirePermission({ tenantId: session.tenantId, role: session.role as Role }, "ai-system:update");
+  } catch {
+    return reply.status(403).send({ error: "Not authorized to update AI impacts" });
+  }
+
+  const { id } = request.params as { id: string };
+  const impact = await prisma.aiImpact.findUnique({ where: { id } });
+  if (!impact) {
+    return reply.status(404).send({ error: "AI impact not found" });
+  }
+  try {
+    assertOwnedByTenant(impact, { tenantId: session.tenantId }, "AI impact");
+  } catch {
+    return reply.status(404).send({ error: "AI impact not found" });
+  }
+  const assessment = await prisma.aiImpactAssessment.findUnique({ where: { id: impact.assessmentId } });
+  if (!assessment) {
+    return reply.status(404).send({ error: "AI impact assessment not found" });
+  }
+  if (assessment.status === "COMPLETED") {
+    return reply.status(409).send({ error: AI_IMPACT_LOCKED_MESSAGE });
+  }
+
+  const result = buildAiImpactData((request.body ?? {}) as AiImpactInput, impact);
+  if ("error" in result) {
+    return reply.status(400).send({ error: result.error });
+  }
+  if (Object.keys(result.data).length === 0) {
+    return reply.status(400).send({ error: "No changes provided" });
+  }
+
+  const updated = await prisma.aiImpact.update({ where: { id: impact.id }, data: result.data as never });
+  await prisma.auditEvent.create({
+    data: {
+      tenantId: session.tenantId,
+      actorUserId: session.userId,
+      action: "ai_impact.updated",
+      targetType: "AiImpact",
+      targetId: impact.id,
+      outcome: "SUCCESS",
+      metadataJson: { assessmentId: assessment.id, fields: Object.keys(result.data) } as never,
+    },
+  });
+  return reply.send(updated);
+});
+
+server.delete("/ai-impacts/:id", async (request, reply) => {
+  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  if (!session) {
+    return reply.status(401).send({ error: "Not logged in" });
+  }
+  try {
+    requirePermission({ tenantId: session.tenantId, role: session.role as Role }, "ai-system:update");
+  } catch {
+    return reply.status(403).send({ error: "Not authorized to delete AI impacts" });
+  }
+
+  const { id } = request.params as { id: string };
+  const impact = await prisma.aiImpact.findUnique({ where: { id } });
+  if (!impact) {
+    return reply.status(404).send({ error: "AI impact not found" });
+  }
+  try {
+    assertOwnedByTenant(impact, { tenantId: session.tenantId }, "AI impact");
+  } catch {
+    return reply.status(404).send({ error: "AI impact not found" });
+  }
+  const assessment = await prisma.aiImpactAssessment.findUnique({ where: { id: impact.assessmentId } });
+  if (!assessment) {
+    return reply.status(404).send({ error: "AI impact assessment not found" });
+  }
+  if (assessment.status === "COMPLETED") {
+    return reply.status(409).send({ error: AI_IMPACT_LOCKED_MESSAGE });
+  }
+
+  await prisma.aiImpact.delete({ where: { id: impact.id } });
+  await prisma.auditEvent.create({
+    data: {
+      tenantId: session.tenantId,
+      actorUserId: session.userId,
+      action: "ai_impact.deleted",
+      targetType: "AiImpact",
+      targetId: impact.id,
+      outcome: "SUCCESS",
+      metadataJson: { assessmentId: assessment.id, title: impact.title } as never,
+    },
+  });
+  return reply.send({ deleted: true });
+});
+
+server.post("/ai-impact-assessments/:id/review", async (request, reply) => {
+  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  if (!session) {
+    return reply.status(401).send({ error: "Not logged in" });
+  }
+  const { id } = request.params as { id: string };
+  const auditDenied = (reason: string) =>
+    prisma.auditEvent.create({
+      data: {
+        tenantId: session.tenantId,
+        actorUserId: session.userId,
+        action: "ai_impact_assessment.review_denied",
+        targetType: "AiImpactAssessment",
+        targetId: id,
+        outcome: "DENIED",
+        metadataJson: { reason } as never,
+      },
+    });
+
+  try {
+    requirePermission({ tenantId: session.tenantId, role: session.role as Role }, "ai-impact-assessment:review");
+  } catch {
+    await auditDenied("missing_permission");
+    return reply.status(403).send({ error: "Not authorized to review AI impact assessments" });
+  }
+
+  const assessment = await loadImpactAssessmentForTenant(id, session.tenantId);
+  if (!assessment) {
+    return reply.status(404).send({ error: "AI impact assessment not found" });
+  }
+
+  const body = (request.body ?? {}) as { decision?: string; rationale?: string };
+  if (!body.decision || !AI_ASSESSMENT_REVIEW_DECISIONS.includes(body.decision)) {
+    return reply.status(400).send({ error: "Invalid or missing decision" });
+  }
+  if (!body.rationale || !body.rationale.trim()) {
+    return reply.status(400).send({ error: "rationale is required" });
+  }
+  if (assessment.status === "COMPLETED" || assessment.reviewDecision === "APPROVED") {
+    await auditDenied("already_completed");
+    return reply.status(409).send({ error: AI_IMPACT_ALREADY_REVIEWED_MESSAGE });
+  }
+  if (!assessment.assessorUserId) {
+    await auditDenied("no_assessor_assigned");
+    return reply.status(403).send({
+      error: "Review cannot proceed because an assessor has not been assigned to this impact assessment.",
+    });
+  }
+  if (assessment.assessorUserId === session.userId) {
+    await auditDenied("self_review");
+    return reply.status(403).send({ error: "The assessor cannot also review their own impact assessment" });
+  }
+
+  const newStatus = body.decision === "APPROVED" ? "COMPLETED" : "IN_PROGRESS";
+
+  // Conditional update: only succeeds while the assessment is still unapproved,
+  // so two reviewers submitting at the same moment cannot both win.
+  const result = await prisma.aiImpactAssessment.updateMany({
+    where: {
+      id: assessment.id,
+      tenantId: session.tenantId,
+      status: { not: "COMPLETED" as never },
+      OR: [{ reviewDecision: null }, { reviewDecision: { not: "APPROVED" as never } }],
+    },
+    data: {
+      reviewedAt: new Date(),
+      reviewerUserId: session.userId,
+      reviewDecision: body.decision as never,
+      reviewRationale: body.rationale.trim(),
+      status: newStatus as never,
+      completedAt: body.decision === "APPROVED" ? new Date() : undefined,
+    },
+  });
+  if (result.count === 0) {
+    await auditDenied("already_completed");
+    return reply.status(409).send({ error: AI_IMPACT_ALREADY_REVIEWED_MESSAGE });
+  }
+  const updated = await prisma.aiImpactAssessment.findUnique({ where: { id: assessment.id } });
+
+  await prisma.auditEvent.create({
+    data: {
+      tenantId: session.tenantId,
+      actorUserId: session.userId,
+      action: "ai_impact_assessment.review_recorded",
+      targetType: "AiImpactAssessment",
+      targetId: assessment.id,
+      outcome: "SUCCESS",
+      metadataJson: { decision: body.decision } as never,
+    },
+  });
+
+  return reply.send(updated);
+});
+
 const start = async () => {
   try {
     const port = process.env.PORT ? parseInt(process.env.PORT) : 4000;
