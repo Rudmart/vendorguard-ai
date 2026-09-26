@@ -15,6 +15,7 @@ import { buildExecutiveReport } from "./executiveReport.js";
 import { renderExecutiveReportPdf } from "./executiveReportPdf.js";
 import { askAssistant } from "@vendorguard/ai-client";
 import { buildAssistantContext } from "./assistantContext.js";
+import { registerAiControlEvidenceRoutes } from "./aiControlEvidence.js";
 import { registerAuthRoutes } from "./auth-routes.js";
 import { getSessionFromCookie, COOKIE_NAME, requireFindingReviewAuthority, requireRiskAcceptanceAuthority, AuthorizationError, requestContextSchema, assertOwnedByTenant, requirePermission } from "@vendorguard/auth";
 import type { Role } from "@vendorguard/shared";
@@ -42,6 +43,7 @@ server.register(rateLimit, {
 });
 
 server.register(registerAuthRoutes);
+server.register(registerAiControlEvidenceRoutes);
 
 server.get("/health", async () => {
   return { status: "ok", service: "vendorguard-api" };
