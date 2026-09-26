@@ -186,6 +186,11 @@ function ControlEditor({ row, users, onSaved }: { row: ControlRow; users: UserOp
         )}
       </div>
 
+      <div style={{ marginTop: 8 }}>
+        <a href={"/ai-system-controls/" + row.id + "/evidence"} style={{ color: "#93c5fd", fontSize: 13, textDecoration: "none" }}>
+          {"Evidence & assurance ->"}
+        </a>
+      </div>
       {row.linkedRisks.length > 0 && (
         <p style={{ fontSize: 12, color: colors.soft, margin: "8px 0 0" }}>
           Linked to AI risk (from the AI Risk Assessment, read only): {row.linkedRisks.map((risk) => risk.title).join(", ")}

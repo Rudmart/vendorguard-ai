@@ -162,6 +162,8 @@ model User {
   frameworkApplicabilityDetermined AiSystemFrameworkApplicability[] @relation("AiFrameworkApplicabilityDeterminedBy")
   aiSystemControlsOwned            AiSystemControl[]                @relation("AiSystemControlOwner")
   aiSystemControlsMapped           AiSystemControl[]                @relation("AiSystemControlMappedBy")
+  aiControlEvidenceSubmitted AiSystemControlEvidence[] @relation("AiControlEvidenceSubmittedBy")
+  aiControlEvidenceReviews   AiControlEvidenceReview[]  @relation("AiControlEvidenceReviewer")
 
   @@map("users")
 }
@@ -434,7 +436,8 @@ model QuestionnaireResponse {
 model EvidenceDocument {
   id             String        @id @default(uuid())
   tenantId       String
-  vendorId       String
+  vendorId       String? // optional since Step 9: evidence belongs to a vendor OR an AI system (API requires one)
+  aiSystemId     String? // Step 9: internal AI-system evidence
   displayFilename String
   storageKey    String  // generated, non-guessable storage name
   mimeType       String
@@ -449,12 +452,15 @@ model EvidenceDocument {
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 
-  vendor Vendor          @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  vendor   Vendor?   @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  aiSystem AiSystem? @relation(fields: [aiSystemId], references: [id], onDelete: Restrict)
   chunks EvidenceChunk[]
+  aiControlLinks AiSystemControlEvidence[]
   findingEvidence FindingEvidence[]
 
   @@index([tenantId])
   @@index([tenantId, vendorId])
+  @@index([tenantId, aiSystemId])
   @@index([tenantId, state])
   @@index([sha256Hash]) // duplicate detection
   @@map("evidence_documents")
@@ -933,6 +939,7 @@ model AiSystem {
   impactAssessments AiImpactAssessment[]
   frameworkApplicability AiSystemFrameworkApplicability[]
   controls               AiSystemControl[]
+  evidenceDocuments      EvidenceDocument[]
 
   createdAt       DateTime                @default(now())
   updatedAt       DateTime                @updatedAt
@@ -1224,10 +1231,71 @@ model AiSystemControl {
   sourceApplicability AiSystemFrameworkApplicability @relation(fields: [sourceApplicabilityId], references: [id], onDelete: Restrict)
   owner               User?                          @relation("AiSystemControlOwner", fields: [ownerUserId], references: [id])
   mappedBy            User?                          @relation("AiSystemControlMappedBy", fields: [mappedByUserId], references: [id])
+  evidenceLinks       AiSystemControlEvidence[]
 
   @@unique([aiSystemId, controlId])
   @@index([tenantId])
   @@index([tenantId, aiSystemId])
   @@index([tenantId, ownerUserId])
   @@map("ai_system_controls")
+}
+
+// ---------------------------------------------------------------------------
+// Step 9 - AI control evidence & assurance (human-reviewed).
+// No control testing / effectiveness here - that is the later Control Testing capability.
+// ---------------------------------------------------------------------------
+enum AiControlEvidenceStatus {
+  PENDING_REVIEW
+  ACCEPTED
+  REJECTED
+}
+
+enum AiControlEvidenceDecision {
+  ACCEPT
+  REJECT
+}
+
+model AiSystemControlEvidence {
+  id                 String                  @id @default(uuid())
+  tenantId           String
+  aiSystemControlId  String
+  evidenceDocumentId String
+  status             AiControlEvidenceStatus @default(PENDING_REVIEW)
+  submissionNote     String?
+  submittedByUserId  String
+  submittedAt        DateTime                @default(now())
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  aiSystemControl  AiSystemControl           @relation(fields: [aiSystemControlId], references: [id], onDelete: Restrict)
+  evidenceDocument EvidenceDocument          @relation(fields: [evidenceDocumentId], references: [id], onDelete: Restrict)
+  submittedBy      User                      @relation("AiControlEvidenceSubmittedBy", fields: [submittedByUserId], references: [id], onDelete: Restrict)
+  reviews          AiControlEvidenceReview[]
+
+  @@unique([aiSystemControlId, evidenceDocumentId])
+  @@index([tenantId])
+  @@index([tenantId, aiSystemControlId])
+  @@index([tenantId, status])
+  @@map("ai_system_control_evidence")
+}
+
+// Append-only review history - rows are never updated or deleted by the API.
+model AiControlEvidenceReview {
+  id             String                    @id @default(uuid())
+  tenantId       String
+  linkId         String
+  reviewerUserId String
+  decision       AiControlEvidenceDecision
+  rationale      String
+  previousStatus AiControlEvidenceStatus
+  newStatus      AiControlEvidenceStatus
+  createdAt      DateTime                  @default(now())
+
+  link     AiSystemControlEvidence @relation(fields: [linkId], references: [id], onDelete: Restrict)
+  reviewer User                    @relation("AiControlEvidenceReviewer", fields: [reviewerUserId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId])
+  @@index([linkId])
+  @@map("ai_control_evidence_reviews")
 }
