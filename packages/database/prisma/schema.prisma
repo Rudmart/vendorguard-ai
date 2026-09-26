@@ -164,6 +164,8 @@ model User {
   aiSystemControlsMapped           AiSystemControl[]                @relation("AiSystemControlMappedBy")
   aiControlEvidenceSubmitted AiSystemControlEvidence[] @relation("AiControlEvidenceSubmittedBy")
   aiControlEvidenceReviews   AiControlEvidenceReview[]  @relation("AiControlEvidenceReviewer")
+  aiControlTestsPerformed    AiControlTest[]            @relation("AiControlTestTester")
+  aiControlTestEvidenceAdded AiControlTestEvidence[]    @relation("AiControlTestEvidenceAddedBy")
 
   @@map("users")
 }
@@ -1232,6 +1234,7 @@ model AiSystemControl {
   owner               User?                          @relation("AiSystemControlOwner", fields: [ownerUserId], references: [id])
   mappedBy            User?                          @relation("AiSystemControlMappedBy", fields: [mappedByUserId], references: [id])
   evidenceLinks       AiSystemControlEvidence[]
+  tests               AiControlTest[]
 
   @@unique([aiSystemId, controlId])
   @@index([tenantId])
@@ -1272,6 +1275,7 @@ model AiSystemControlEvidence {
   evidenceDocument EvidenceDocument          @relation(fields: [evidenceDocumentId], references: [id], onDelete: Restrict)
   submittedBy      User                      @relation("AiControlEvidenceSubmittedBy", fields: [submittedByUserId], references: [id], onDelete: Restrict)
   reviews          AiControlEvidenceReview[]
+  testUsages       AiControlTestEvidence[]
 
   @@unique([aiSystemControlId, evidenceDocumentId])
   @@index([tenantId])
@@ -1298,4 +1302,74 @@ model AiControlEvidenceReview {
   @@index([tenantId])
   @@index([linkId])
   @@map("ai_control_evidence_reviews")
+}
+
+// ---------------------------------------------------------------------------
+// Step 10 - Control testing & effectiveness (human-authoritative).
+// Evidence acceptance (Step 9) and control effectiveness are separate decisions.
+// Completed tests are locked; a retest is a new record. Findings for AI-system
+// controls are deferred to Step 11 (deficiency lives in the result + rationale).
+// ---------------------------------------------------------------------------
+enum AiControlTestMethod {
+  DOCUMENT_REVIEW
+  INTERVIEW
+  OBSERVATION
+  SAMPLE_TESTING
+  CONFIGURATION_REVIEW
+  OTHER
+}
+
+enum AiControlTestStatus {
+  IN_PROGRESS
+  COMPLETED
+}
+
+model AiControlTest {
+  id                     String                 @id @default(uuid())
+  tenantId               String
+  aiSystemControlId      String
+  testerUserId           String
+  status                 AiControlTestStatus    @default(IN_PROGRESS)
+  method                 AiControlTestMethod
+  procedure              String
+  testDate               DateTime?
+  sampleSize             Int?
+  exceptionsFound        Int?
+  designEffectiveness    AiControlEffectiveness @default(NOT_ASSESSED)
+  operatingEffectiveness AiControlEffectiveness @default(NOT_ASSESSED)
+  overallEffectiveness   AiControlEffectiveness @default(NOT_ASSESSED)
+  conclusionRationale    String?
+  nextTestDate           DateTime?
+  completedAt            DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  aiSystemControl AiSystemControl         @relation(fields: [aiSystemControlId], references: [id], onDelete: Restrict)
+  tester          User                    @relation("AiControlTestTester", fields: [testerUserId], references: [id], onDelete: Restrict)
+  evidence        AiControlTestEvidence[]
+
+  @@index([tenantId])
+  @@index([tenantId, aiSystemControlId])
+  @@index([tenantId, status])
+  @@map("ai_control_tests")
+}
+
+// Evidence considered in a test = a Step 9 evidence link (no file duplication).
+model AiControlTestEvidence {
+  id             String   @id @default(uuid())
+  tenantId       String
+  testId         String
+  evidenceLinkId String
+  addedByUserId  String
+  createdAt      DateTime @default(now())
+
+  test         AiControlTest           @relation(fields: [testId], references: [id], onDelete: Restrict)
+  evidenceLink AiSystemControlEvidence @relation(fields: [evidenceLinkId], references: [id], onDelete: Restrict)
+  addedBy      User                    @relation("AiControlTestEvidenceAddedBy", fields: [addedByUserId], references: [id], onDelete: Restrict)
+
+  @@unique([testId, evidenceLinkId])
+  @@index([tenantId])
+  @@index([testId])
+  @@map("ai_control_test_evidence")
 }

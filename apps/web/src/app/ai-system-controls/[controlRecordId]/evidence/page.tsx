@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type CSSProperties } from "react";
 import { useParams } from "next/navigation";
+import ControlTestingSection from "./control-testing";
 
 const API = process.env.NEXT_PUBLIC_API_URL;
 
@@ -367,6 +368,12 @@ export default function ControlEvidencePage() {
           </div>
         ))}
       </section>
+      <ControlTestingSection
+        controlRecordId={controlRecordId}
+        evidenceLinks={links}
+        assuranceStatus={assuranceStatus}
+        disabled={notApplicable}
+      />
     </main>
   );
 }
