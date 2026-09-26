@@ -9,6 +9,7 @@ let vendorId: string;
 let assessmentId: string;
 let controlId: string;
 let findingId: string;
+let frameworkId: string;
 
 function cookieFor(userId: string, role: string) {
   return JSON.stringify({ userId, tenantId, email: `${userId}@example.com`, displayName: "Test User", role });
@@ -36,6 +37,7 @@ beforeAll(async () => {
   vendorId = vendor.id;
 
   const framework = await prisma.framework.create({ data: { catalogId: `m12-test-${Date.now()}`, name: "M12 Test Framework", scope: "VENDOR_ASSESSMENT", industries: ["GENERAL"] } });
+  frameworkId = framework.id;
   const version = await prisma.frameworkVersion.create({ data: { frameworkId: framework.id, version: "1.0" } });
   const control = await prisma.control.create({
     data: { frameworkVersionId: version.id, controlId: "M12-1", title: "Test Control", summary: "Test", domain: "Test", expectedEvidenceTypes: [], validationGuidance: "n/a" },
@@ -70,6 +72,7 @@ afterAll(async () => {
   await prisma.riskAcceptance.deleteMany({ where: { tenantId } });
   await prisma.vendor.deleteMany({ where: { tenantId } });
   await prisma.control.delete({ where: { id: controlId } });
+  await prisma.framework.delete({ where: { id: frameworkId } }); // removes its test version too
   await prisma.tenantMembership.deleteMany({ where: { tenantId } });
   await prisma.user.delete({ where: { id: reviewerUserId } });
   await prisma.user.delete({ where: { id: analystUserId } });

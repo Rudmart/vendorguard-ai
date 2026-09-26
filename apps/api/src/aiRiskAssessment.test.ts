@@ -11,6 +11,7 @@ let readOnlyUserId: string;
 let tenantBUserId: string;
 let controlId: string;
 let vendorAId: string;
+let raFrameworkId: string;
 
 function cookieFor(userId: string, role: string, tenantId: string) {
   return JSON.stringify({ userId, tenantId, email: `${userId}@example.com`, displayName: "Test User", role });
@@ -84,12 +85,14 @@ beforeAll(async () => {
     },
   });
   controlId = control.id;
+  raFrameworkId = framework.id;
 });
 
 afterAll(async () => {
   await prisma.auditEvent.deleteMany({ where: { tenantId: { in: [tenantAId, tenantBId] } } });
   await prisma.remediationAction.deleteMany({ where: { tenantId: { in: [tenantAId, tenantBId] } } });
   await prisma.aiRisk.deleteMany({ where: { tenantId: { in: [tenantAId, tenantBId] } } });
+  await prisma.framework.delete({ where: { id: raFrameworkId } }); // removes its test version and control too
   await prisma.aiRiskAssessment.deleteMany({ where: { tenantId: { in: [tenantAId, tenantBId] } } });
   await prisma.aiSystemVendor.deleteMany({ where: { tenantId: { in: [tenantAId, tenantBId] } } });
   await prisma.aiSystem.deleteMany({ where: { tenantId: { in: [tenantAId, tenantBId] } } });

@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import ImpactAssessmentCard from "./impact-assessment-card";
+import FrameworkApplicabilityCard from "./framework-applicability-card";
 
 type TenantUser = { id: string; displayName: string; email: string };
 type RiskAssessmentSummary = { id: string; name: string; status: string; risks: { inherentScore: number; residualScore: number | null }[] };
@@ -598,6 +599,7 @@ export default function AiSystemDetailPage() {
         )}
       </div>
       <ImpactAssessmentCard aiSystemId={String(id)} />
+      <FrameworkApplicabilityCard aiSystemId={String(id)} />
     </main>
   );
 }
