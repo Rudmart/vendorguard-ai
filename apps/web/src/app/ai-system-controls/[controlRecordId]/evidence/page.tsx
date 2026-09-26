@@ -79,6 +79,7 @@ const field: CSSProperties = {
   width: "100%",
   boxSizing: "border-box",
   marginBottom: 8,
+  colorScheme: "dark",
 };
 const button: CSSProperties = { background: "#2563eb", color: "white", border: "none", borderRadius: 6, padding: "6px 12px", fontSize: 13, cursor: "pointer", marginRight: 8 };
 const muted: CSSProperties = { color: "#9ca3af", fontSize: 12 };

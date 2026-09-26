@@ -88,6 +88,7 @@ const field: CSSProperties = {
   width: "100%",
   boxSizing: "border-box",
   marginBottom: 8,
+  colorScheme: "dark",
 };
 const button: CSSProperties = { background: "#2563eb", color: "white", border: "none", borderRadius: 6, padding: "6px 12px", fontSize: 13, cursor: "pointer", marginRight: 8 };
 const muted: CSSProperties = { color: "#9ca3af", fontSize: 12 };
@@ -298,7 +299,8 @@ export default function ControlTestingSection({
           <div style={{ ...muted, fontWeight: 600 }}>
             Test in progress - started by {inProgress.tester.displayName} ({inProgress.tester.email}). Only this tester can edit or complete it.
           </div>
-          <div style={{ ...grid, marginTop: 10 }}>
+          <div style={{ color: "#93c5fd", fontSize: 13, fontWeight: 600, margin: "14px 0 6px 0" }}>1. Test details</div>
+          <div style={grid}>
             <div>
               <span style={label}>Test method</span>
               <select style={field} value={draft.method} onChange={(e) => update("method", e.target.value)}>
@@ -310,22 +312,15 @@ export default function ControlTestingSection({
               </select>
             </div>
             <div>
-              <span style={label}>Test date</span>
+              <span style={label}>Test date - when the test was performed</span>
               <input style={field} type="date" value={draft.testDate} onChange={(e) => update("testDate", e.target.value)} />
             </div>
-            <div>
-              <span style={label}>Sample size (optional)</span>
-              <input style={field} type="number" min={1} value={draft.sampleSize} onChange={(e) => update("sampleSize", e.target.value)} />
-            </div>
-            <div>
-              <span style={label}>Exceptions found (optional)</span>
-              <input style={field} type="number" min={0} value={draft.exceptionsFound} onChange={(e) => update("exceptionsFound", e.target.value)} />
-            </div>
           </div>
-          <span style={label}>Test procedure</span>
+          <span style={label}>Test procedure - what you did to check the control</span>
           <textarea style={field} rows={2} value={draft.procedure} onChange={(e) => update("procedure", e.target.value)} />
 
-          <span style={label}>Evidence considered (at least one must be Accepted to complete the test)</span>
+          <div style={{ color: "#93c5fd", fontSize: 13, fontWeight: 600, margin: "14px 0 6px 0" }}>2. Evidence considered</div>
+          <p style={muted}>At least one item must be Accepted in evidence review before the test can be completed.</p>
           {inProgress.evidence.length === 0 && <p style={muted}>No evidence added yet.</p>}
           {inProgress.evidence.map((item) => (
             <p key={item.id} style={{ ...muted, margin: "2px 0" }}>
@@ -359,12 +354,25 @@ export default function ControlTestingSection({
             </button>
           </div>
 
-          <div style={{ ...grid, marginTop: 12 }}>
+          <div style={{ color: "#93c5fd", fontSize: 13, fontWeight: 600, margin: "14px 0 6px 0" }}>3. Results</div>
+          <div style={grid}>
+            <div>
+              <span style={label}>Sample size - how many items you checked (optional)</span>
+              <input style={field} type="number" min={1} value={draft.sampleSize} onChange={(e) => update("sampleSize", e.target.value)} />
+            </div>
+            <div>
+              <span style={label}>Exceptions found - how many failed (optional)</span>
+              <input style={field} type="number" min={0} value={draft.exceptionsFound} onChange={(e) => update("exceptionsFound", e.target.value)} />
+            </div>
+          </div>
+          <div style={grid}>
             {effSelect("designEffectiveness", "Design effectiveness - is the control designed to address the risk?")}
             {effSelect("operatingEffectiveness", "Operating effectiveness - did it actually operate as designed?")}
             {effSelect("overallEffectiveness", "Overall effectiveness - cannot be better than the weaker of the two")}
           </div>
-          <span style={label}>Conclusion rationale</span>
+
+          <div style={{ color: "#93c5fd", fontSize: 13, fontWeight: 600, margin: "14px 0 6px 0" }}>4. Conclusion</div>
+          <span style={label}>Conclusion rationale - why you reached this result</span>
           <textarea
             style={field}
             rows={3}
@@ -374,7 +382,6 @@ export default function ControlTestingSection({
           />
           <span style={label}>Next test / retest date (optional)</span>
           <input style={field} type="date" value={draft.nextTestDate} onChange={(e) => update("nextTestDate", e.target.value)} />
-
           <button
             style={button}
             disabled={busy}
