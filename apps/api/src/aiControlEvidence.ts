@@ -15,9 +15,9 @@ import type { Role } from "@vendorguard/shared";
 import { getStorageClient } from "@vendorguard/storage-client";
 import { extractAndSaveEvidenceChunks } from "./evidenceExtraction.js";
 
-type Session = NonNullable<ReturnType<typeof getSessionFromCookie>>;
-type Permission = Parameters<typeof requirePermission>[1];
-type AuditMeta = Record<string, string | number | boolean | null>;
+export type Session = NonNullable<ReturnType<typeof getSessionFromCookie>>;
+export type Permission = Parameters<typeof requirePermission>[1];
+export type AuditMeta = Record<string, string | number | boolean | null>;
 
 export type AssuranceStatus = "NO_EVIDENCE" | "PENDING_REVIEW" | "ACCEPTED" | "REJECTED";
 
@@ -57,11 +57,11 @@ const EVIDENCE_SELECT = {
 } as const;
 const USER_SELECT = { id: true, displayName: true, email: true } as const;
 
-function sessionOf(request: FastifyRequest): Session | null {
+export function sessionOf(request: FastifyRequest): Session | null {
   return getSessionFromCookie(request.cookies[COOKIE_NAME]) ?? null;
 }
 
-function hasPermission(session: Session, permission: Permission): boolean {
+export function hasPermission(session: Session, permission: Permission): boolean {
   try {
     requirePermission({ tenantId: session.tenantId, role: session.role as Role }, permission);
     return true;
@@ -70,7 +70,7 @@ function hasPermission(session: Session, permission: Permission): boolean {
   }
 }
 
-function cleanText(value: unknown, max: number): string | null {
+export function cleanText(value: unknown, max: number): string | null {
   if (typeof value !== "string") {
     return null;
   }
@@ -81,7 +81,7 @@ function cleanText(value: unknown, max: number): string | null {
   return trimmed;
 }
 
-function parseOptionalDate(value: unknown): Date | null | "invalid" {
+export function parseOptionalDate(value: unknown): Date | null | "invalid" {
   if (value === undefined || value === null || value === "") {
     return null;
   }
@@ -102,7 +102,7 @@ function isUsableEvidence(doc: { state: string; expirationDate: Date | null }): 
   return true;
 }
 
-async function audit(
+export async function audit(
   session: Session,
   action: string,
   targetType: string,

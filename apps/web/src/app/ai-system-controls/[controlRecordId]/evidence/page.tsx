@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type CSSProperties } from "react";
 import { useParams } from "next/navigation";
+import ControlTestingSection from "./control-testing";
 
 const API = process.env.NEXT_PUBLIC_API_URL;
 
@@ -78,6 +79,7 @@ const field: CSSProperties = {
   width: "100%",
   boxSizing: "border-box",
   marginBottom: 8,
+  colorScheme: "dark",
 };
 const button: CSSProperties = { background: "#2563eb", color: "white", border: "none", borderRadius: 6, padding: "6px 12px", fontSize: 13, cursor: "pointer", marginRight: 8 };
 const muted: CSSProperties = { color: "#9ca3af", fontSize: 12 };
@@ -367,6 +369,12 @@ export default function ControlEvidencePage() {
           </div>
         ))}
       </section>
+      <ControlTestingSection
+        controlRecordId={controlRecordId}
+        evidenceLinks={links}
+        assuranceStatus={assuranceStatus}
+        disabled={notApplicable}
+      />
     </main>
   );
 }
