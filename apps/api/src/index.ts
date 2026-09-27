@@ -17,6 +17,7 @@ import { askAssistant } from "@vendorguard/ai-client";
 import { buildAssistantContext } from "./assistantContext.js";
 import { registerAiControlEvidenceRoutes } from "./aiControlEvidence.js";
 import { registerAiControlTestRoutes } from "./aiControlTests.js";
+import { registerGovernanceFindingRoutes } from "./aiGovernanceFindings.js";
 import { registerAuthRoutes } from "./auth-routes.js";
 import { getSessionFromCookie, COOKIE_NAME, requireFindingReviewAuthority, requireRiskAcceptanceAuthority, AuthorizationError, requestContextSchema, assertOwnedByTenant, requirePermission } from "@vendorguard/auth";
 import type { Role } from "@vendorguard/shared";
@@ -46,6 +47,7 @@ server.register(rateLimit, {
 server.register(registerAuthRoutes);
 server.register(registerAiControlEvidenceRoutes);
 server.register(registerAiControlTestRoutes);
+server.register(registerGovernanceFindingRoutes);
 
 server.get("/health", async () => {
   return { status: "ok", service: "vendorguard-api" };

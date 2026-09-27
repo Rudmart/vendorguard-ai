@@ -170,11 +170,13 @@ export default function ControlTestingSection({
   evidenceLinks,
   assuranceStatus,
   disabled,
+  onChanged,
 }: {
   controlRecordId: string;
   evidenceLinks: EvidenceLinkOption[];
   assuranceStatus: string;
   disabled: boolean;
+  onChanged?: () => void;
 }) {
   const [tests, setTests] = useState<ControlTest[]>([]);
   const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT);
@@ -226,6 +228,9 @@ export default function ControlTestingSection({
     setMessage(success);
     setSelectedLink("");
     setReloadKey((k) => k + 1);
+    if (onChanged) {
+      onChanged();
+    }
   }
 
   const inProgress = tests.find((test) => test.status === "IN_PROGRESS") ?? null;

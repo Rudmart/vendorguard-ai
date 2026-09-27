@@ -3,6 +3,7 @@
 import { useEffect, useState, type CSSProperties } from "react";
 import { useParams } from "next/navigation";
 import ControlTestingSection from "./control-testing";
+import FindingsSection from "./findings";
 
 const API = process.env.NEXT_PUBLIC_API_URL;
 
@@ -118,6 +119,7 @@ export default function ControlEvidencePage() {
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
+  const [findingsKey, setFindingsKey] = useState(0);
 
   const [selectedDocId, setSelectedDocId] = useState("");
   const [note, setNote] = useState("");
@@ -374,7 +376,9 @@ export default function ControlEvidencePage() {
         evidenceLinks={links}
         assuranceStatus={assuranceStatus}
         disabled={notApplicable}
+        onChanged={() => setFindingsKey((k) => k + 1)}
       />
+      <FindingsSection controlRecordId={controlRecordId} aiSystemId={aiSystemId} refreshKey={findingsKey} />
     </main>
   );
 }

@@ -166,6 +166,9 @@ model User {
   aiControlEvidenceReviews   AiControlEvidenceReview[]  @relation("AiControlEvidenceReviewer")
   aiControlTestsPerformed    AiControlTest[]            @relation("AiControlTestTester")
   aiControlTestEvidenceAdded AiControlTestEvidence[]    @relation("AiControlTestEvidenceAddedBy")
+  governanceFindingsCreated  GovernanceFinding[]        @relation("GovernanceFindingCreatedBy")
+  governanceFindingsOwned    GovernanceFinding[]        @relation("GovernanceFindingOwner")
+  governanceFindingReviews   GovernanceFindingReview[]  @relation("GovernanceFindingReviewer")
 
   @@map("users")
 }
@@ -1348,6 +1351,7 @@ model AiControlTest {
   aiSystemControl AiSystemControl         @relation(fields: [aiSystemControlId], references: [id], onDelete: Restrict)
   tester          User                    @relation("AiControlTestTester", fields: [testerUserId], references: [id], onDelete: Restrict)
   evidence        AiControlTestEvidence[]
+  finding         GovernanceFinding?
 
   @@index([tenantId])
   @@index([tenantId, aiSystemControlId])
@@ -1372,4 +1376,68 @@ model AiControlTestEvidence {
   @@index([tenantId])
   @@index([testId])
   @@map("ai_control_test_evidence")
+}
+
+// ---------------------------------------------------------------------------
+// Step 11 - Governance Findings (UI term: "Finding").
+//   ControlFinding    = vendor assessment control-evaluation result (unchanged)
+//   AiControlTest     = AI-system control evaluation/test result
+//   GovernanceFinding = formal governance record of a deficiency to track and dispose
+// Created manually by a human. Source-neutral: Step 11 source is an AI control test;
+// other sources can be added later as optional links. Reviewing a Finding is NOT risk acceptance.
+// ---------------------------------------------------------------------------
+enum GovernanceFindingStatus {
+  PENDING_REVIEW
+  OPEN
+  DISMISSED
+  CLOSED // reserved for Step 12 (remediation / closure) - not settable in Step 11
+}
+
+enum GovernanceFindingDecision {
+  CONFIRM
+  DISMISS
+}
+
+model GovernanceFinding {
+  id              String                  @id @default(uuid())
+  tenantId        String
+  aiControlTestId String?                 @unique // one Finding per originating control test
+  title           String
+  description     String // the observed deficiency
+  severity        ControlSeverity
+  status          GovernanceFindingStatus @default(PENDING_REVIEW)
+  ownerUserId     String?
+  createdByUserId String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  aiControlTest AiControlTest?            @relation(fields: [aiControlTestId], references: [id], onDelete: Restrict)
+  owner         User?                     @relation("GovernanceFindingOwner", fields: [ownerUserId], references: [id])
+  createdBy     User                      @relation("GovernanceFindingCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  reviews       GovernanceFindingReview[]
+
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@map("governance_findings")
+}
+
+// Append-only review history - rows are never updated or deleted by the API.
+model GovernanceFindingReview {
+  id             String                    @id @default(uuid())
+  tenantId       String
+  findingId      String
+  reviewerUserId String
+  decision       GovernanceFindingDecision
+  rationale      String
+  previousStatus GovernanceFindingStatus
+  newStatus      GovernanceFindingStatus
+  createdAt      DateTime                  @default(now())
+
+  finding  GovernanceFinding @relation(fields: [findingId], references: [id], onDelete: Restrict)
+  reviewer User              @relation("GovernanceFindingReviewer", fields: [reviewerUserId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId])
+  @@index([findingId])
+  @@map("governance_finding_reviews")
 }
