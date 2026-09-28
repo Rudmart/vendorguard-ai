@@ -42,6 +42,8 @@ const FINDING_INCLUDE = {
     },
   },
   reviews: { orderBy: { createdAt: "desc" }, include: { reviewer: { select: USER_SELECT } } },
+  // Step 13: read-only context. An approved acceptance never changes the Finding status.
+  riskAcceptances: { where: { status: "APPROVED" }, select: { id: true, expiresAt: true, aiRiskId: true } },
 } as const;
 
 function isSeverity(value: unknown): value is Severity {

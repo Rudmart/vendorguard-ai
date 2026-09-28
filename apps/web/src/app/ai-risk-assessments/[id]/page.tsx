@@ -178,11 +178,14 @@ function RiskCard({ risk, onUpdate }: { risk: Risk; onUpdate: () => void }) {
         <div style={labelStyle}>Residual Risk</div>
         <span style={{ fontSize: 13 }}>{risk.residualScore ?? "Not yet assessed"}</span>
         <RatingBadge rating={risk.residualRating} />
+            <a href={"/risk-acceptance/" + risk.id} style={{ marginLeft: 8, fontSize: 12, color: "#93c5fd", textDecoration: "none" }}>
+              {"Risk Acceptance ->"}
+            </a>
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: 12, marginBottom: 14 }}>
         <div>
-          <div style={labelStyle}>Treatment</div>
+          <div style={labelStyle}>Planned Treatment (ACCEPT is a plan - only an approved Risk Acceptance is authoritative)</div>
           <select style={selectStyle} value={treatment} onChange={(e) => setTreatment(e.target.value)}>
             <option value="">Not decided</option>
             {TREATMENT_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
