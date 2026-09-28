@@ -18,6 +18,7 @@ import { buildAssistantContext } from "./assistantContext.js";
 import { registerAiControlEvidenceRoutes } from "./aiControlEvidence.js";
 import { registerAiControlTestRoutes } from "./aiControlTests.js";
 import { registerGovernanceFindingRoutes } from "./aiGovernanceFindings.js";
+import { registerGovernanceRemediationRoutes } from "./aiGovernanceRemediation.js";
 import { registerAuthRoutes } from "./auth-routes.js";
 import { getSessionFromCookie, COOKIE_NAME, requireFindingReviewAuthority, requireRiskAcceptanceAuthority, AuthorizationError, requestContextSchema, assertOwnedByTenant, requirePermission } from "@vendorguard/auth";
 import type { Role } from "@vendorguard/shared";
@@ -48,6 +49,7 @@ server.register(registerAuthRoutes);
 server.register(registerAiControlEvidenceRoutes);
 server.register(registerAiControlTestRoutes);
 server.register(registerGovernanceFindingRoutes);
+server.register(registerGovernanceRemediationRoutes);
 
 server.get("/health", async () => {
   return { status: "ok", service: "vendorguard-api" };
@@ -1463,7 +1465,13 @@ server.get("/remediations", async (request, reply) => {
   const remediations = await prisma.remediationAction.findMany({
     where: { tenantId: session.tenantId },
     orderBy: { createdAt: "desc" },
-    include: { vendor: { select: { legalName: true } } },
+    include: {
+      vendor: { select: { legalName: true } },
+      aiRisk: { select: { title: true } },
+      governanceFinding: {
+        select: { id: true, title: true, status: true, aiControlTest: { select: { aiSystemControl: { select: { id: true, aiSystem: { select: { name: true } } } } } } },
+      },
+    },
   });
 
   return { remediations };
@@ -1505,6 +1513,10 @@ server.patch("/remediations/:id", async (request, reply) => {
     assertOwnedByTenant(existing, session, "Remediation");
   } catch {
     return reply.status(404).send({ error: "Remediation not found" });
+  }
+  // Step 12 Guard A: Finding-linked remediation must use the governed lifecycle (submit + independent verification).
+  if (existing.governanceFindingId) {
+    return reply.status(409).send({ error: "This remediation belongs to a Finding. Use the Finding remediation workflow (progress, submit for verification, independent verification)." });
   }
   try {
     requirePermission({ tenantId: session.tenantId, role: session.role as Role }, "remediation:update");

@@ -92,6 +92,7 @@ enum MappingStrength {
 enum RemediationStatus {
   OPEN
   IN_PROGRESS
+  PENDING_VERIFICATION // Step 12: owner says work is done; NOT verified until an independent verifier decides
   OVERDUE
   CLOSED
 }
@@ -169,6 +170,7 @@ model User {
   governanceFindingsCreated  GovernanceFinding[]        @relation("GovernanceFindingCreatedBy")
   governanceFindingsOwned    GovernanceFinding[]        @relation("GovernanceFindingOwner")
   governanceFindingReviews   GovernanceFindingReview[]  @relation("GovernanceFindingReviewer")
+  remediationVerifications   RemediationVerification[]  @relation("RemediationVerifier")
 
   @@map("users")
 }
@@ -659,6 +661,7 @@ model RemediationAction {
   vendorId     String?
   findingId    String?
   aiRiskId     String?
+  governanceFindingId String? @unique // Step 12: one remediation per GovernanceFinding
   title        String
   description  String
   ownerUserId  String?
@@ -672,6 +675,8 @@ model RemediationAction {
   vendor  Vendor?         @relation(fields: [vendorId], references: [id], onDelete: Cascade)
   finding ControlFinding? @relation(fields: [findingId], references: [id],onDelete: SetNull)
   aiRisk  AiRisk?         @relation(fields: [aiRiskId], references: [id], onDelete: Cascade)
+  governanceFinding GovernanceFinding? @relation(fields: [governanceFindingId], references: [id], onDelete: Restrict)
+  verifications     RemediationVerification[]
 
   @@index([tenantId])
   @@index([tenantId, vendorId])
@@ -1416,6 +1421,7 @@ model GovernanceFinding {
   owner         User?                     @relation("GovernanceFindingOwner", fields: [ownerUserId], references: [id])
   createdBy     User                      @relation("GovernanceFindingCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
   reviews       GovernanceFindingReview[]
+  remediation   RemediationAction?
 
   @@index([tenantId])
   @@index([tenantId, status])
@@ -1440,4 +1446,33 @@ model GovernanceFindingReview {
   @@index([tenantId])
   @@index([findingId])
   @@map("governance_finding_reviews")
+}
+
+// ---------------------------------------------------------------------------
+// Step 12 - Remediation verification (append-only).
+// Remediation completion != verified remediation != Finding closure. Risk acceptance is separate.
+// VERIFIED: remediation CLOSED + GovernanceFinding CLOSED (atomic). REJECTED: back to IN_PROGRESS.
+// ---------------------------------------------------------------------------
+enum RemediationVerificationDecision {
+  VERIFIED
+  REJECTED
+}
+
+model RemediationVerification {
+  id             String                          @id @default(uuid())
+  tenantId       String
+  remediationId  String
+  verifierUserId String
+  decision       RemediationVerificationDecision
+  rationale      String
+  previousStatus RemediationStatus
+  newStatus      RemediationStatus
+  createdAt      DateTime                        @default(now())
+
+  remediation RemediationAction @relation(fields: [remediationId], references: [id], onDelete: Restrict)
+  verifier    User              @relation("RemediationVerifier", fields: [verifierUserId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId])
+  @@index([remediationId])
+  @@map("remediation_verifications")
 }
