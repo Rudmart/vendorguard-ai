@@ -19,6 +19,7 @@ import { registerAiControlEvidenceRoutes } from "./aiControlEvidence.js";
 import { registerAiControlTestRoutes } from "./aiControlTests.js";
 import { registerGovernanceFindingRoutes } from "./aiGovernanceFindings.js";
 import { registerGovernanceRemediationRoutes } from "./aiGovernanceRemediation.js";
+import { registerRiskAcceptanceRoutes } from "./aiRiskAcceptance.js";
 import { registerAuthRoutes } from "./auth-routes.js";
 import { getSessionFromCookie, COOKIE_NAME, requireFindingReviewAuthority, requireRiskAcceptanceAuthority, AuthorizationError, requestContextSchema, assertOwnedByTenant, requirePermission } from "@vendorguard/auth";
 import type { Role } from "@vendorguard/shared";
@@ -50,6 +51,7 @@ server.register(registerAiControlEvidenceRoutes);
 server.register(registerAiControlTestRoutes);
 server.register(registerGovernanceFindingRoutes);
 server.register(registerGovernanceRemediationRoutes);
+server.register(registerRiskAcceptanceRoutes);
 
 server.get("/health", async () => {
   return { status: "ok", service: "vendorguard-api" };
@@ -406,6 +408,7 @@ server.post("/vendors/:id/risk-acceptance", async (request, reply) => {
       vendorId: vendor.id,
       assessmentId: body.assessmentId,
       approvedByUserId: session.userId,
+      status: "APPROVED", // legacy single-step vendor acceptance - behaviour unchanged (Step 13 backlog)
       justification: body.justification,
       expiresAt: body.expiresAt ? new Date(body.expiresAt) : undefined,
     },
@@ -2789,6 +2792,12 @@ server.delete("/ai-risks/:id", async (request, reply) => {
     assertOwnedByTenant(existing, { tenantId: session.tenantId }, "Risk");
   } catch {
     return reply.status(404).send({ error: "Risk not found" });
+  }
+
+  // Step 13: Risk Acceptance history must never be orphaned or destroyed.
+  const acceptanceHistory = await prisma.riskAcceptance.count({ where: { tenantId: session.tenantId, aiRiskId: existing.id } });
+  if (acceptanceHistory > 0) {
+    return reply.status(409).send({ error: "This risk has Risk Acceptance history and cannot be deleted" });
   }
 
   await prisma.aiRisk.delete({ where: { id: existing.id } });

@@ -685,21 +685,44 @@ model RemediationAction {
 }
 
 model RiskAcceptance {
-  id             String   @id @default(uuid())
-  tenantId       String
-  vendorId       String
-  assessmentId   String?
-  approvedByUserId String // must hold REVIEWER or ADMIN role at approval time - enforced in packages/auth, not just here
-  justification  String
-  expiresAt      DateTime?
-  createdAt      DateTime @default(now())
+  id               String    @id @default(uuid())
+  tenantId         String
+  vendorId         String? // legacy vendor acceptance (single-step, stored APPROVED). Optional since Step 13.
+  assessmentId     String?
+  approvedByUserId String? // approver. Legacy vendor route: set at creation. AI flow: set only when APPROVED.
+  justification    String
+  expiresAt        DateTime? // required by the API for AI risk acceptance (time-bound)
+  createdAt        DateTime  @default(now())
 
-  vendor   Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
-  approver User   @relation(fields: [approvedByUserId], references: [id], onDelete: Restrict)
+  // Step 13 - AI risk acceptance: an independent human decision to tolerate the RESIDUAL risk of an AiRisk.
+  // ACTIVE / EXPIRED are derived from APPROVED + expiresAt. Decided records are immutable.
+  aiRiskId                String?
+  governanceFindingId     String? // optional context only - the Finding is NOT accepted and its status never changes
+  status                  RiskAcceptanceStatus @default(PENDING_REVIEW)
+  requestedByUserId       String?
+  residualRiskStatement   String?
+  residualScoreAtRequest  Int? // snapshot of the residual risk that was actually reviewed
+  residualRatingAtRequest RiskBand?
+  conditions              String?
+  decidedByUserId         String?
+  decisionRationale       String?
+  decidedAt               DateTime?
+
+  vendor            Vendor?            @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  approver          User?              @relation(fields: [approvedByUserId], references: [id], onDelete: Restrict)
+  aiRisk            AiRisk?            @relation(fields: [aiRiskId], references: [id], onDelete: Restrict)
+  governanceFinding GovernanceFinding? @relation(fields: [governanceFindingId], references: [id], onDelete: Restrict)
 
   @@index([tenantId])
   @@index([tenantId, vendorId])
+  @@index([tenantId, aiRiskId])
   @@map("risk_acceptances")
+}
+
+enum RiskAcceptanceStatus {
+  PENDING_REVIEW
+  APPROVED
+  REJECTED
 }
 
 // ---------------------------------------------------------------------------
@@ -1015,6 +1038,7 @@ model AiRiskAssessment {
 }
 
 model AiRisk {
+  riskAcceptances RiskAcceptance[] // Step 13
   id           String         @id @default(uuid())
   tenantId     String
   assessmentId String
@@ -1404,6 +1428,7 @@ enum GovernanceFindingDecision {
 }
 
 model GovernanceFinding {
+  riskAcceptances RiskAcceptance[] // Step 13: context only
   id              String                  @id @default(uuid())
   tenantId        String
   aiControlTestId String?                 @unique // one Finding per originating control test

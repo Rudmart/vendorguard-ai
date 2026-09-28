@@ -19,6 +19,7 @@ type Finding = {
   owner: UserRef | null;
   aiControlTest: { id: string; testDate: string | null; overallEffectiveness: string; method: string } | null;
   reviews: FindingReview[];
+  riskAcceptances?: { id: string; expiresAt: string | null; aiRiskId: string | null }[];
 };
 
 const SEVERITIES = ["LOW", "MEDIUM", "HIGH", "CRITICAL"];
@@ -217,6 +218,18 @@ export default function FindingsSection({ controlRecordId, aiSystemId, refreshKe
             </span>
           </div>
           <p style={muted}>{f.description}</p>
+          {(f.riskAcceptances ?? [])
+            .filter((a) => a.expiresAt !== null && new Date(a.expiresAt).getTime() >= Date.now())
+            .map((a) => (
+              <p key={a.id} style={{ ...muted, color: "#c4b5fd" }}>
+                {"Related risk accepted until " + formatDate(a.expiresAt) + " - this Finding itself remains unresolved. "}
+                {a.aiRiskId && (
+                  <a href={"/risk-acceptance/" + a.aiRiskId} style={{ color: "#93c5fd" }}>
+                    View Risk Acceptance
+                  </a>
+                )}
+              </p>
+            ))}
           <p style={muted}>
             Source: control test on {formatDate(f.aiControlTest?.testDate ?? null)} - Overall:{" "}
             {RESULT_LABEL[f.aiControlTest?.overallEffectiveness ?? ""] ?? "Unknown"} | Created by {f.createdBy.displayName} ({f.createdBy.email}) on{" "}
