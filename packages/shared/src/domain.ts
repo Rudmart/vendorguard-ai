@@ -122,6 +122,7 @@ export const ROLE_PERMISSIONS: Record<Role, readonly string[]> = {
     "questionnaire:review",
     "remediation:read",
     "remediation:update",
+    "remediation:verify",
     "risk:accept",
   ],
   AUDITOR: [
@@ -134,6 +135,7 @@ export const ROLE_PERMISSIONS: Record<Role, readonly string[]> = {
     "ai-finding:create",
     "audit:read",
     "remediation:read",
+    "remediation:verify",
   ],
   READ_ONLY: ["vendor:read", "ai-system:read", "assessment:read", "finding:read"],
 };

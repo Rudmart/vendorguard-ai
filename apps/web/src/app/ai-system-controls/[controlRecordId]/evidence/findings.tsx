@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, type CSSProperties } from "react";
+import FindingRemediation from "./remediation";
 
 const API = process.env.NEXT_PUBLIC_API_URL;
 
@@ -260,6 +261,9 @@ export default function FindingsSection({ controlRecordId, aiSystemId, refreshKe
                 </p>
               ))}
             </div>
+          )}
+          {(f.status === "OPEN" || f.status === "CLOSED") && (
+            <FindingRemediation findingId={f.id} findingStatus={f.status} onChanged={() => setReloadKey((k) => k + 1)} />
           )}
         </div>
       ))}
