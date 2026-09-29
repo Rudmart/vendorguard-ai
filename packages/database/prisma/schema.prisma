@@ -685,6 +685,7 @@ model RemediationAction {
 }
 
 model RiskAcceptance {
+  reassessments AiReassessment[] // Step 14: context only - never renewed or changed
   id               String    @id @default(uuid())
   tenantId         String
   vendorId         String? // legacy vendor acceptance (single-step, stored APPROVED). Optional since Step 13.
@@ -940,6 +941,7 @@ enum AiAssessmentReviewDecision {
 }
 
 model AiSystem {
+  reassessments AiReassessment[] // Step 14
   id              String                  @id @default(uuid())
   tenantId        String
   tenant          Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -1006,6 +1008,8 @@ model AiSystemVendor {
 }
 
 model AiRiskAssessment {
+  reassessmentsAsPrior AiReassessment[] @relation("ReassessmentPriorRisk")
+  reassessmentsAsNew   AiReassessment[] @relation("ReassessmentNewRisk")
   id             String                 @id @default(uuid())
   tenantId       String
   aiSystemId     String
@@ -1032,6 +1036,7 @@ model AiRiskAssessment {
   risks    AiRisk[]
 
   @@index([tenantId])
+  @@unique([aiSystemId, version]) // Step 14: one version number per AI system - completed versions are history
   @@index([tenantId, aiSystemId])
   @@index([tenantId, status])
   @@map("ai_risk_assessments")
@@ -1120,6 +1125,8 @@ enum AiImpactReversibility {
 }
 
 model AiImpactAssessment {
+  reassessmentsAsPrior AiReassessment[] @relation("ReassessmentPriorImpact")
+  reassessmentsAsNew   AiReassessment[] @relation("ReassessmentNewImpact")
   id         String                 @id @default(uuid())
   tenantId   String
   aiSystemId String
@@ -1500,4 +1507,68 @@ model RemediationVerification {
   @@index([tenantId])
   @@index([remediationId])
   @@map("remediation_verifications")
+}
+
+// ---------------------------------------------------------------------------
+// Step 14 - Reassessment & Governance Review Cycle (orchestration / history record).
+// References existing governance records; snapshots only a few AiSystem classification fields.
+// Never clones controls, evidence, tests, Findings, remediation or acceptances. No triggers, no scheduler.
+// ---------------------------------------------------------------------------
+enum AiReassessmentReason {
+  PERIODIC_REVIEW
+  MATERIAL_CHANGE
+  REMEDIATION_COMPLETED
+  RISK_ACCEPTANCE_REVIEW
+  REGULATORY_CHANGE
+  OTHER
+}
+
+enum AiReassessmentStatus {
+  IN_PROGRESS
+  COMPLETED
+}
+
+enum AiReassessmentConclusion {
+  NO_MATERIAL_CHANGE
+  GOVERNANCE_UPDATED
+  FOLLOW_UP_REQUIRED
+}
+
+model AiReassessment {
+  id                        String                    @id @default(uuid())
+  tenantId                  String
+  aiSystemId                String
+  reason                    AiReassessmentReason
+  status                    AiReassessmentStatus      @default(IN_PROGRESS)
+  openCycleKey              String?                   @unique // = aiSystemId while IN_PROGRESS, null once COMPLETED: one open cycle per AI system
+  whatChanged               String
+  materialChange            Boolean                   @default(false)
+  materialChangeDescription String?
+  targetDate                DateTime?
+  priorRiskAssessmentId     String? // latest COMPLETED risk assessment at start (the baseline being reconsidered)
+  priorImpactAssessmentId   String? // latest COMPLETED impact assessment at start
+  newRiskAssessmentId       String? // new version produced during this cycle through the existing workflow
+  newImpactAssessmentId     String?
+  relatedRiskAcceptanceId   String? // RISK_ACCEPTANCE_REVIEW context only
+  snapshotAtStart           Json // small AiSystem classification snapshot
+  snapshotAtCompletion      Json?
+  conclusion                AiReassessmentConclusion?
+  conclusionRationale       String?
+  initiatedByUserId         String
+  completedByUserId         String?
+  completedAt               DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  aiSystem              AiSystem            @relation(fields: [aiSystemId], references: [id], onDelete: Restrict)
+  priorRiskAssessment   AiRiskAssessment?   @relation("ReassessmentPriorRisk", fields: [priorRiskAssessmentId], references: [id], onDelete: Restrict)
+  newRiskAssessment     AiRiskAssessment?   @relation("ReassessmentNewRisk", fields: [newRiskAssessmentId], references: [id], onDelete: Restrict)
+  priorImpactAssessment AiImpactAssessment? @relation("ReassessmentPriorImpact", fields: [priorImpactAssessmentId], references: [id], onDelete: Restrict)
+  newImpactAssessment   AiImpactAssessment? @relation("ReassessmentNewImpact", fields: [newImpactAssessmentId], references: [id], onDelete: Restrict)
+  relatedRiskAcceptance RiskAcceptance?     @relation(fields: [relatedRiskAcceptanceId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId])
+  @@index([tenantId, aiSystemId])
+  @@map("ai_reassessments")
 }

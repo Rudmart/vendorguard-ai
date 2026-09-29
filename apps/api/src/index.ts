@@ -20,6 +20,7 @@ import { registerAiControlTestRoutes } from "./aiControlTests.js";
 import { registerGovernanceFindingRoutes } from "./aiGovernanceFindings.js";
 import { registerGovernanceRemediationRoutes } from "./aiGovernanceRemediation.js";
 import { registerRiskAcceptanceRoutes } from "./aiRiskAcceptance.js";
+import { registerReassessmentRoutes } from "./aiReassessments.js";
 import { registerAuthRoutes } from "./auth-routes.js";
 import { getSessionFromCookie, COOKIE_NAME, requireFindingReviewAuthority, requireRiskAcceptanceAuthority, AuthorizationError, requestContextSchema, assertOwnedByTenant, requirePermission } from "@vendorguard/auth";
 import type { Role } from "@vendorguard/shared";
@@ -52,6 +53,7 @@ server.register(registerAiControlTestRoutes);
 server.register(registerGovernanceFindingRoutes);
 server.register(registerGovernanceRemediationRoutes);
 server.register(registerRiskAcceptanceRoutes);
+server.register(registerReassessmentRoutes);
 
 server.get("/health", async () => {
   return { status: "ok", service: "vendorguard-api" };
@@ -2364,14 +2366,24 @@ server.post("/ai-systems/:id/risk-assessments", async (request, reply) => {
     assessorUserId = body.assessorUserId;
   }
 
-  const assessment = await prisma.aiRiskAssessment.create({
-    data: {
-      tenantId: session.tenantId,
-      aiSystemId: aiSystem.id,
-      name: body.name,
-      assessorUserId,
-    },
-  });
+  // Step 14: each new risk assessment for an AI system gets the next version. The unique
+  // (aiSystemId, version) constraint protects against two being created at the same moment.
+  let assessment: Awaited<ReturnType<typeof prisma.aiRiskAssessment.create>> | null = null;
+  for (let attempt = 0; attempt < 3 && !assessment; attempt++) {
+    const latest = await prisma.aiRiskAssessment.findFirst({ where: { aiSystemId: aiSystem.id }, orderBy: { version: "desc" }, select: { version: true } });
+    try {
+      assessment = await prisma.aiRiskAssessment.create({
+        data: { tenantId: session.tenantId, aiSystemId: aiSystem.id, name: body.name, assessorUserId, version: (latest?.version ?? 0) + 1 },
+      });
+    } catch (err) {
+      if ((err as { code?: string }).code !== "P2002") {
+        throw err;
+      }
+    }
+  }
+  if (!assessment) {
+    return reply.status(409).send({ error: "Could not allocate a new assessment version. Please retry." });
+  }
 
   await prisma.auditEvent.create({
     data: {
@@ -2470,10 +2482,21 @@ server.patch("/ai-risk-assessments/:id", async (request, reply) => {
     return reply.status(404).send({ error: "AI risk assessment not found" });
   }
 
+  // Step 14: completed risk assessments are historical records - start a new version instead.
+  if (existing.status === "COMPLETED") {
+    return reply.status(409).send({ error: "This risk assessment is completed and cannot be changed. Start a new version to record changes." });
+  }
+
   const body = request.body as { name?: string; status?: string; assessorUserId?: string | null };
 
   if (body.status !== undefined && !AI_RISK_ASSESSMENT_STATUSES.includes(body.status)) {
     return reply.status(400).send({ error: "Invalid status" });
+  }
+  if (body.status === "COMPLETED") {
+    return reply.status(400).send({ error: "A risk assessment is completed only through independent review." });
+  }
+  if (body.status === "COMPLETED") {
+    return reply.status(400).send({ error: "A risk assessment is completed only through independent review." });
   }
 
   let assessorUserId = existing.assessorUserId;
@@ -2499,7 +2522,6 @@ server.patch("/ai-risk-assessments/:id", async (request, reply) => {
       name: body.name ?? undefined,
       status: (body.status as never) ?? undefined,
       assessorUserId,
-      completedAt: body.status === "COMPLETED" && existing.status !== "COMPLETED" ? new Date() : undefined,
     },
   });
 
@@ -2538,6 +2560,11 @@ server.post("/ai-risk-assessments/:id/risks", async (request, reply) => {
     assertOwnedByTenant(assessment, { tenantId: session.tenantId }, "AI risk assessment");
   } catch {
     return reply.status(404).send({ error: "AI risk assessment not found" });
+  }
+
+  // Step 14: a completed risk assessment is historical - new risks belong in a new version.
+  if (assessment.status === "COMPLETED") {
+    return reply.status(409).send({ error: "This risk assessment is completed. Start a new version to record new risks." });
   }
 
   const body = request.body as {
@@ -2645,6 +2672,19 @@ server.patch("/ai-risks/:id", async (request, reply) => {
     treatmentOwnerUserId?: string | null;
     treatmentTargetDate?: string | null;
   };
+
+  // Step 14: once the risk assessment is COMPLETED, the assessed risk state is historical.
+  // Treatment planning (treatment, rationale, owner, target date) may continue; assessed fields may not change.
+  const parentAssessment = await prisma.aiRiskAssessment.findFirst({ where: { id: existing.assessmentId, tenantId: session.tenantId }, select: { status: true } });
+  if (parentAssessment?.status === "COMPLETED") {
+    const lockedFields = ["title", "category", "statement", "likelihood", "impact", "existingControls", "controlId", "controlEffectiveness", "residualLikelihood", "residualImpact"] as const;
+    const attempted = lockedFields.filter((field) => body[field] !== undefined);
+    if (attempted.length > 0) {
+      return reply.status(409).send({
+        error: "This risk belongs to a completed risk assessment. Assessed fields (" + attempted.join(", ") + ") are locked - start a new assessment version to record a changed risk.",
+      });
+    }
+  }
 
   if (body.category !== undefined && !AI_RISK_CATEGORIES.includes(body.category)) {
     return reply.status(400).send({ error: "Invalid category" });
@@ -2794,6 +2834,11 @@ server.delete("/ai-risks/:id", async (request, reply) => {
     return reply.status(404).send({ error: "Risk not found" });
   }
 
+  // Step 14: risks of a completed risk assessment are historical and cannot be deleted.
+  const deleteParent = await prisma.aiRiskAssessment.findFirst({ where: { id: existing.assessmentId, tenantId: session.tenantId }, select: { status: true } });
+  if (deleteParent?.status === "COMPLETED") {
+    return reply.status(409).send({ error: "This risk belongs to a completed risk assessment and cannot be deleted" });
+  }
   // Step 13: Risk Acceptance history must never be orphaned or destroyed.
   const acceptanceHistory = await prisma.riskAcceptance.count({ where: { tenantId: session.tenantId, aiRiskId: existing.id } });
   if (acceptanceHistory > 0) {
