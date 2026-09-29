@@ -45,7 +45,9 @@ async function newSystem() {
 }
 
 async function riskOn(sysId: string, overrides: Record<string, unknown> = {}) {
-  const assessment = await prisma.aiRiskAssessment.create({ data: { tenantId: tenantAId, aiSystemId: sysId, name: "S13 Risk Assessment" } });
+  // Step 14: explicit version - (aiSystemId, version) is now unique.
+  const version = (await prisma.aiRiskAssessment.count({ where: { aiSystemId: sysId } })) + 1;
+  const assessment = await prisma.aiRiskAssessment.create({ data: { tenantId: tenantAId, aiSystemId: sysId, name: "S13 Risk Assessment", version } });
   const risk = await prisma.aiRisk.create({
     data: {
       tenantId: tenantAId,
