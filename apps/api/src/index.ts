@@ -1469,6 +1469,12 @@ server.get("/remediations", async (request, reply) => {
     return reply.status(401).send({ error: "Not logged in" });
   }
 
+  try {
+    requirePermission({ tenantId: session.tenantId, role: session.role as Role }, "remediation:read");
+  } catch {
+    return reply.status(403).send({ error: "Not authorized to view remediation" });
+  }
+
   const remediations = await prisma.remediationAction.findMany({
     where: { tenantId: session.tenantId },
     orderBy: { createdAt: "desc" },
@@ -1547,6 +1553,12 @@ server.get("/ai-inventory", async (request, reply) => {
   const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
   if (!session) {
     return reply.status(401).send({ error: "Not logged in" });
+  }
+
+  try {
+    requirePermission({ tenantId: session.tenantId, role: session.role as Role }, "ai-system:read");
+  } catch {
+    return reply.status(403).send({ error: "Not authorized to view the AI inventory" });
   }
 
   const allVendors = await prisma.vendor.findMany({
