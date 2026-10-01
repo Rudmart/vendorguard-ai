@@ -525,7 +525,7 @@ without approval.
 
 # 13. THIRD-PARTY AI
 
-Third-Party AI is one module within VendorGuard.
+Third-Party AI Risk is one module within VendorGuard.
 
 It does NOT define the overall product architecture.
 
@@ -1887,7 +1887,7 @@ The target sidebar is exactly:
 - Risk Acceptance
 - Remediation
 
-## Third-Party AI
+## Third-Party AI Risk
 - Vendor Inventory
 - Vendor Assessments
 - Vendor Monitoring
@@ -2136,3 +2136,5 @@ At completion:
 **Build → Test → Database Verify → Browser Walkthrough → Report → STOP**
 
 Never begin the next Step automatically.
+
+> Terminology decision (Alignment Phase A, product owner): the canonical section formerly named "Third-Party AI" is **Third-Party AI Risk** - it governs the broader vendor/third-party risk domain, including AI suppliers.
