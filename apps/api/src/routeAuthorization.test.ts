@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { prisma } from "@vendorguard/database";
 import { ROLES, roleHasPermission, type Role } from "@vendorguard/shared";
 import { server } from "./index.js";
+import { createSessionCookie } from "@vendorguard/auth";
 
 // Security PR 1: expected results are derived from the permission matrix, not hardcoded role names.
 let tenantAId: string;
@@ -14,7 +15,7 @@ function nextIp() {
   return "10.31." + Math.floor(ipCounter / 250) + "." + (ipCounter % 250);
 }
 function cookieFor(userId: string, role: string, tenantId: string) {
-  return JSON.stringify({ userId, tenantId, email: `${userId}@example.com`, displayName: "Test", role });
+  return createSessionCookie({ userId, tenantId, email: `${userId}@example.com`, displayName: "Test", role });
 }
 async function get(url: string, userId?: string, role?: string, tenantId?: string) {
   const res = await server.inject({

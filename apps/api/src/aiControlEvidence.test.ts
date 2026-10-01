@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { prisma } from "@vendorguard/database";
 import { server } from "./index.js";
 import { deriveAssuranceStatus } from "./aiControlEvidence.js";
+import { createSessionCookie } from "@vendorguard/auth";
 
 let tenantAId: string;
 let tenantBId: string;
@@ -18,7 +19,7 @@ let ctrlB: string;
 const PREFIX = "s8-test-s9-";
 
 function cookieFor(userId: string, role: string, tenantId: string) {
-  return JSON.stringify({ userId, tenantId, email: `${userId}@example.com`, displayName: "Test User", role });
+  return createSessionCookie({ userId, tenantId, email: `${userId}@example.com`, displayName: "Test User", role });
 }
 
 async function call(method: "GET" | "POST" | "PUT", url: string, userId: string, role: string, tenantId?: string, payload?: Record<string, unknown>) {

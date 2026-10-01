@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { prisma } from "@vendorguard/database";
 import { server } from "./index.js";
+import { createSessionCookie } from "@vendorguard/auth";
 
 let tenantId: string;
 let reviewerUserId: string;
@@ -12,7 +13,7 @@ let findingId: string;
 let frameworkId: string;
 
 function cookieFor(userId: string, role: string) {
-  return JSON.stringify({ userId, tenantId, email: `${userId}@example.com`, displayName: "Test User", role });
+  return createSessionCookie({ userId, tenantId, email: `${userId}@example.com`, displayName: "Test User", role });
 }
 
 beforeAll(async () => {

@@ -3,6 +3,7 @@ import { prisma } from "@vendorguard/database";
 import { server } from "./index.js";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import { createSessionCookie } from "@vendorguard/auth";
 
 let baseUrl: string;
 let tenantAId: string;
@@ -12,7 +13,7 @@ let vendorAId: string;
 let vendorBId: string;
 
 function cookieHeaderFor(userId: string, tenantId: string, role: string) {
-  const cookieValue = JSON.stringify({ userId, tenantId, email: `${userId}@example.com`, displayName: "Test User", role });
+  const cookieValue = createSessionCookie({ userId, tenantId, email: `${userId}@example.com`, displayName: "Test User", role });
   return `vg_session=${encodeURIComponent(cookieValue)}`;
 }
 
