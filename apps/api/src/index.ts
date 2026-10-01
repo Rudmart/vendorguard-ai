@@ -21,6 +21,7 @@ import { registerGovernanceFindingRoutes } from "./aiGovernanceFindings.js";
 import { registerGovernanceRemediationRoutes } from "./aiGovernanceRemediation.js";
 import { registerRiskAcceptanceRoutes } from "./aiRiskAcceptance.js";
 import { registerReassessmentRoutes } from "./aiReassessments.js";
+import { registerMonitoringRoutes } from "./aiMonitoring.js";
 import { registerAuthRoutes } from "./auth-routes.js";
 import { getSessionFromCookie, COOKIE_NAME, requireFindingReviewAuthority, requireRiskAcceptanceAuthority, AuthorizationError, requestContextSchema, assertOwnedByTenant, requirePermission } from "@vendorguard/auth";
 import type { Role } from "@vendorguard/shared";
@@ -54,6 +55,7 @@ server.register(registerGovernanceFindingRoutes);
 server.register(registerGovernanceRemediationRoutes);
 server.register(registerRiskAcceptanceRoutes);
 server.register(registerReassessmentRoutes);
+server.register(registerMonitoringRoutes);
 
 server.get("/health", async () => {
   return { status: "ok", service: "vendorguard-api" };
@@ -2095,6 +2097,8 @@ server.patch("/ai-systems/:id", async (request, reply) => {
       targetType: "AiSystem",
       targetId: updated.id,
       outcome: "SUCCESS",
+      // Step 15: record the transition itself (applies going forward; history is not reconstructed).
+      metadataJson: lifecycleChanged ? ({ from: existing.lifecycleStatus, to: updated.lifecycleStatus } as never) : undefined,
     },
   });
 

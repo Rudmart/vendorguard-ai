@@ -1,4 +1,4 @@
-﻿
+
 ## `pnpm exec prisma migrate dev --name <name>`
 
 - `pnpm exec` - runs a tool installed just for this project, not globally
@@ -76,3 +76,18 @@ after launch and investigates any spike in incorrect results.
 Definition: A controlled 'waiter' between an AI and an application's real data. Instead of the AI directly accessing a database (risky, unrestricted), it asks the MCP server for specific, predefined things (like get_vendor or get_risk), and the server checks who is asking (login, tenant, role) before returning anything, and logs every request for audit.
 Example: VendorGuard's MCP Compliance Server lets the AI Assistant ask for a vendor's risk score without ever touching the database directly - every request is tenant-scoped and logged.
 
+## Steps 13-15 (Risk Acceptance, Reassessment, Governance Monitoring)
+- **Residual risk** - risk remaining after existing controls (inherent risk = before controls).
+- **Planned treatment** - the intended strategy (e.g. ACCEPT); not an approval.
+- **Risk Acceptance** - an independent, time-bound decision to tolerate residual risk; expires, never auto-renews.
+- **Reassessment** - a new governance review cycle that preserves history and reuses existing workflows.
+- **Material change** - a change that alters an AI system's risk or impact (new use case, users, model, data, autonomy).
+- **Versioning (governance records)** - approved assessments are history; changes become a new version.
+- **Separation of duties (SoD)** - the requester/performer cannot approve their own work.
+- **Audit trail** - who did what and when, including DENIED attempts.
+- **Governance monitoring** - reviewing whether an AI system's governance posture stays acceptable (not technical telemetry).
+- **Monitoring check** - a monitoring obligation: what to review, expectation, owner, cadence.
+- **Monitoring review** - one human observation plus governance judgment; immutable once recorded.
+- **Automation bias** - over-trusting AI output (e.g. loan officers rarely overriding AI recommendations).
+- **Microsoft Defender for Cloud (AI threat protection)** - detects attacks on Azure AI workloads such as prompt injection and data leakage.
+- **Prompt Shields (Azure AI Content Safety)** - blocks direct and indirect prompt-injection attempts.

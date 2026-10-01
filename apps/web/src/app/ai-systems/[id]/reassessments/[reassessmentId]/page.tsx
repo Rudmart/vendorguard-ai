@@ -43,6 +43,7 @@ const REASON_LABEL: Record<string, string> = {
   REMEDIATION_COMPLETED: "Remediation completed",
   RISK_ACCEPTANCE_REVIEW: "Risk Acceptance review",
   REGULATORY_CHANGE: "Regulatory change",
+  MONITORING_REVIEW: "Monitoring review",
   OTHER: "Other",
 };
 const CONCLUSIONS: { value: string; label: string; help: string }[] = [
