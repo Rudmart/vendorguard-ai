@@ -180,7 +180,7 @@ export default function ReassessmentsCard({ aiSystemId }: { aiSystemId: string }
       {rows.map((r) => (
         <p key={r.id} style={{ ...muted, margin: "6px 0" }}>
           <a href={`/ai-systems/${aiSystemId}/reassessments/${r.id}`} style={{ color: "#93c5fd", textDecoration: "none" }}>
-            {formatDate(r.createdAt) + " - " + (REASON_LABEL[r.reason] ?? r.reason)}
+            {formatDate(r.createdAt) + " - " + (REASON_LABEL[r.reason] ?? (r.reason === "MONITORING_REVIEW" ? "Monitoring review" : r.reason))}
           </a>
           {" | " + (r.status === "COMPLETED" ? "Completed: " + (CONCLUSION_LABEL[r.conclusion ?? ""] ?? "-") : "In progress")}
           {r.pastTarget ? " | past target date" : ""}

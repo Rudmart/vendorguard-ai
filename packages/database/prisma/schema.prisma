@@ -941,6 +941,7 @@ enum AiAssessmentReviewDecision {
 }
 
 model AiSystem {
+  monitoringChecks AiMonitoringCheck[] // Step 15
   reassessments AiReassessment[] // Step 14
   id              String                  @id @default(uuid())
   tenantId        String
@@ -1520,6 +1521,7 @@ enum AiReassessmentReason {
   REMEDIATION_COMPLETED
   RISK_ACCEPTANCE_REVIEW
   REGULATORY_CHANGE
+  MONITORING_REVIEW // Step 15: only via explicit human handoff from a Monitoring Review
   OTHER
 }
 
@@ -1535,6 +1537,7 @@ enum AiReassessmentConclusion {
 }
 
 model AiReassessment {
+  monitoringReview AiMonitoringReview? // Step 15: set when started from a Monitoring Review
   id                        String                    @id @default(uuid())
   tenantId                  String
   aiSystemId                String
@@ -1571,4 +1574,80 @@ model AiReassessment {
   @@index([tenantId])
   @@index([tenantId, aiSystemId])
   @@map("ai_reassessments")
+}
+
+// ---------------------------------------------------------------------------
+// Step 15 - Governance Monitoring (NOT telemetry/observability). Manual-first.
+// Check = monitoring obligation. Review = one human observation + judgment (immutable).
+// Due state and governance context are derived on read. No scheduler, no signal table.
+// ---------------------------------------------------------------------------
+enum AiMonitoringCategory {
+  HUMAN_OVERSIGHT
+  USE_AND_SCOPE
+  OUTCOMES_PERFORMANCE
+  FAIRNESS
+  COMPLAINTS_FEEDBACK
+  CONTROL_OPERATION
+  REGULATORY
+  OTHER
+}
+
+enum AiMonitoringCadence {
+  MONTHLY
+  QUARTERLY
+  SEMIANNUALLY
+  ANNUALLY
+}
+
+enum AiMonitoringResult {
+  ACCEPTABLE
+  ATTENTION_REQUIRED
+  REASSESSMENT_REQUIRED
+}
+
+model AiMonitoringCheck {
+  id              String               @id @default(uuid())
+  tenantId        String
+  aiSystemId      String
+  title           String
+  whatToReview    String
+  expectation     String
+  category        AiMonitoringCategory
+  cadence         AiMonitoringCadence
+  ownerUserId     String // accountable for the obligation; validated tenant member
+  active          Boolean              @default(true)
+  deactivatedAt   DateTime?
+  createdByUserId String
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+
+  aiSystem AiSystem             @relation(fields: [aiSystemId], references: [id], onDelete: Restrict)
+  reviews  AiMonitoringReview[]
+
+  @@index([tenantId])
+  @@index([tenantId, aiSystemId])
+  @@map("ai_monitoring_checks")
+}
+
+model AiMonitoringReview {
+  id             String             @id @default(uuid())
+  tenantId       String
+  checkId        String
+  reviewedAt     DateTime           @default(now())
+  periodCovered  String?
+  observation    String
+  observedValue  Float? // optional quantitative observation - not telemetry
+  unit           String?
+  result         AiMonitoringResult
+  rationale      String
+  reviewerUserId String
+  reassessmentId String?            @unique // set only by an explicit human "Start reassessment"
+  createdAt      DateTime           @default(now())
+
+  check        AiMonitoringCheck @relation(fields: [checkId], references: [id], onDelete: Restrict)
+  reassessment AiReassessment?   @relation(fields: [reassessmentId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId])
+  @@index([tenantId, checkId])
+  @@map("ai_monitoring_reviews")
 }
