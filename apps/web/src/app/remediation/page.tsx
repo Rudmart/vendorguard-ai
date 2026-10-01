@@ -74,7 +74,7 @@ export default function RemediationTrackerPage() {
 
   return (
     <main style={{ maxWidth: 900, margin: "0 auto", padding: "32px 24px" }}>
-      <h1 style={{ fontSize: 24, marginBottom: 4 }}>Remediation Tracker</h1>
+      <h1 style={{ fontSize: 24, marginBottom: 4 }}>Remediation</h1>
       <p style={{ color: "#8b96ac", fontSize: 13, marginBottom: 24 }}>
         {openCount} open of {items.length} total actions across your portfolio
       </p>

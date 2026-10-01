@@ -64,7 +64,7 @@ export default async function HomePage() {
     <main style={{ maxWidth: 960, margin: "0 auto", padding: "32px 24px" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
         <div>
-          <h1 style={{ fontSize: 24, marginBottom: 2 }}>Executive Dashboard</h1>
+          <h1 style={{ fontSize: 24, marginBottom: 2 }}>Dashboard</h1>
           <p style={{ color: "#8b96ac", fontSize: 13, margin: 0 }}>
             {vendorsWithScores.length} vendors tracked
           </p>
