@@ -12,28 +12,44 @@ type NavItem = {
   color?: string;
 };
 
-const tprmWorkflowItems: NavItem[] = [
-  { label: "Executive Dashboard", href: "/", built: true, icon: "\u2637" },
-  { label: "Vendor Inventory", href: "/vendors-list", built: true, icon: "\uD83C\uDFE2" },
-  { label: "Vendor Assessments", href: "/assessments", built: true, icon: "\u2705" },
-  { label: "Pending Reviews", href: "/governance/reviews", built: true, icon: "\u2611" },
-  { label: "Remediation Tracker", href: "/remediation", built: true, icon: "\u2705" },
-  { label: "Vendor Reports", href: "/reports", built: false, icon: "\uD83D\uDCC8" },
-];
+type NavSectionDef = { title: string; items: NavItem[] };
 
-const governanceReferenceItems: NavItem[] = [
-  { label: "Evidence Library", href: "/evidence", built: true, icon: "\uD83D\uDCC4", badge: "3" },
-  { label: "Compliance Frameworks", href: "/frameworks", built: true, icon: "\uD83D\uDCD8" },
-  { label: "AI inventory", href: "/ai-inventory", built: true, icon: "\u2728" },
-  { label: "AI Agents", href: "/ai-agents", built: false, icon: "\uD83E\uDD16" },
-  { label: "Third-party risk", href: "/third-party-risk", built: false, icon: "\uD83D\uDEE1" },
-  { label: "Audit Logs", href: "/audit-log", built: false, icon: "\uD83D\uDCC4" },
-  { label: "Administration", href: "/administration", built: false, icon: "\u2699" },
-];
-
-const educationItems: NavItem[] = [
-  { label: "GRC Workflow Guide", href: "/grc-guide", built: true, icon: "\uD83C\uDF93", color: "#86efac" },
-  { label: "TPRM Workflow Guide", href: "/tprm-guide", built: true, icon: "\uD83D\uDCDA", color: "#86efac" },
+// Canonical Master Plan sections, showing ONLY pages that exist and work today.
+// Unimplemented capabilities are not shown (no "soon", no "#", no placeholders); empty sections are hidden.
+const navSections: NavSectionDef[] = [
+  { title: "Overview", items: [{ label: "Dashboard", href: "/", built: true, icon: "\u2637" }] },
+  {
+    title: "AI Governance",
+    items: [
+      { label: "AI Inventory", href: "/ai-inventory", built: true, icon: "\u2728" },
+      { label: "Pending Reviews", href: "/governance/reviews", built: true, icon: "\u2611" },
+    ],
+  },
+  {
+    title: "AI Risk",
+    items: [
+      { label: "Risk Acceptance", href: "/risk-acceptance", built: true, icon: "\u2696" },
+      { label: "Remediation", href: "/remediation", built: true, icon: "\u2705" },
+    ],
+  },
+  {
+    title: "Third-Party AI Risk",
+    items: [
+      { label: "Vendor Inventory", href: "/vendors-list", built: true, icon: "\uD83C\uDFE2" },
+      { label: "Vendor Assessments", href: "/assessments", built: true, icon: "\u2705" },
+    ],
+  },
+  { title: "Compliance & Assurance", items: [{ label: "Compliance Frameworks", href: "/frameworks", built: true, icon: "\uD83D\uDCD8" }] },
+  { title: "Monitoring", items: [] },
+  { title: "Reporting", items: [] },
+  {
+    title: "Learning Center",
+    items: [
+      { label: "GRC Workflow Guide", href: "/grc-guide", built: true, icon: "\uD83C\uDF93", color: "#86efac" },
+      { label: "TPRM Workflow Guide", href: "/tprm-guide", built: true, icon: "\uD83D\uDCDA", color: "#86efac" },
+    ],
+  },
+  { title: "System", items: [{ label: "Audit Logs", href: "/audit-log", built: true, icon: "\uD83D\uDCC4" }] },
 ];
 
 const styles = {
@@ -45,6 +61,7 @@ const styles = {
     display: "flex",
     flexDirection: "column" as const,
     height: "100vh",
+    overflowY: "auto" as const,
     position: "sticky" as const,
     top: 0,
     flexShrink: 0,
@@ -70,7 +87,7 @@ const styles = {
     letterSpacing: 0.5,
     color: "#86efac",
     fontWeight: 700,
-    padding: "28px 10px 6px 10px",
+    padding: "16px 10px 6px 10px",
     marginTop: 6,
     borderTop: "1px solid #2e3d63",
   },
@@ -172,26 +189,21 @@ export default function Sidebar() {
         <div style={styles.brandIcon}>{"\uD83D\uDEE1"}</div>
         <div>
           <div style={styles.brandName}>VendorGuard</div>
-          <div style={styles.brandTag}>BANKING &middot; HEALTHCARE &middot; TPRM</div>
+          <div style={styles.brandTag}>AI GOVERNANCE &middot; RISK &middot; ASSURANCE</div>
         </div>
       </div>
 
-      <div style={styles.sectionLabelFirst}>TPRM Workflow</div>
-      <NavSection items={tprmWorkflowItems.map((item) => item.label === "Remediation Tracker" ? { ...item, badge: remediationBadge } : item)} pathname={pathname} />
-
-      <div style={styles.sectionLabel}>Governance &amp; Reference</div>
-      <NavSection items={governanceReferenceItems} pathname={pathname} />
-
-      <div style={styles.sectionLabel}>Education</div>
-      <NavSection items={educationItems} pathname={pathname} />
-
-      <div style={styles.footer}>
-        <div style={styles.avatar}>RM</div>
-        <div>
-          <div style={styles.footerName}>Ruddy A Martinez</div>
-          <div style={styles.footerRole}>NEXAIGLOBAL</div>
-        </div>
-      </div>
+      {navSections
+        .filter((section) => section.items.length > 0)
+        .map((section, index) => (
+          <div key={section.title}>
+            <div style={index === 0 ? styles.sectionLabelFirst : styles.sectionLabel}>{section.title}</div>
+            <NavSection
+              items={section.items.map((item) => (item.href === "/remediation" ? { ...item, badge: remediationBadge } : item))}
+              pathname={pathname}
+            />
+          </div>
+        ))}
     </aside>
   );
 }

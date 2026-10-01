@@ -51,7 +51,7 @@ const steps: Step[] = [
     title: "Evidence",
     description: "Collect and review documentation proving controls are actually in place.",
     buttonLabel: "Go to Evidence Library",
-    href: "/evidence",
+    href: "/vendors-list",
   },
   {
     number: 7,

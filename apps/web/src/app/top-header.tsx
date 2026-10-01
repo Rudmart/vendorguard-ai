@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import UserMenu from "./user-menu";
 
 const industries = ["Banking & Financial", "Healthcare", "General"];
 
@@ -108,6 +109,7 @@ export default function TopHeader({
         NEXAIGLOBAL
       </div>
 
+      <UserMenu />
       <button
         onClick={onToggleChat}
         style={{

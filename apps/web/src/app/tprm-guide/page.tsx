@@ -61,7 +61,7 @@ const steps: Step[] = [
     concept: "Don't just trust the vendor's answer to a questionnaire - verify it against real, independent documentation.",
     example: "A vendor claims to encrypt data at rest. Their SOC 2 report is reviewed to confirm the control is actually implemented and was tested by an independent auditor, not just claimed in an email.",
     analystJob: "Review SOC 2 reports, policies, certifications, screenshots, and test results submitted as evidence.",
-    actions: [{ label: "Go to Evidence Library", href: "/evidence" }],
+    actions: [{ label: "Open a vendor to manage its evidence", href: "/vendors-list" }],
   },
   {
     number: 7,
