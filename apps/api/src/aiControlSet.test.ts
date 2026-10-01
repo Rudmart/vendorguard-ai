@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { prisma } from "@vendorguard/database";
 import { server } from "./index.js";
+import { createSessionCookie } from "@vendorguard/auth";
 
 let tenantAId: string;
 let tenantBId: string;
@@ -25,7 +26,7 @@ let librarySnapshotBefore: string;
 const TEST_PREFIXES = ["m12-test-", "ra-test-fw-", "s8-test-"];
 
 function cookieFor(userId: string, role: string, tenantId: string) {
-  return JSON.stringify({ userId, tenantId, email: `${userId}@example.com`, displayName: "Test User", role });
+  return createSessionCookie({ userId, tenantId, email: `${userId}@example.com`, displayName: "Test User", role });
 }
 
 // Snapshot of every framework/version/control that is NOT a temporary test record.

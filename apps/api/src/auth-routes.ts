@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { prisma } from "@vendorguard/database";
-import { COOKIE_NAME } from "@vendorguard/auth";
+import { COOKIE_NAME, createSessionCookie, getSessionFromCookie } from "@vendorguard/auth";
 
 export async function registerAuthRoutes(server: FastifyInstance) {
   // Fail closed: this passwordless dev-only login must never be reachable
@@ -54,7 +54,7 @@ export async function registerAuthRoutes(server: FastifyInstance) {
       role: membership.role,
     };
 
-    reply.setCookie(COOKIE_NAME, JSON.stringify(session), {
+    reply.setCookie(COOKIE_NAME, createSessionCookie(session), {
       path: "/",
       httpOnly: true,
       sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
@@ -72,16 +72,12 @@ export async function registerAuthRoutes(server: FastifyInstance) {
   });
 
   server.get("/auth/me", async (request, reply) => {
-    const raw = request.cookies[COOKIE_NAME];
-    if (!raw) {
+    // Security PR 2: only a cookie with a valid signature is trusted.
+    const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+    if (!session) {
       return reply.status(401).send({ error: "Not logged in" });
     }
-    try {
-      const session = JSON.parse(raw);
-      return reply.send({ user: session });
-    } catch {
-      return reply.status(401).send({ error: "Invalid session" });
-    }
+    return reply.send({ user: session });
   });
 }
 
