@@ -28,6 +28,10 @@ const navSections: NavSectionDef[] = [
   {
     title: "AI Risk",
     items: [
+      { label: "Risk Register", href: "/risk-register", built: true, icon: "\uD83D\uDCCB" },
+      { label: "Risk Assessments", href: "/risk-assessments", built: true, icon: "\uD83D\uDCCA" },
+      { label: "Impact Assessments", href: "/impact-assessments", built: true, icon: "\uD83C\uDFAF" },
+      { label: "Findings", href: "/findings", built: true, icon: "\u26A0" },
       { label: "Risk Acceptance", href: "/risk-acceptance", built: true, icon: "\u2696" },
       { label: "Remediation", href: "/remediation", built: true, icon: "\u2705" },
     ],
@@ -40,7 +44,13 @@ const navSections: NavSectionDef[] = [
     ],
   },
   { title: "Compliance & Assurance", items: [{ label: "Compliance Frameworks", href: "/frameworks", built: true, icon: "\uD83D\uDCD8" }] },
-  { title: "Monitoring", items: [] },
+  {
+    title: "Monitoring",
+    items: [
+      { label: "Governance Monitoring", href: "/governance-monitoring", built: true, icon: "\uD83D\uDCE1" },
+      { label: "Reassessments", href: "/reassessments", built: true, icon: "\uD83D\uDD04" },
+    ],
+  },
   { title: "Reporting", items: [] },
   {
     title: "Learning Center",
