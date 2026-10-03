@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
+import SignOutButton from "./sign-out-button";
 
 type NavItem = {
   label: string;
@@ -17,12 +18,12 @@ type NavSectionDef = { title: string; items: NavItem[] };
 // Canonical Master Plan sections, showing ONLY pages that exist and work today.
 // Unimplemented capabilities are not shown (no "soon", no "#", no placeholders); empty sections are hidden.
 const navSections: NavSectionDef[] = [
-  { title: "Overview", items: [{ label: "Dashboard", href: "/", built: true, icon: "\u2637" }] },
+  { title: "Overview", items: [{ label: "Dashboard", href: "/", built: true, icon: "\u2637" }, { label: "My Work", href: "/my-work", built: true, icon: "\uD83D\uDDC2" }] },
   {
     title: "AI Governance",
     items: [
       { label: "AI Inventory", href: "/ai-inventory", built: true, icon: "\u2728" },
-      { label: "Pending Reviews", href: "/governance/reviews", built: true, icon: "\u2611" },
+      { label: "Pending Reviews", href: "/reviews/pending", built: true, icon: "\u2611" },
     ],
   },
   {
@@ -214,6 +215,9 @@ export default function Sidebar() {
             />
           </div>
         ))}
+      <div style={styles.footer}>
+        <SignOutButton />
+      </div>
     </aside>
   );
 }
