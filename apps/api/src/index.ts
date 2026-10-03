@@ -23,6 +23,7 @@ import { registerRiskAcceptanceRoutes } from "./aiRiskAcceptance.js";
 import { registerReassessmentRoutes } from "./aiReassessments.js";
 import { registerMonitoringRoutes } from "./aiMonitoring.js";
 import { registerGlobalListRoutes } from "./aiGlobalLists.js";
+import { registerWorkQueueRoutes } from "./aiWorkQueues.js";
 import { registerAuthRoutes } from "./auth-routes.js";
 import { getSessionFromCookie, COOKIE_NAME, requireFindingReviewAuthority, requireRiskAcceptanceAuthority, AuthorizationError, requestContextSchema, assertOwnedByTenant, requirePermission } from "@vendorguard/auth";
 import type { Role } from "@vendorguard/shared";
@@ -58,6 +59,7 @@ server.register(registerRiskAcceptanceRoutes);
 server.register(registerReassessmentRoutes);
 server.register(registerMonitoringRoutes);
 server.register(registerGlobalListRoutes);
+server.register(registerWorkQueueRoutes);
 
 server.get("/health", async () => {
   return { status: "ok", service: "vendorguard-api" };

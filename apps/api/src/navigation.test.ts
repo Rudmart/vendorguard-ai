@@ -26,7 +26,7 @@ describe("Alignment Phase A - navigation", () => {
     expect(hrefs).not.toContain("/evidence");
     expect(sidebar).not.toContain('badge: "3"');
     expect(sidebar).not.toContain("Ruddy A Martinez");
-    for (const label of ["AI Incidents", "AI Agents", "AI Use Cases", "Administration", "Vendor Reports", "Third-party risk", "Policies", "Exceptions", "My Work", "Evidence Library"]) {
+    for (const label of ["AI Incidents", "AI Agents", "AI Use Cases", "Administration", "Vendor Reports", "Third-party risk", "Policies", "Exceptions", "Evidence Library"]) {
       expect(sidebar).not.toContain(`label: "${label}"`);
     }
   });

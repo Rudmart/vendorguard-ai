@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, type CSSProperties } from "react";
+import { usePathname } from "next/navigation";
 
 const API = process.env.NEXT_PUBLIC_API_URL;
 
@@ -45,18 +46,21 @@ function initials(name: string): string {
 export default function UserMenu() {
   const [me, setMe] = useState<Me | null>(null);
   const [open, setOpen] = useState(false);
+  const pathname = usePathname();
 
   useEffect(() => {
+    setOpen(false);
     fetch(`${API}/auth/me`, { credentials: "include" })
       .then((res) => (res.ok ? res.json() : null))
       .then((data: unknown) => {
+        if (!data) { setMe(null); return; }
         if (data && typeof data === "object") {
           const record = data as { user?: Me } & Me;
           setMe(record.user ?? record);
         }
       })
       .catch(() => undefined);
-  }, []);
+  }, [pathname]);
 
   async function signOut() {
     await fetch(`${API}/auth/logout`, { method: "POST", credentials: "include" }).catch(() => undefined);
