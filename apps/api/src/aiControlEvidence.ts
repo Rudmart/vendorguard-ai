@@ -10,7 +10,8 @@
 import { randomUUID } from "node:crypto";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { prisma } from "@vendorguard/database";
-import { getSessionFromCookie, COOKIE_NAME, requirePermission } from "@vendorguard/auth";
+import { getSessionFromCookie, requirePermission } from "@vendorguard/auth";
+import { resolveSession } from "./session.js";
 import type { Role } from "@vendorguard/shared";
 import { getStorageClient } from "@vendorguard/storage-client";
 import { extractAndSaveEvidenceChunks } from "./evidenceExtraction.js";
@@ -57,8 +58,8 @@ const EVIDENCE_SELECT = {
 } as const;
 const USER_SELECT = { id: true, displayName: true, email: true } as const;
 
-export function sessionOf(request: FastifyRequest): Session | null {
-  return getSessionFromCookie(request.cookies[COOKIE_NAME]) ?? null;
+export async function sessionOf(request: FastifyRequest): Promise<Session | null> {
+  return resolveSession(request);
 }
 
 export function hasPermission(session: Session, permission: Permission): boolean {
@@ -139,7 +140,7 @@ async function linkedVendorIds(tenantId: string, aiSystemId: string): Promise<st
 export async function registerAiControlEvidenceRoutes(app: FastifyInstance): Promise<void> {
   // 1. Record AI-system evidence metadata (no file). Mirrors POST /vendors/:id/evidence.
   app.post("/ai-systems/:id/evidence", async (request, reply) => {
-    const session = sessionOf(request);
+    const session = await sessionOf(request);
     if (!session) {
       return reply.status(401).send({ error: "Not logged in" });
     }
@@ -186,7 +187,7 @@ export async function registerAiControlEvidenceRoutes(app: FastifyInstance): Pro
 
   // 2. Upload an AI-system evidence file. Mirrors POST /vendors/:id/evidence/upload.
   app.post("/ai-systems/:id/evidence/upload", async (request, reply) => {
-    const session = sessionOf(request);
+    const session = await sessionOf(request);
     if (!session) {
       return reply.status(401).send({ error: "Not logged in" });
     }
@@ -259,7 +260,7 @@ export async function registerAiControlEvidenceRoutes(app: FastifyInstance): Pro
 
   // 3. Evidence available to this AI system: its own evidence + evidence of its linked vendors.
   app.get("/ai-systems/:id/evidence", async (request, reply) => {
-    const session = sessionOf(request);
+    const session = await sessionOf(request);
     if (!session) {
       return reply.status(401).send({ error: "Not logged in" });
     }
@@ -292,7 +293,7 @@ export async function registerAiControlEvidenceRoutes(app: FastifyInstance): Pro
 
   // 4. Submit (link) evidence to a mapped AI-system control -> PENDING_REVIEW.
   app.post("/ai-system-controls/:controlRecordId/evidence", async (request, reply) => {
-    const session = sessionOf(request);
+    const session = await sessionOf(request);
     if (!session) {
       return reply.status(401).send({ error: "Not logged in" });
     }
@@ -362,7 +363,7 @@ export async function registerAiControlEvidenceRoutes(app: FastifyInstance): Pro
 
   // 5. Evidence links, review history and assurance status for one mapped control.
   app.get("/ai-system-controls/:controlRecordId/evidence", async (request, reply) => {
-    const session = sessionOf(request);
+    const session = await sessionOf(request);
     if (!session) {
       return reply.status(401).send({ error: "Not logged in" });
     }
@@ -401,7 +402,7 @@ export async function registerAiControlEvidenceRoutes(app: FastifyInstance): Pro
 
   // 6. Human review: ACCEPT or REJECT a pending evidence link (rationale required, separation of duties).
   app.post("/ai-control-evidence/:linkId/review", async (request, reply) => {
-    const session = sessionOf(request);
+    const session = await sessionOf(request);
     if (!session) {
       return reply.status(401).send({ error: "Not logged in" });
     }
@@ -470,7 +471,7 @@ export async function registerAiControlEvidenceRoutes(app: FastifyInstance): Pro
 
   // 7. Resubmit rejected evidence -> PENDING_REVIEW again (history is preserved).
   app.post("/ai-control-evidence/:linkId/resubmit", async (request, reply) => {
-    const session = sessionOf(request);
+    const session = await sessionOf(request);
     if (!session) {
       return reply.status(401).send({ error: "Not logged in" });
     }
@@ -519,7 +520,7 @@ export async function registerAiControlEvidenceRoutes(app: FastifyInstance): Pro
 
   // 8. Assurance summary for an AI system (in-scope = every mapped control not marked Not Applicable).
   app.get("/ai-systems/:id/assurance", async (request, reply) => {
-    const session = sessionOf(request);
+    const session = await sessionOf(request);
     if (!session) {
       return reply.status(401).send({ error: "Not logged in" });
     }

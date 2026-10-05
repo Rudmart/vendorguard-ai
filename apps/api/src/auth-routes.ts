@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { prisma } from "@vendorguard/database";
-import { COOKIE_NAME, createSessionCookie, getSessionFromCookie } from "@vendorguard/auth";
+import { COOKIE_NAME, createSessionCookie } from "@vendorguard/auth";
+import { resolveSession } from "./session.js";
 
 export async function registerAuthRoutes(server: FastifyInstance) {
   // Fail closed: this passwordless dev-only login must never be reachable
@@ -72,8 +73,8 @@ export async function registerAuthRoutes(server: FastifyInstance) {
   });
 
   server.get("/auth/me", async (request, reply) => {
-    // Security PR 2: only a cookie with a valid signature is trusted.
-    const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+    // Signature verified, then role/identity come from the current database membership - exactly what the API enforces.
+    const session = await resolveSession(request);
     if (!session) {
       return reply.status(401).send({ error: "Not logged in" });
     }

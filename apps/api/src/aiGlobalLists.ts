@@ -15,8 +15,8 @@ type UserRef = { id: string; displayName: string; email: string };
 
 export type RiskPosture = "LATEST_ASSESSED" | "DRAFT_NO_COMPLETED_ASSESSMENT" | "OTHER_VERSION";
 
-function readSession(request: FastifyRequest, reply: FastifyReply): Session | null {
-  const session = sessionOf(request);
+async function readSession(request: FastifyRequest, reply: FastifyReply): Promise<Session | null> {
+  const session = await sessionOf(request);
   if (!session) {
     void reply.status(401).send({ error: "Not logged in" });
     return null;
@@ -45,7 +45,7 @@ export async function registerGlobalListRoutes(app: FastifyInstance): Promise<vo
   // Risk Register: default = latest COMPLETED assessment per AI system ("latest assessed posture");
   // no completed version -> latest version as an explicitly labeled draft. scope=all -> every version.
   app.get("/ai-risks", async (request, reply) => {
-    const session = readSession(request, reply);
+    const session = await readSession(request, reply);
     if (!session) {
       return reply;
     }
@@ -109,7 +109,7 @@ export async function registerGlobalListRoutes(app: FastifyInstance): Promise<vo
 
   // Risk Assessment versions (latest completed per AI system marked).
   app.get("/ai-risk-assessments", async (request, reply) => {
-    const session = readSession(request, reply);
+    const session = await readSession(request, reply);
     if (!session) {
       return reply;
     }
@@ -131,7 +131,7 @@ export async function registerGlobalListRoutes(app: FastifyInstance): Promise<vo
 
   // Impact Assessment versions (same conventions).
   app.get("/ai-impact-assessments", async (request, reply) => {
-    const session = readSession(request, reply);
+    const session = await readSession(request, reply);
     if (!session) {
       return reply;
     }
@@ -153,7 +153,7 @@ export async function registerGlobalListRoutes(app: FastifyInstance): Promise<vo
 
   // AI governance Findings only (vendor ControlFinding stays in the vendor workflow).
   app.get("/governance-findings", async (request, reply) => {
-    const session = readSession(request, reply);
+    const session = await readSession(request, reply);
     if (!session) {
       return reply;
     }
@@ -202,7 +202,7 @@ export async function registerGlobalListRoutes(app: FastifyInstance): Promise<vo
 
   // Governance monitoring obligations across AI systems (Step 15 due helpers reused).
   app.get("/ai-monitoring-checks", async (request, reply) => {
-    const session = readSession(request, reply);
+    const session = await readSession(request, reply);
     if (!session) {
       return reply;
     }
@@ -234,7 +234,7 @@ export async function registerGlobalListRoutes(app: FastifyInstance): Promise<vo
 
   // Reassessments across AI systems: in progress first, then completed newest first.
   app.get("/ai-reassessments", async (request, reply) => {
-    const session = readSession(request, reply);
+    const session = await readSession(request, reply);
     if (!session) {
       return reply;
     }

@@ -104,7 +104,7 @@ async function denyDecision(session: Session, id: string, reason: string): Promi
 export async function registerRiskAcceptanceRoutes(app: FastifyInstance): Promise<void> {
   // 1. Risk context + acceptance history for one AI risk.
   app.get("/ai-risks/:id/risk-acceptance", async (request, reply) => {
-    const session = sessionOf(request);
+    const session = await sessionOf(request);
     if (!session) {
       return reply.status(401).send({ error: "Not logged in" });
     }
@@ -149,7 +149,7 @@ export async function registerRiskAcceptanceRoutes(app: FastifyInstance): Promis
 
   // 2. Request Risk Acceptance (PENDING_REVIEW). Snapshots the residual risk being reviewed.
   app.post("/ai-risks/:id/risk-acceptance", async (request, reply) => {
-    const session = sessionOf(request);
+    const session = await sessionOf(request);
     if (!session) {
       return reply.status(401).send({ error: "Not logged in" });
     }
@@ -243,7 +243,7 @@ export async function registerRiskAcceptanceRoutes(app: FastifyInstance): Promis
 
   // 3. Edit a pending request (requestor only). Decided records are immutable.
   app.patch("/risk-acceptances/:id", async (request, reply) => {
-    const session = sessionOf(request);
+    const session = await sessionOf(request);
     if (!session) {
       return reply.status(401).send({ error: "Not logged in" });
     }
@@ -308,7 +308,7 @@ export async function registerRiskAcceptanceRoutes(app: FastifyInstance): Promis
 
   // 4. Independent decision: APPROVE or REJECT (risk:accept, requestor != approver, rationale required).
   app.post("/risk-acceptances/:id/decision", async (request, reply) => {
-    const session = sessionOf(request);
+    const session = await sessionOf(request);
     if (!session) {
       return reply.status(401).send({ error: "Not logged in" });
     }
@@ -366,7 +366,7 @@ export async function registerRiskAcceptanceRoutes(app: FastifyInstance): Promis
 
   // 5. Risk Acceptance list across AI risks.
   app.get("/risk-acceptances", async (request, reply) => {
-    const session = sessionOf(request);
+    const session = await sessionOf(request);
     if (!session) {
       return reply.status(401).send({ error: "Not logged in" });
     }

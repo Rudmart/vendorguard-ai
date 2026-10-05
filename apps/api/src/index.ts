@@ -16,6 +16,7 @@ import { renderExecutiveReportPdf } from "./executiveReportPdf.js";
 import { askAssistant } from "@vendorguard/ai-client";
 import { buildAssistantContext } from "./assistantContext.js";
 import { registerAiControlEvidenceRoutes } from "./aiControlEvidence.js";
+import { resolveSession } from "./session.js";
 import { registerAiControlTestRoutes } from "./aiControlTests.js";
 import { registerGovernanceFindingRoutes } from "./aiGovernanceFindings.js";
 import { registerGovernanceRemediationRoutes } from "./aiGovernanceRemediation.js";
@@ -30,7 +31,7 @@ const OPEN_IMPACT_ASSESSMENT_ERROR = "An unfinished impact assessment already ex
 import { registerGlobalListRoutes } from "./aiGlobalLists.js";
 import { registerWorkQueueRoutes } from "./aiWorkQueues.js";
 import { registerAuthRoutes } from "./auth-routes.js";
-import { getSessionFromCookie, COOKIE_NAME, requireFindingReviewAuthority, requireRiskAcceptanceAuthority, AuthorizationError, requestContextSchema, assertOwnedByTenant, requirePermission } from "@vendorguard/auth";
+import { requireFindingReviewAuthority, requireRiskAcceptanceAuthority, AuthorizationError, requestContextSchema, assertOwnedByTenant, requirePermission } from "@vendorguard/auth";
 import type { Role } from "@vendorguard/shared";
 import { DATA_CATEGORIES, AFFECTED_POPULATIONS, REGULATORY_RELEVANCE_TAGS } from "@vendorguard/shared";
 import { readdirSync, readFileSync } from "fs";
@@ -71,7 +72,7 @@ server.get("/health", async () => {
 });
 
 server.get("/frameworks", async (request, reply) => {
-  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  const session = await resolveSession(request);
   if (!session) {
     return reply.status(401).send({ error: "Not logged in" });
   }
@@ -100,7 +101,7 @@ server.get("/frameworks", async (request, reply) => {
 });
 
 server.get("/frameworks/:frameworkId/controls", async (request, reply) => {
-  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  const session = await resolveSession(request);
   if (!session) {
     return reply.status(401).send({ error: "Not logged in" });
   }
@@ -123,7 +124,7 @@ server.get("/frameworks/:frameworkId/controls", async (request, reply) => {
 });
 
 server.post("/vendors/:id/assessments", async (request, reply) => {
-  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  const session = await resolveSession(request);
   if (!session) {
     return reply.status(401).send({ error: "Not logged in" });
   }
@@ -189,7 +190,7 @@ server.post("/vendors/:id/assessments", async (request, reply) => {
 });
 
 server.post("/assessments/:id/findings", async (request, reply) => {
-  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  const session = await resolveSession(request);
   if (!session) {
     return reply.status(401).send({ error: "Not logged in" });
   }
@@ -248,7 +249,7 @@ server.post("/assessments/:id/findings", async (request, reply) => {
   return reply.status(200).send(finding);
 });
 server.post("/assessments/:id/evidence/:evidenceDocumentId/analyze", async (request, reply) => {
-  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  const session = await resolveSession(request);
   if (!session) {
     return reply.status(401).send({ error: "Not logged in" });
   }
@@ -269,7 +270,7 @@ server.post("/assessments/:id/evidence/:evidenceDocumentId/analyze", async (requ
   }
 });
 server.get("/reviews/findings", async (request, reply) => {
-  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  const session = await resolveSession(request);
   if (!session) {
     return reply.status(401).send({ error: "Not logged in" });
   }
@@ -309,7 +310,7 @@ server.get("/reviews/findings", async (request, reply) => {
 });
 
 server.post("/assessments/:id/findings/:findingId/review", async (request, reply) => {
-  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  const session = await resolveSession(request);
   if (!session) {
     return reply.status(401).send({ error: "Not logged in" });
   }
@@ -376,7 +377,7 @@ server.post("/assessments/:id/findings/:findingId/review", async (request, reply
   return reply.status(200).send({ reviewDecision, finding: updatedFinding });
 });
 server.post("/vendors/:id/risk-acceptance", async (request, reply) => {
-  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  const session = await resolveSession(request);
   if (!session) {
     return reply.status(401).send({ error: "Not logged in" });
   }
@@ -431,7 +432,7 @@ server.post("/vendors/:id/risk-acceptance", async (request, reply) => {
 });
 
 server.get("/vendors/:id/risk-acceptance", async (request, reply) => {
-  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  const session = await resolveSession(request);
   if (!session) {
     return reply.status(401).send({ error: "Not logged in" });
   }
@@ -444,7 +445,7 @@ server.get("/vendors/:id/risk-acceptance", async (request, reply) => {
 });
 
 server.get("/evidence/:evidenceDocumentId", async (request, reply) => {
-  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  const session = await resolveSession(request);
   if (!session) {
     return reply.status(401).send({ error: "Not logged in" });
   }
@@ -459,7 +460,7 @@ server.get("/evidence/:evidenceDocumentId", async (request, reply) => {
 });
 
 server.get("/vendors/:id/executive-report", async (request, reply) => {
-  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  const session = await resolveSession(request);
   if (!session) {
     return reply.status(401).send({ error: "Not logged in" });
   }
@@ -484,7 +485,7 @@ server.get("/vendors/:id/executive-report", async (request, reply) => {
   return reply.status(200).send(report);
 });
 server.get("/evidence/:evidenceDocumentId/download", async (request, reply) => {
-  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  const session = await resolveSession(request);
   if (!session) {
     return reply.status(401).send({ error: "Not logged in" });
   }
@@ -505,7 +506,7 @@ server.get("/evidence/:evidenceDocumentId/download", async (request, reply) => {
   return reply.send(buffer);
 });
 server.get("/assessments", async (request, reply) => {
-  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  const session = await resolveSession(request);
   if (!session) {
     return reply.status(401).send({ error: "Not logged in" });
   }
@@ -527,7 +528,7 @@ server.get("/assessments", async (request, reply) => {
 });
 
 server.get("/vendors/:id/executive-report/export", async (request, reply) => {
-  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  const session = await resolveSession(request);
   if (!session) {
     return reply.status(401).send({ error: "Not logged in" });
   }
@@ -557,7 +558,7 @@ server.get("/vendors/:id/executive-report/export", async (request, reply) => {
 });
 
 server.get("/assessments/:id", async (request, reply) => {
-  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  const session = await resolveSession(request);
   if (!session) {
     return reply.status(401).send({ error: "Not logged in" });
   }
@@ -604,7 +605,7 @@ server.get("/assessments/:id", async (request, reply) => {
 });
 
 server.post("/vendors/:id/assistant/messages", async (request, reply) => {
-  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  const session = await resolveSession(request);
   if (!session) {
     return reply.status(401).send({ error: "Not logged in" });
   }
@@ -706,7 +707,7 @@ server.post("/vendors/:id/assistant/messages", async (request, reply) => {
 });
 
 server.get("/assessments/:id/framework-mapping", async (request, reply) => {
-  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  const session = await resolveSession(request);
   if (!session) {
     return reply.status(401).send({ error: "Not logged in" });
   }
@@ -798,7 +799,7 @@ server.get("/assessments/:id/framework-mapping", async (request, reply) => {
 });
 
 server.post("/assessments/:id/ai-risk-score", async (request, reply) => {
-  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  const session = await resolveSession(request);
   if (!session) {
     return reply.status(401).send({ error: "Not logged in" });
   }
@@ -859,7 +860,7 @@ server.post("/assessments/:id/ai-risk-score", async (request, reply) => {
   };
 });
 server.post("/assessments/:id/ai-impact-score", async (request, reply) => {
-  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  const session = await resolveSession(request);
   if (!session) {
     return reply.status(401).send({ error: "Not logged in" });
   }
@@ -914,7 +915,7 @@ server.post("/assessments/:id/ai-impact-score", async (request, reply) => {
 });
 
 server.post("/assessments/:id/questionnaire", async (request, reply) => {
-  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  const session = await resolveSession(request);
   if (!session) {
     return reply.status(401).send({ error: "Not logged in" });
   }
@@ -959,7 +960,7 @@ server.post("/assessments/:id/questionnaire", async (request, reply) => {
 });
 
 server.get("/questionnaires/:id", async (request, reply) => {
-  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  const session = await resolveSession(request);
   if (!session) {
     return reply.status(401).send({ error: "Not logged in" });
   }
@@ -980,7 +981,7 @@ server.get("/questionnaires/:id", async (request, reply) => {
 });
 
 server.patch("/questionnaires/:id/responses", async (request, reply) => {
-  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  const session = await resolveSession(request);
   if (!session) {
     return reply.status(401).send({ error: "Not logged in" });
   }
@@ -1044,7 +1045,7 @@ server.patch("/questionnaires/:id/responses", async (request, reply) => {
 });
 
 server.post("/questionnaires/:id/submit", async (request, reply) => {
-  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  const session = await resolveSession(request);
   if (!session) {
     return reply.status(401).send({ error: "Not logged in" });
   }
@@ -1111,7 +1112,7 @@ server.post("/questionnaires/:id/submit", async (request, reply) => {
 });
 
 server.post("/questionnaires/:id/review", async (request, reply) => {
-  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  const session = await resolveSession(request);
   if (!session) {
     return reply.status(401).send({ error: "Not logged in" });
   }
@@ -1154,7 +1155,7 @@ server.post("/questionnaires/:id/review", async (request, reply) => {
 });
 
 server.post("/questionnaires/:id/approve", async (request, reply) => {
-  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  const session = await resolveSession(request);
   if (!session) {
     return reply.status(401).send({ error: "Not logged in" });
   }
@@ -1198,7 +1199,7 @@ server.post("/questionnaires/:id/approve", async (request, reply) => {
 
 
 server.post("/assessments/:id/risk-rating", async (request, reply) => {
-  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  const session = await resolveSession(request);
   if (!session) {
     return reply.status(401).send({ error: "Not logged in" });
   }
@@ -1262,7 +1263,7 @@ server.post("/assessments/:id/risk-rating", async (request, reply) => {
 });
 
 server.post("/vendors/:id/evidence", async (request, reply) => {
-  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  const session = await resolveSession(request);
   if (!session) {
     return reply.status(401).send({ error: "Not logged in" });
   }
@@ -1319,7 +1320,7 @@ server.post("/vendors/:id/evidence", async (request, reply) => {
 });
 
 server.post("/vendors/:id/evidence/upload", async (request, reply) => {
-  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  const session = await resolveSession(request);
   if (!session) {
     return reply.status(401).send({ error: "Not logged in" });
   }
@@ -1416,7 +1417,7 @@ server.post("/vendors/:id/evidence/upload", async (request, reply) => {
   return reply.status(201).send({ ...evidence, chunksExtracted });
 });
 server.get("/vendors/:id/evidence", async (request, reply) => {
-  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  const session = await resolveSession(request);
   if (!session) {
     return reply.status(401).send({ error: "Not logged in" });
   }
@@ -1431,7 +1432,7 @@ server.get("/vendors/:id/evidence", async (request, reply) => {
 });
 
 server.post("/vendors/:id/remediations", async (request, reply) => {
-  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  const session = await resolveSession(request);
   if (!session) {
     return reply.status(401).send({ error: "Not logged in" });
   }
@@ -1473,7 +1474,7 @@ server.post("/vendors/:id/remediations", async (request, reply) => {
 });
 
 server.get("/remediations", async (request, reply) => {
-  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  const session = await resolveSession(request);
   if (!session) {
     return reply.status(401).send({ error: "Not logged in" });
   }
@@ -1500,7 +1501,7 @@ server.get("/remediations", async (request, reply) => {
 });
 
 server.get("/vendors/:id/remediations", async (request, reply) => {
-  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  const session = await resolveSession(request);
   if (!session) {
     return reply.status(401).send({ error: "Not logged in" });
   }
@@ -1515,7 +1516,7 @@ server.get("/vendors/:id/remediations", async (request, reply) => {
 });
 
 server.patch("/remediations/:id", async (request, reply) => {
-  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  const session = await resolveSession(request);
   if (!session) {
     return reply.status(401).send({ error: "Not logged in" });
   }
@@ -1559,7 +1560,7 @@ server.patch("/remediations/:id", async (request, reply) => {
 });
 
 server.get("/ai-inventory", async (request, reply) => {
-  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  const session = await resolveSession(request);
   if (!session) {
     return reply.status(401).send({ error: "Not logged in" });
   }
@@ -1585,7 +1586,7 @@ server.get("/ai-inventory", async (request, reply) => {
 });
 
 server.get("/vendors", async (request, reply) => {
-  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  const session = await resolveSession(request);
   if (!session) {
     return reply.status(401).send({ error: "Not logged in" });
   }
@@ -1597,7 +1598,7 @@ server.get("/vendors", async (request, reply) => {
 });
 
 server.get("/vendors/:id", async (request, reply) => {
-  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  const session = await resolveSession(request);
   if (!session) {
     return reply.status(401).send({ error: "Not logged in" });
   }
@@ -1615,7 +1616,7 @@ server.get("/vendors/:id", async (request, reply) => {
 });
 
 server.post("/vendors", async (request, reply) => {
-  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  const session = await resolveSession(request);
   if (!session) {
     return reply.status(401).send({ error: "Not logged in" });
   }
@@ -1680,7 +1681,7 @@ server.post("/vendors", async (request, reply) => {
 });
 
 server.get("/vendors/:id/risk-score", async (request, reply) => {
-  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  const session = await resolveSession(request);
   if (!session) {
     return reply.status(401).send({ error: "Not logged in" });
   }
@@ -1709,7 +1710,7 @@ server.get("/vendors/:id/risk-score", async (request, reply) => {
 });
 
 server.patch("/vendors/:id", async (request, reply) => {
-  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  const session = await resolveSession(request);
   if (!session) {
     return reply.status(401).send({ error: "Not logged in" });
   }
@@ -1777,7 +1778,7 @@ server.patch("/vendors/:id", async (request, reply) => {
   return vendor;
 });
 server.delete("/vendors/:id", async (request, reply) => {
-  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  const session = await resolveSession(request);
   if (!session) {
     return reply.status(401).send({ error: "Not logged in" });
   }
@@ -1833,7 +1834,7 @@ const DATA_SENSITIVITY_VALUES = ["PUBLIC", "INTERNAL", "CONFIDENTIAL", "RESTRICT
 const ASSESSMENT_STATUS_VALUES = ["NOT_ASSESSED", "ASSESSMENT_REQUIRED", "ASSESSED"];
 
 server.post("/ai-systems", async (request, reply) => {
-  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  const session = await resolveSession(request);
   if (!session) {
     return reply.status(401).send({ error: "Not logged in" });
   }
@@ -1911,7 +1912,7 @@ server.post("/ai-systems", async (request, reply) => {
 });
 
 server.get("/ai-systems", async (request, reply) => {
-  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  const session = await resolveSession(request);
   if (!session) {
     return reply.status(401).send({ error: "Not logged in" });
   }
@@ -1929,7 +1930,7 @@ server.get("/ai-systems", async (request, reply) => {
 });
 
 server.get("/ai-systems/:id", async (request, reply) => {
-  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  const session = await resolveSession(request);
   if (!session) {
     return reply.status(401).send({ error: "Not logged in" });
   }
@@ -1957,7 +1958,7 @@ server.get("/ai-systems/:id", async (request, reply) => {
 });
 
 server.patch("/ai-systems/:id", async (request, reply) => {
-  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  const session = await resolveSession(request);
   if (!session) {
     return reply.status(401).send({ error: "Not logged in" });
   }
@@ -2169,7 +2170,7 @@ server.patch("/ai-systems/:id", async (request, reply) => {
 });
 
 server.post("/ai-systems/:id/vendors", async (request, reply) => {
-  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  const session = await resolveSession(request);
   if (!session) {
     return reply.status(401).send({ error: "Not logged in" });
   }
@@ -2242,7 +2243,7 @@ server.post("/ai-systems/:id/vendors", async (request, reply) => {
 });
 
 server.get("/ai-systems/:id/vendors", async (request, reply) => {
-  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  const session = await resolveSession(request);
   if (!session) {
     return reply.status(401).send({ error: "Not logged in" });
   }
@@ -2271,7 +2272,7 @@ server.get("/ai-systems/:id/vendors", async (request, reply) => {
 });
 
 server.delete("/ai-systems/:id/vendors/:linkId", async (request, reply) => {
-  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  const session = await resolveSession(request);
   if (!session) {
     return reply.status(401).send({ error: "Not logged in" });
   }
@@ -2310,7 +2311,7 @@ server.delete("/ai-systems/:id/vendors/:linkId", async (request, reply) => {
 
 
 server.get("/tenant-users", async (request, reply) => {
-  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  const session = await resolveSession(request);
   if (!session) {
     return reply.status(401).send({ error: "Not logged in" });
   }
@@ -2355,7 +2356,7 @@ function isValidScale(n: unknown): n is number {
 }
 
 server.post("/ai-systems/:id/risk-assessments", async (request, reply) => {
-  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  const session = await resolveSession(request);
   if (!session) {
     return reply.status(401).send({ error: "Not logged in" });
   }
@@ -2434,7 +2435,7 @@ server.post("/ai-systems/:id/risk-assessments", async (request, reply) => {
 });
 
 server.get("/ai-systems/:id/risk-assessments", async (request, reply) => {
-  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  const session = await resolveSession(request);
   if (!session) {
     return reply.status(401).send({ error: "Not logged in" });
   }
@@ -2464,7 +2465,7 @@ server.get("/ai-systems/:id/risk-assessments", async (request, reply) => {
 });
 
 server.get("/ai-risk-assessments/:id", async (request, reply) => {
-  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  const session = await resolveSession(request);
   if (!session) {
     return reply.status(401).send({ error: "Not logged in" });
   }
@@ -2495,7 +2496,7 @@ server.get("/ai-risk-assessments/:id", async (request, reply) => {
 });
 
 server.patch("/ai-risk-assessments/:id", async (request, reply) => {
-  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  const session = await resolveSession(request);
   if (!session) {
     return reply.status(401).send({ error: "Not logged in" });
   }
@@ -2575,7 +2576,7 @@ server.patch("/ai-risk-assessments/:id", async (request, reply) => {
 });
 
 server.post("/ai-risk-assessments/:id/risks", async (request, reply) => {
-  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  const session = await resolveSession(request);
   if (!session) {
     return reply.status(401).send({ error: "Not logged in" });
   }
@@ -2669,7 +2670,7 @@ server.post("/ai-risk-assessments/:id/risks", async (request, reply) => {
 });
 
 server.patch("/ai-risks/:id", async (request, reply) => {
-  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  const session = await resolveSession(request);
   if (!session) {
     return reply.status(401).send({ error: "Not logged in" });
   }
@@ -2847,7 +2848,7 @@ server.patch("/ai-risks/:id", async (request, reply) => {
 });
 
 server.delete("/ai-risks/:id", async (request, reply) => {
-  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  const session = await resolveSession(request);
   if (!session) {
     return reply.status(401).send({ error: "Not logged in" });
   }
@@ -2896,7 +2897,7 @@ server.delete("/ai-risks/:id", async (request, reply) => {
 });
 
 server.post("/ai-risk-assessments/:id/review", async (request, reply) => {
-  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  const session = await resolveSession(request);
   if (!session) {
     return reply.status(401).send({ error: "Not logged in" });
   }
@@ -2993,7 +2994,7 @@ server.post("/ai-risk-assessments/:id/review", async (request, reply) => {
 });
 
 server.post("/ai-risks/:id/remediation", async (request, reply) => {
-  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  const session = await resolveSession(request);
   if (!session) {
     return reply.status(401).send({ error: "Not logged in" });
   }
@@ -3216,7 +3217,7 @@ async function loadImpactAssessmentForTenant(id: string, tenantId: string) {
 }
 
 server.post("/ai-systems/:id/impact-assessments", async (request, reply) => {
-  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  const session = await resolveSession(request);
   if (!session) {
     return reply.status(401).send({ error: "Not logged in" });
   }
@@ -3292,7 +3293,7 @@ server.post("/ai-systems/:id/impact-assessments", async (request, reply) => {
 });
 
 server.get("/ai-systems/:id/impact-assessments", async (request, reply) => {
-  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  const session = await resolveSession(request);
   if (!session) {
     return reply.status(401).send({ error: "Not logged in" });
   }
@@ -3324,7 +3325,7 @@ server.get("/ai-systems/:id/impact-assessments", async (request, reply) => {
 });
 
 server.get("/ai-impact-assessments/:id", async (request, reply) => {
-  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  const session = await resolveSession(request);
   if (!session) {
     return reply.status(401).send({ error: "Not logged in" });
   }
@@ -3368,7 +3369,7 @@ server.get("/ai-impact-assessments/:id", async (request, reply) => {
 });
 
 server.patch("/ai-impact-assessments/:id", async (request, reply) => {
-  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  const session = await resolveSession(request);
   if (!session) {
     return reply.status(401).send({ error: "Not logged in" });
   }
@@ -3446,7 +3447,7 @@ server.patch("/ai-impact-assessments/:id", async (request, reply) => {
 });
 
 server.post("/ai-impact-assessments/:id/impacts", async (request, reply) => {
-  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  const session = await resolveSession(request);
   if (!session) {
     return reply.status(401).send({ error: "Not logged in" });
   }
@@ -3493,7 +3494,7 @@ server.post("/ai-impact-assessments/:id/impacts", async (request, reply) => {
 });
 
 server.patch("/ai-impacts/:id", async (request, reply) => {
-  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  const session = await resolveSession(request);
   if (!session) {
     return reply.status(401).send({ error: "Not logged in" });
   }
@@ -3545,7 +3546,7 @@ server.patch("/ai-impacts/:id", async (request, reply) => {
 });
 
 server.delete("/ai-impacts/:id", async (request, reply) => {
-  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  const session = await resolveSession(request);
   if (!session) {
     return reply.status(401).send({ error: "Not logged in" });
   }
@@ -3589,7 +3590,7 @@ server.delete("/ai-impacts/:id", async (request, reply) => {
 });
 
 server.post("/ai-impact-assessments/:id/review", async (request, reply) => {
-  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  const session = await resolveSession(request);
   if (!session) {
     return reply.status(401).send({ error: "Not logged in" });
   }
@@ -3733,7 +3734,7 @@ async function auditGovernanceEvent(
 }
 
 server.get("/ai-systems/:id/framework-applicability", async (request, reply) => {
-  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  const session = await resolveSession(request);
   if (!session) {
     return reply.status(401).send({ error: "Not logged in" });
   }
@@ -3800,7 +3801,7 @@ server.get("/ai-systems/:id/framework-applicability", async (request, reply) => 
 });
 
 server.put("/ai-systems/:id/framework-applicability/:frameworkId", async (request, reply) => {
-  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  const session = await resolveSession(request);
   if (!session) {
     return reply.status(401).send({ error: "Not logged in" });
   }
@@ -3884,7 +3885,7 @@ server.put("/ai-systems/:id/framework-applicability/:frameworkId", async (reques
 });
 
 server.get("/ai-systems/:id/frameworks/:frameworkId/available-controls", async (request, reply) => {
-  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  const session = await resolveSession(request);
   if (!session) {
     return reply.status(401).send({ error: "Not logged in" });
   }
@@ -3932,7 +3933,7 @@ server.get("/ai-systems/:id/frameworks/:frameworkId/available-controls", async (
 });
 
 server.post("/ai-systems/:id/controls", async (request, reply) => {
-  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  const session = await resolveSession(request);
   if (!session) {
     return reply.status(401).send({ error: "Not logged in" });
   }
@@ -4030,7 +4031,7 @@ server.post("/ai-systems/:id/controls", async (request, reply) => {
 });
 
 server.get("/ai-systems/:id/controls", async (request, reply) => {
-  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  const session = await resolveSession(request);
   if (!session) {
     return reply.status(401).send({ error: "Not logged in" });
   }
@@ -4120,7 +4121,7 @@ server.get("/ai-systems/:id/controls", async (request, reply) => {
 });
 
 server.patch("/ai-system-controls/:id", async (request, reply) => {
-  const session = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+  const session = await resolveSession(request);
   if (!session) {
     return reply.status(401).send({ error: "Not logged in" });
   }

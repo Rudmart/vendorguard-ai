@@ -159,7 +159,7 @@ const NOT_YOUR_TEST = "Only the tester who started this test can change or compl
 export async function registerAiControlTestRoutes(app: FastifyInstance): Promise<void> {
   // 1. Start a control test (IN_PROGRESS). A new test after a completed one is a retest.
   app.post("/ai-system-controls/:controlRecordId/tests", async (request, reply) => {
-    const session = sessionOf(request);
+    const session = await sessionOf(request);
     if (!session) {
       return reply.status(401).send({ error: "Not logged in" });
     }
@@ -212,7 +212,7 @@ export async function registerAiControlTestRoutes(app: FastifyInstance): Promise
 
   // 2. Test history for a mapped control (newest first) + latest completed result.
   app.get("/ai-system-controls/:controlRecordId/tests", async (request, reply) => {
-    const session = sessionOf(request);
+    const session = await sessionOf(request);
     if (!session) {
       return reply.status(401).send({ error: "Not logged in" });
     }
@@ -238,7 +238,7 @@ export async function registerAiControlTestRoutes(app: FastifyInstance): Promise
 
   // 3. One test.
   app.get("/ai-control-tests/:testId", async (request, reply) => {
-    const session = sessionOf(request);
+    const session = await sessionOf(request);
     if (!session) {
       return reply.status(401).send({ error: "Not logged in" });
     }
@@ -255,7 +255,7 @@ export async function registerAiControlTestRoutes(app: FastifyInstance): Promise
 
   // 4. Update an IN_PROGRESS test (tester only).
   app.patch("/ai-control-tests/:testId", async (request, reply) => {
-    const session = sessionOf(request);
+    const session = await sessionOf(request);
     if (!session) {
       return reply.status(401).send({ error: "Not logged in" });
     }
@@ -296,7 +296,7 @@ export async function registerAiControlTestRoutes(app: FastifyInstance): Promise
 
   // 5. Associate a Step 9 evidence link with an IN_PROGRESS test (tester only, separation of duties).
   app.post("/ai-control-tests/:testId/evidence", async (request, reply) => {
-    const session = sessionOf(request);
+    const session = await sessionOf(request);
     if (!session) {
       return reply.status(401).send({ error: "Not logged in" });
     }
@@ -349,7 +349,7 @@ export async function registerAiControlTestRoutes(app: FastifyInstance): Promise
 
   // 6. Complete a test: human conclusions + accepted evidence required, then locked.
   app.post("/ai-control-tests/:testId/complete", async (request, reply) => {
-    const session = sessionOf(request);
+    const session = await sessionOf(request);
     if (!session) {
       return reply.status(401).send({ error: "Not logged in" });
     }
