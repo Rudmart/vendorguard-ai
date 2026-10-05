@@ -23,6 +23,10 @@ import { registerRiskAcceptanceRoutes } from "./aiRiskAcceptance.js";
 import { registerReassessmentRoutes } from "./aiReassessments.js";
 import { registerMonitoringRoutes } from "./aiMonitoring.js";
 import { loadAssessmentPosture } from "./aiAssessmentPosture.js";
+
+// Phase D2: at most one non-COMPLETED Risk and one non-COMPLETED Impact Assessment version per AI system.
+const OPEN_RISK_ASSESSMENT_ERROR = "An unfinished risk assessment already exists for this AI system. Complete it before starting a new version.";
+const OPEN_IMPACT_ASSESSMENT_ERROR = "An unfinished impact assessment already exists for this AI system. Complete it before starting a new version.";
 import { registerGlobalListRoutes } from "./aiGlobalLists.js";
 import { registerWorkQueueRoutes } from "./aiWorkQueues.js";
 import { registerAuthRoutes } from "./auth-routes.js";
@@ -2392,7 +2396,15 @@ server.post("/ai-systems/:id/risk-assessments", async (request, reply) => {
   // (aiSystemId, version) constraint protects against two being created at the same moment.
   let assessment: Awaited<ReturnType<typeof prisma.aiRiskAssessment.create>> | null = null;
   for (let attempt = 0; attempt < 3 && !assessment; attempt++) {
-    const latest = await prisma.aiRiskAssessment.findFirst({ where: { aiSystemId: aiSystem.id }, orderBy: { version: "desc" }, select: { version: true } });
+    // Phase D2: ONE read returns every version with its status, so the open-version check and the next
+    // version number come from the same snapshot. If another request creates a version after this read,
+    // our create collides on the unique (aiSystemId, version) constraint, we retry, and the re-read sees
+    // the new unfinished version -> 409. Two parallel unfinished versions cannot both be created.
+    const riskVersionRows = await prisma.aiRiskAssessment.findMany({ where: { aiSystemId: aiSystem.id }, select: { version: true, status: true } });
+    if (riskVersionRows.some((row) => row.status !== "COMPLETED")) {
+      return reply.status(409).send({ error: OPEN_RISK_ASSESSMENT_ERROR });
+    }
+    const latest = riskVersionRows.length > 0 ? { version: Math.max(...riskVersionRows.map((row) => row.version)) } : null;
     try {
       assessment = await prisma.aiRiskAssessment.create({
         data: { tenantId: session.tenantId, aiSystemId: aiSystem.id, name: body.name, assessorUserId, version: (latest?.version ?? 0) + 1 },
@@ -3240,11 +3252,12 @@ server.post("/ai-systems/:id/impact-assessments", async (request, reply) => {
   // New versions never overwrite earlier assessments. The unique (aiSystemId, version)
   // constraint protects against two assessments being created at the same moment.
   for (let attempt = 0; attempt < 3; attempt++) {
-    const latest = await prisma.aiImpactAssessment.findFirst({
-      where: { aiSystemId: aiSystem.id },
-      orderBy: { version: "desc" },
-      select: { version: true },
-    });
+    // Phase D2: same single-snapshot rule as the risk assessment route.
+    const impactVersionRows = await prisma.aiImpactAssessment.findMany({ where: { aiSystemId: aiSystem.id }, select: { version: true, status: true } });
+    if (impactVersionRows.some((row) => row.status !== "COMPLETED")) {
+      return reply.status(409).send({ error: OPEN_IMPACT_ASSESSMENT_ERROR });
+    }
+    const latest = impactVersionRows.length > 0 ? { version: Math.max(...impactVersionRows.map((row) => row.version)) } : null;
     const version = (latest?.version ?? 0) + 1;
     try {
       const assessment = await prisma.aiImpactAssessment.create({
