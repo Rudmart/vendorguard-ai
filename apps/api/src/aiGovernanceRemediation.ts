@@ -72,7 +72,7 @@ async function denyVerification(session: Session, remediationId: string, reason:
 export async function registerGovernanceRemediationRoutes(app: FastifyInstance): Promise<void> {
   // 1. Create remediation for an OPEN Finding (owner required).
   app.post("/governance-findings/:id/remediation", async (request, reply) => {
-    const session = sessionOf(request);
+    const session = await sessionOf(request);
     if (!session) {
       return reply.status(401).send({ error: "Not logged in" });
     }
@@ -120,7 +120,7 @@ export async function registerGovernanceRemediationRoutes(app: FastifyInstance):
 
   // 2. The remediation (with verification history) for a Finding.
   app.get("/governance-findings/:id/remediation", async (request, reply) => {
-    const session = sessionOf(request);
+    const session = await sessionOf(request);
     if (!session) {
       return reply.status(401).send({ error: "Not logged in" });
     }
@@ -138,7 +138,7 @@ export async function registerGovernanceRemediationRoutes(app: FastifyInstance):
 
   // 3. Remediation detail.
   app.get("/governance-remediations/:id", async (request, reply) => {
-    const session = sessionOf(request);
+    const session = await sessionOf(request);
     if (!session) {
       return reply.status(401).send({ error: "Not logged in" });
     }
@@ -155,7 +155,7 @@ export async function registerGovernanceRemediationRoutes(app: FastifyInstance):
 
   // 4. Update details / owner / progress (OPEN <-> IN_PROGRESS only).
   app.patch("/governance-remediations/:id", async (request, reply) => {
-    const session = sessionOf(request);
+    const session = await sessionOf(request);
     if (!session) {
       return reply.status(401).send({ error: "Not logged in" });
     }
@@ -243,7 +243,7 @@ export async function registerGovernanceRemediationRoutes(app: FastifyInstance):
 
   // 5. Owner submits for independent verification (IN_PROGRESS -> PENDING_VERIFICATION).
   app.post("/governance-remediations/:id/submit", async (request, reply) => {
-    const session = sessionOf(request);
+    const session = await sessionOf(request);
     if (!session) {
       return reply.status(401).send({ error: "Not logged in" });
     }
@@ -271,7 +271,7 @@ export async function registerGovernanceRemediationRoutes(app: FastifyInstance):
 
   // 6. Independent verification: VERIFIED (close remediation + Finding) or REJECTED (back to IN_PROGRESS).
   app.post("/governance-remediations/:id/verify", async (request, reply) => {
-    const session = sessionOf(request);
+    const session = await sessionOf(request);
     if (!session) {
       return reply.status(401).send({ error: "Not logged in" });
     }

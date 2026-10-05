@@ -74,7 +74,7 @@ const NOT_A_CREATOR = "Only ADMIN, REVIEWER or AUDITOR users can create findings
 export async function registerGovernanceFindingRoutes(app: FastifyInstance): Promise<void> {
   // 1. Create a Finding from a completed, deficient control test (manual, human decision).
   app.post("/ai-control-tests/:testId/findings", async (request, reply) => {
-    const session = sessionOf(request);
+    const session = await sessionOf(request);
     if (!session) {
       return reply.status(401).send({ error: "Not logged in" });
     }
@@ -137,7 +137,7 @@ export async function registerGovernanceFindingRoutes(app: FastifyInstance): Pro
 
   // 2. Finding detail (with source test, control and AI system traceability + review history).
   app.get("/governance-findings/:id", async (request, reply) => {
-    const session = sessionOf(request);
+    const session = await sessionOf(request);
     if (!session) {
       return reply.status(401).send({ error: "Not logged in" });
     }
@@ -154,7 +154,7 @@ export async function registerGovernanceFindingRoutes(app: FastifyInstance): Pro
 
   // 3. Findings for an AI system.
   app.get("/ai-systems/:id/findings", async (request, reply) => {
-    const session = sessionOf(request);
+    const session = await sessionOf(request);
     if (!session) {
       return reply.status(401).send({ error: "Not logged in" });
     }
@@ -185,7 +185,7 @@ export async function registerGovernanceFindingRoutes(app: FastifyInstance): Pro
 
   // 4. Findings for one mapped control.
   app.get("/ai-system-controls/:controlRecordId/findings", async (request, reply) => {
-    const session = sessionOf(request);
+    const session = await sessionOf(request);
     if (!session) {
       return reply.status(401).send({ error: "Not logged in" });
     }
@@ -208,7 +208,7 @@ export async function registerGovernanceFindingRoutes(app: FastifyInstance): Pro
   // 5. Update allowed fields. Content (title/description/severity) only while PENDING_REVIEW and only by
   //    the creator; owner can be set while PENDING_REVIEW or OPEN. Status changes only through review.
   app.patch("/governance-findings/:id", async (request, reply) => {
-    const session = sessionOf(request);
+    const session = await sessionOf(request);
     if (!session) {
       return reply.status(401).send({ error: "Not logged in" });
     }
@@ -290,7 +290,7 @@ export async function registerGovernanceFindingRoutes(app: FastifyInstance): Pro
 
   // 6. Human review: CONFIRM (-> OPEN) or DISMISS (-> DISMISSED). Rationale required. Reviewer != creator.
   app.post("/governance-findings/:id/review", async (request, reply) => {
-    const session = sessionOf(request);
+    const session = await sessionOf(request);
     if (!session) {
       return reply.status(401).send({ error: "Not logged in" });
     }

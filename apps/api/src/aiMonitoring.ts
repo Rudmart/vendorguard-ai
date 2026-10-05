@@ -166,7 +166,7 @@ export async function buildGovernanceContext(tenantId: string, aiSystemId: strin
 export async function registerMonitoringRoutes(app: FastifyInstance): Promise<void> {
   // 1. Monitoring overview for an AI system: checks with derived due state + governance context.
   app.get("/ai-systems/:id/monitoring", async (request, reply) => {
-    const session = sessionOf(request);
+    const session = await sessionOf(request);
     if (!session) {
       return reply.status(401).send({ error: "Not logged in" });
     }
@@ -189,7 +189,7 @@ export async function registerMonitoringRoutes(app: FastifyInstance): Promise<vo
 
   // 2. List checks.
   app.get("/ai-systems/:id/monitoring-checks", async (request, reply) => {
-    const session = sessionOf(request);
+    const session = await sessionOf(request);
     if (!session) {
       return reply.status(401).send({ error: "Not logged in" });
     }
@@ -206,7 +206,7 @@ export async function registerMonitoringRoutes(app: FastifyInstance): Promise<vo
 
   // 3. Create a monitoring check (obligation).
   app.post("/ai-systems/:id/monitoring-checks", async (request, reply) => {
-    const session = sessionOf(request);
+    const session = await sessionOf(request);
     if (!session) {
       return reply.status(401).send({ error: "Not logged in" });
     }
@@ -263,7 +263,7 @@ export async function registerMonitoringRoutes(app: FastifyInstance): Promise<vo
 
   // 4. Update / deactivate a check (no delete - review history is preserved).
   app.patch("/ai-monitoring-checks/:id", async (request, reply) => {
-    const session = sessionOf(request);
+    const session = await sessionOf(request);
     if (!session) {
       return reply.status(401).send({ error: "Not logged in" });
     }
@@ -337,7 +337,7 @@ export async function registerMonitoringRoutes(app: FastifyInstance): Promise<vo
 
   // 5. Check detail + full review history.
   app.get("/ai-monitoring-checks/:id/reviews", async (request, reply) => {
-    const session = sessionOf(request);
+    const session = await sessionOf(request);
     if (!session) {
       return reply.status(401).send({ error: "Not logged in" });
     }
@@ -362,7 +362,7 @@ export async function registerMonitoringRoutes(app: FastifyInstance): Promise<vo
 
   // 6. Record a monitoring review (observation + judgment). Immutable once recorded.
   app.post("/ai-monitoring-checks/:id/reviews", async (request, reply) => {
-    const session = sessionOf(request);
+    const session = await sessionOf(request);
     if (!session) {
       return reply.status(401).send({ error: "Not logged in" });
     }
@@ -425,7 +425,7 @@ export async function registerMonitoringRoutes(app: FastifyInstance): Promise<vo
 
   // 7. Explicit human escalation: start a Step 14 reassessment from a review (never automatic).
   app.post("/ai-monitoring-reviews/:id/start-reassessment", async (request, reply) => {
-    const session = sessionOf(request);
+    const session = await sessionOf(request);
     if (!session) {
       return reply.status(401).send({ error: "Not logged in" });
     }

@@ -159,7 +159,9 @@ describe("Phase B global lists - access", () => {
   it("require a valid signed session (401), ai-system:read (403), and allow read roles", async () => {
     for (const url of ROUTES) {
       expect((await get(url)).status, url).toBe(401);
-      expect((await get(url, adminA, "NO_ACCESS")).status, url).toBe(403);
+      // Security fix: the database role is authoritative - a signed cookie claiming a fake role (NO_ACCESS)
+      // for a user whose membership is ADMIN is ignored, so the ADMIN read succeeds.
+      expect((await get(url, adminA, "NO_ACCESS")).status, url).toBe(200);
       expect((await get(url, readOnlyA, "READ_ONLY")).status, url).toBe(200);
     }
   });

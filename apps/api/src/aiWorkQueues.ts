@@ -175,7 +175,7 @@ export async function myWorkFor(session: Session): Promise<WorkItem[]> {
 
 export async function registerWorkQueueRoutes(app: FastifyInstance): Promise<void> {
   app.get("/reviews/pending", async (request, reply) => {
-    const session = sessionOf(request);
+    const session = await sessionOf(request);
     if (!session) {
       return reply.status(401).send({ error: "Not logged in" });
     }
@@ -184,7 +184,7 @@ export async function registerWorkQueueRoutes(app: FastifyInstance): Promise<voi
   });
 
   app.get("/my-work", async (request, reply) => {
-    const session = sessionOf(request);
+    const session = await sessionOf(request);
     if (!session) {
       return reply.status(401).send({ error: "Not logged in" });
     }
@@ -193,7 +193,7 @@ export async function registerWorkQueueRoutes(app: FastifyInstance): Promise<voi
   });
 
   app.get("/dashboard/summary", async (request, reply) => {
-    const session = sessionOf(request);
+    const session = await sessionOf(request);
     if (!session) {
       return reply.status(401).send({ error: "Not logged in" });
     }

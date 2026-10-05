@@ -139,7 +139,7 @@ async function linkAcceptance(value: unknown, tenantId: string, aiSystemId: stri
 export async function registerReassessmentRoutes(app: FastifyInstance): Promise<void> {
   // 1. Initiate a reassessment (human-initiated; no automatic triggers).
   app.post("/ai-systems/:id/reassessments", async (request, reply) => {
-    const session = sessionOf(request);
+    const session = await sessionOf(request);
     if (!session) {
       return reply.status(401).send({ error: "Not logged in" });
     }
@@ -232,7 +232,7 @@ export async function registerReassessmentRoutes(app: FastifyInstance): Promise<
 
   // 2. Reassessment history for an AI system.
   app.get("/ai-systems/:id/reassessments", async (request, reply) => {
-    const session = sessionOf(request);
+    const session = await sessionOf(request);
     if (!session) {
       return reply.status(401).send({ error: "Not logged in" });
     }
@@ -262,7 +262,7 @@ export async function registerReassessmentRoutes(app: FastifyInstance): Promise<
 
   // 3. Reassessment detail with governance context.
   app.get("/ai-reassessments/:id", async (request, reply) => {
-    const session = sessionOf(request);
+    const session = await sessionOf(request);
     if (!session) {
       return reply.status(401).send({ error: "Not logged in" });
     }
@@ -334,7 +334,7 @@ export async function registerReassessmentRoutes(app: FastifyInstance): Promise<
 
   // 4. Update while IN_PROGRESS (what changed, material change, target date, links).
   app.patch("/ai-reassessments/:id", async (request, reply) => {
-    const session = sessionOf(request);
+    const session = await sessionOf(request);
     if (!session) {
       return reply.status(401).send({ error: "Not logged in" });
     }
@@ -432,7 +432,7 @@ export async function registerReassessmentRoutes(app: FastifyInstance): Promise<
 
   // 5. Complete: explicit human conclusion + rationale. Snapshot at completion. Locked afterwards.
   app.post("/ai-reassessments/:id/complete", async (request, reply) => {
-    const session = sessionOf(request);
+    const session = await sessionOf(request);
     if (!session) {
       return reply.status(401).send({ error: "Not logged in" });
     }
