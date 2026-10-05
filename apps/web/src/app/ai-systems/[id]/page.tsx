@@ -5,9 +5,10 @@ import ImpactAssessmentCard from "./impact-assessment-card";
 import FrameworkApplicabilityCard from "./framework-applicability-card";
 import ReassessmentsCard from "./reassessments-card";
 import MonitoringCard from "./monitoring-card";
+import RiskAssessmentCard from "./risk-assessment-card";
+import GovernancePosture, { type AssessmentPosture } from "./governance-posture";
 
 type TenantUser = { id: string; displayName: string; email: string };
-type RiskAssessmentSummary = { id: string; name: string; status: string; risks: { inherentScore: number; residualScore: number | null }[] };
 
 type AiSystem = {
   id: string;
@@ -29,6 +30,7 @@ type AiSystem = {
   externalImpact: boolean | null;
   regulatoryRelevance: string[];
   assessmentStatus: string;
+  assessmentPosture?: AssessmentPosture;
   createdAt: string;
   updatedAt: string;
 };
@@ -51,7 +53,6 @@ const IMPACT_LEVEL_OPTIONS = ["LOW", "MODERATE", "HIGH"];
 const DATA_SENSITIVITY_OPTIONS = ["PUBLIC", "INTERNAL", "CONFIDENTIAL", "RESTRICTED"];
 const AFFECTED_POPULATION_OPTIONS = ["EMPLOYEES", "CUSTOMERS", "PUBLIC", "OTHER"];
 const REGULATORY_RELEVANCE_OPTIONS = ["EU_AI_ACT", "PRIVACY", "INDUSTRY_SPECIFIC", "OTHER"];
-const ASSESSMENT_STATUS_OPTIONS = ["NOT_ASSESSED", "ASSESSMENT_REQUIRED", "ASSESSED"];
 
 const DECISION_ROLE_HELP: Record<string, string> = {
   ADVISORY: "Provides information only.",
@@ -78,8 +79,6 @@ export default function AiSystemDetailPage() {
   const [linkRole, setLinkRole] = useState("OTHER");
   const [linkError, setLinkError] = useState("");
   const [linking, setLinking] = useState(false);
-
-  const [riskAssessments, setRiskAssessments] = useState<RiskAssessmentSummary[] | null>(null);
 
   const [govOwnerUserId, setGovOwnerUserId] = useState("");
   const [govBusinessCriticality, setGovBusinessCriticality] = useState("");
@@ -142,24 +141,7 @@ export default function AiSystemDetailPage() {
       .then((res) => (res.ok ? res.json() : { users: [] }))
       .then((d) => setTenantUsers(d.users))
       .catch(() => setTenantUsers([]));
-    fetch(`${process.env.NEXT_PUBLIC_API_URL}/ai-systems/${id}/risk-assessments`, { credentials: "include" })
-      .then((res) => (res.ok ? res.json() : { assessments: [] }))
-      .then((d) => setRiskAssessments(d.assessments))
-      .catch(() => setRiskAssessments([]));
   }, [id]);
-
-  async function handleStartAssessment() {
-    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/ai-systems/${id}/risk-assessments`, {
-      method: "POST",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: "Risk Assessment - " + new Date().toLocaleDateString() }),
-    });
-    if (res.ok) {
-      const created = await res.json();
-      window.location.href = `/ai-risk-assessments/${created.id}`;
-    }
-  }
 
   async function handleLifecycleUpdate() {
     setLifecycleSaving(true);
@@ -300,6 +282,8 @@ export default function AiSystemDetailPage() {
   const selectStyle = { padding: "8px 12px", borderRadius: 8, border: "1px solid #2e3d63", background: "#0a0f1a", color: "#e6e9f0", fontSize: 13, width: "100%" };
   const fieldLabelStyle = { fontSize: 13, color: "#8b96ac", display: "block", marginBottom: 4 };
   const helpTextStyle = { fontSize: 11.5, color: "#5d6786", marginTop: 4, marginBottom: 0 };
+  const sectionHeadingStyle = { fontSize: 13, textTransform: "uppercase" as const, letterSpacing: 0.6, color: "#86efac", margin: "28px 0 12px", scrollMarginTop: 16 };
+  const linkButtonStyle = { fontSize: 13, color: "#93c5fd", border: "1px solid #3b82f6", borderRadius: 8, padding: "8px 14px", textDecoration: "none", display: "inline-block" };
 
   return (
     <main style={{ maxWidth: 760, margin: "0 auto", padding: "32px 24px" }}>
@@ -307,6 +291,10 @@ export default function AiSystemDetailPage() {
       <p style={{ color: "#8b96ac", fontSize: 13, marginBottom: 24, fontStyle: "italic" }}>
         AI assists. Humans govern.
       </p>
+
+      <GovernancePosture aiSystemId={String(id)} lifecycleStatus={aiSystem.lifecycleStatus} owner={aiSystem.owner} posture={aiSystem.assessmentPosture ?? null} />
+
+      <h2 id="profile" style={sectionHeadingStyle}>Profile & Classification</h2>
 
       <div style={cardStyle}>
         <h2 style={{ fontSize: 15, marginTop: 0, marginBottom: 16 }}>Overview</h2>
@@ -388,11 +376,9 @@ export default function AiSystemDetailPage() {
           </label>
 
           <label style={fieldLabelStyle}>
-            Assessment Status
-            <select style={selectStyle} value={govAssessmentStatus} onChange={(e) => setGovAssessmentStatus(e.target.value)}>
-              {ASSESSMENT_STATUS_OPTIONS.map((o) => <option key={o} value={o}>{o.replace(/_/g, " ")}</option>)}
-            </select>
-            <p style={helpTextStyle}>Governance assessment status only - not the assessment itself.</p>
+            Assessment Status (derived)
+            <div style={{ ...selectStyle, color: "#8b96ac" }}>{aiSystem.assessmentPosture ? aiSystem.assessmentPosture.state.replace(/_/g, " ") : "-"}</div>
+            <p style={helpTextStyle}>Derived from completed Risk and Impact Assessments (see Governance posture above). Not edited here.</p>
           </label>
         </div>
 
@@ -562,47 +548,38 @@ export default function AiSystemDetailPage() {
         )}
       </div>
     
-      <div style={cardStyle}>
-        <h2 style={{ fontSize: 15, marginTop: 0, marginBottom: 4 }}>AI Risk Assessment</h2>
-        <p style={{ color: "#8b96ac", fontSize: 12.5, marginTop: 0, marginBottom: 16 }}>
-          Structured risk identification, inherent/residual scoring, controls, treatment, and human review for this AI system.
-        </p>
-        {riskAssessments === null ? (
-          <p style={{ color: "#8b96ac", fontSize: 13 }}>Loading...</p>
-        ) : riskAssessments.length === 0 ? (
-          <>
-            <p style={{ color: "#8b96ac", fontSize: 13, marginBottom: 16 }}>No risk assessment has been started yet.</p>
-            <button
-              onClick={handleStartAssessment}
-              style={{ background: "#3b82f6", color: "#fff", border: "none", borderRadius: 8, padding: "10px 18px", fontSize: 13.5, fontWeight: 700, cursor: "pointer" }}
-            >
-              Start Risk Assessment
-            </button>
-          </>
-        ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {riskAssessments.map((a: RiskAssessmentSummary) => {
-              const risks = a.risks || [];
-              return (
-                <a key={a.id} href={`/ai-risk-assessments/${a.id}`} style={{ textDecoration: "none", color: "inherit" }}>
-                  <div style={{ background: "#0a0f1a", border: "1px solid #233150", borderRadius: 8, padding: "14px 16px" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <span style={{ fontWeight: 600, fontSize: 13.5 }}>{a.name}</span>
-                      <span style={{ fontSize: 11, color: "#8b96ac" }}>{a.status.replace(/_/g, " ")}</span>
-                    </div>
-                    <div style={{ fontSize: 12, color: "#8b96ac", marginTop: 6 }}>
-                      {risks.length} risk{risks.length === 1 ? "" : "s"} identified
-                    </div>
-                  </div>
-                </a>
-              );
-            })}
-          </div>
-        )}
-      </div>
+      <h2 id="risk-impact" style={sectionHeadingStyle}>Risk & Impact</h2>
+      <RiskAssessmentCard aiSystemId={String(id)} />
       <ImpactAssessmentCard aiSystemId={String(id)} />
-      <FrameworkApplicabilityCard aiSystemId={String(id)} />
+      <div style={{ height: 20 }} />
       <ReassessmentsCard aiSystemId={String(id)} />
+
+      <h2 id="assurance" style={sectionHeadingStyle}>Assurance</h2>
+      <FrameworkApplicabilityCard aiSystemId={String(id)} />
+      <div style={{ ...cardStyle, marginTop: 20 }}>
+        <h2 style={{ fontSize: 15, marginTop: 0, marginBottom: 4 }}>Controls, Evidence & Findings</h2>
+        <p style={{ color: "#8b96ac", fontSize: 12.5, marginTop: 0, marginBottom: 16 }}>
+          Controls come from the applicable frameworks. Evidence is reviewed and tested per control; failed tests become Findings.
+        </p>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          <a href={`/ai-systems/${id}/controls`} style={linkButtonStyle}>Controls & evidence</a>
+          <a href={`/ai-systems/${id}/findings`} style={linkButtonStyle}>Findings</a>
+        </div>
+      </div>
+
+      <h2 id="treatment" style={sectionHeadingStyle}>Treatment & Oversight</h2>
+      <div style={cardStyle}>
+        <h2 style={{ fontSize: 15, marginTop: 0, marginBottom: 4 }}>Risk Treatment, Acceptance & Remediation</h2>
+        <p style={{ color: "#8b96ac", fontSize: 12.5, marginTop: 0, marginBottom: 16 }}>
+          Treatment is planned on each risk inside its Risk Assessment. These registers cover all AI systems - use their AI system filter.
+        </p>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          <a href="/risk-register" style={linkButtonStyle}>Risk Register</a>
+          <a href="/risk-acceptance" style={linkButtonStyle}>Risk Acceptance</a>
+          <a href="/remediation" style={linkButtonStyle}>Remediation</a>
+        </div>
+      </div>
+
       <MonitoringCard aiSystemId={String(id)} />
     </main>
   );

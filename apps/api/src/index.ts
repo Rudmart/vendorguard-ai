@@ -22,6 +22,7 @@ import { registerGovernanceRemediationRoutes } from "./aiGovernanceRemediation.j
 import { registerRiskAcceptanceRoutes } from "./aiRiskAcceptance.js";
 import { registerReassessmentRoutes } from "./aiReassessments.js";
 import { registerMonitoringRoutes } from "./aiMonitoring.js";
+import { loadAssessmentPosture } from "./aiAssessmentPosture.js";
 import { registerGlobalListRoutes } from "./aiGlobalLists.js";
 import { registerWorkQueueRoutes } from "./aiWorkQueues.js";
 import { registerAuthRoutes } from "./auth-routes.js";
@@ -1947,7 +1948,8 @@ server.get("/ai-systems/:id", async (request, reply) => {
   } catch {
     return reply.status(404).send({ error: "AI system not found" });
   }
-  return reply.send(aiSystem);
+  // Phase D1: assessment posture is derived on read from authoritative assessments (legacy assessmentStatus untouched).
+  return reply.send({ ...aiSystem, assessmentPosture: await loadAssessmentPosture(aiSystem.id) });
 });
 
 server.patch("/ai-systems/:id", async (request, reply) => {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import VersionList, { summarizeVersions } from "./assessment-versions";
 
 const API = process.env.NEXT_PUBLIC_API_URL;
 
@@ -107,8 +108,7 @@ export default function ImpactAssessmentCard({ aiSystemId }: { aiSystemId: strin
   }
 
   const latest = items && items.length > 0 ? items[0] : null;
-  const canStart = items !== null && (!latest || latest.status === "COMPLETED");
-  const earlier = items && items.length > 1 ? items.slice(1) : [];
+  const canStart = items !== null && summarizeVersions(items).canStart;
 
   return (
     <div style={{ background: "#161e33", border: "1px solid #28324d", borderRadius: 12, padding: 24, marginTop: 24 }}>
@@ -125,7 +125,7 @@ export default function ImpactAssessmentCard({ aiSystemId }: { aiSystemId: strin
         <div style={{ background: "#0d1323", border: "1px solid #28324d", borderRadius: 10, padding: 16, marginBottom: 16 }}>
           <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
             <strong>
-              {latest.name} (version {latest.version})
+              {latest.name} (v{latest.version})
             </strong>
             <span style={{ color: latest.status === "COMPLETED" ? "#34d399" : "#8e9ab5", fontSize: 13 }}>
               {latest.status === "COMPLETED" ? "Approved" : readable(latest.status)}
@@ -163,19 +163,7 @@ export default function ImpactAssessmentCard({ aiSystemId }: { aiSystemId: strin
         )}
       </div>
 
-      {earlier.length > 0 && (
-        <p style={{ color: "#8e9ab5", fontSize: 12, marginTop: 16, marginBottom: 0 }}>
-          Earlier versions:{" "}
-          {earlier.map((item, index) => (
-            <span key={item.id}>
-              {index > 0 && ", "}
-              <a href={`/ai-impact-assessments/${item.id}`} style={{ color: "#93c5fd" }}>
-                version {item.version}
-              </a>
-            </span>
-          ))}
-        </p>
-      )}
+      {items !== null && <VersionList rows={items} hrefBase="/ai-impact-assessments/" />}
     </div>
   );
 }
