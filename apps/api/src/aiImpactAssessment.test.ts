@@ -152,6 +152,8 @@ describe("AI Impact Assessment - create/retrieve/update", () => {
   it("creates a new version instead of overwriting the previous assessment", async () => {
     const sysId = await createAiSystem(tenantAId, "ADMIN", adminUserId);
     const first = JSON.parse((await createImpactAssessment(sysId, tenantAId, "ANALYST", analystUserId)).body);
+    // Phase D2: a new version can only start once the previous one is COMPLETED.
+    await prisma.aiImpactAssessment.update({ where: { id: first.id }, data: { status: "COMPLETED", completedAt: new Date() } });
     const second = JSON.parse((await createImpactAssessment(sysId, tenantAId, "ANALYST", analystUserId)).body);
     expect(first.version).toBe(1);
     expect(second.version).toBe(2);
@@ -184,7 +186,9 @@ describe("AI Impact Assessment - create/retrieve/update", () => {
 
   it("lists assessments newest version first with an impact summary", async () => {
     const sysId = await createAiSystem(tenantAId, "ADMIN", adminUserId);
-    await createImpactAssessment(sysId, tenantAId, "ANALYST", analystUserId);
+    const v1 = JSON.parse((await createImpactAssessment(sysId, tenantAId, "ANALYST", analystUserId)).body);
+    // Phase D2: complete v1 before starting v2.
+    await prisma.aiImpactAssessment.update({ where: { id: v1.id }, data: { status: "COMPLETED", completedAt: new Date() } });
     await createImpactAssessment(sysId, tenantAId, "ANALYST", analystUserId);
     const res = await server.inject({
       method: "GET", url: `/ai-systems/${sysId}/impact-assessments`,

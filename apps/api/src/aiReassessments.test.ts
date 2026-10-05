@@ -93,19 +93,25 @@ afterAll(async () => {
 describe("Risk Assessment integrity repair", () => {
   it("allocates versions 1, 2, 3 per AI system", async () => {
     const sysId = await newSystem();
-    expect((await newRiskAssessment(sysId)).version).toBe(1);
-    expect((await newRiskAssessment(sysId)).version).toBe(2);
+    // Phase D2: each version must be COMPLETED before the next one can start.
+    const markCompleted = (id: string) => prisma.aiRiskAssessment.update({ where: { id }, data: { status: "COMPLETED", completedAt: new Date() } });
+    const v1 = await newRiskAssessment(sysId);
+    expect(v1.version).toBe(1);
+    await markCompleted(v1.id);
+    const v2 = await newRiskAssessment(sysId);
+    expect(v2.version).toBe(2);
+    await markCompleted(v2.id);
     expect((await newRiskAssessment(sysId)).version).toBe(3);
   });
 
-  it("gives distinct versions when two are created at the same time", async () => {
+  it("lets only one of two simultaneous creates succeed (Phase D2: one open version)", async () => {
     const sysId = await newSystem();
     const [a, b] = await Promise.all([
       call("POST", `/ai-systems/${sysId}/risk-assessments`, analystUserId, "ANALYST", { name: "A" }),
       call("POST", `/ai-systems/${sysId}/risk-assessments`, analystUserId, "ANALYST", { name: "B" }),
     ]);
-    expect([a.status, b.status]).toEqual([201, 201]);
-    expect([a.body.version, b.body.version].sort()).toEqual([1, 2]);
+    expect([a.status, b.status].sort()).toEqual([201, 409]);
+    expect(await prisma.aiRiskAssessment.count({ where: { aiSystemId: sysId, status: { not: "COMPLETED" } } })).toBe(1);
   });
 
   it("does not let generic PATCH set COMPLETED", async () => {
@@ -203,6 +209,8 @@ describe("Linking new assessments", () => {
   it("rejects an assessment created before the reassessment or from another AI system; accepts a new one", async () => {
     const sysId = await newSystem();
     const old = await newRiskAssessment(sysId);
+    // Phase D2: the baseline version must be COMPLETED before a new version can start.
+    await prisma.aiRiskAssessment.update({ where: { id: old.id }, data: { status: "COMPLETED", completedAt: new Date() } });
     const r = await start(sysId);
     expect((await call("PATCH", `/ai-reassessments/${r.body.id}`, analystUserId, "ANALYST", { newRiskAssessmentId: old.id })).status).toBe(400);
     const other = await newRiskAssessment(await newSystem());
