@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type CSSProperties } from "react";
 import { useParams } from "next/navigation";
+import TenantUserSelect from "../../../../tenant-user-select";
 
 const API = process.env.NEXT_PUBLIC_API_URL;
 
@@ -60,6 +61,7 @@ export default function MonitoringCheckPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
+  const [newOwner, setNewOwner] = useState("");
   const [form, setForm] = useState({ periodCovered: "", observation: "", observedValue: "", unit: "", result: "", rationale: "" });
 
   useEffect(() => {
@@ -123,6 +125,15 @@ export default function MonitoringCheckPage() {
     }
   }
 
+  async function changeOwner() {
+    const ok = await send("PATCH", `${API}/ai-monitoring-checks/${checkId}`, { ownerUserId: newOwner });
+    if (ok) {
+      setMessage("Owner updated.");
+      setNewOwner("");
+      setReloadKey((n) => n + 1);
+    }
+  }
+
   if (!data) {
     return <main style={{ padding: 24, color: "#e6e9f0" }}>{error ?? "Loading..."}</main>;
   }
@@ -144,6 +155,17 @@ export default function MonitoringCheckPage() {
         <h2 style={heading}>What to review</h2>
         <p style={muted}>{k.whatToReview}</p>
         <p style={muted}>Expectation: {k.expectation}</p>
+        {k.active && (
+          <div style={{ display: "flex", gap: 8, alignItems: "flex-end", margin: "10px 0" }}>
+            <div style={{ flex: 1 }}>
+              <span style={label}>Change owner</span>
+              <TenantUserSelect value={newOwner} onChange={setNewOwner} emptyLabel="Select new owner" style={field} />
+            </div>
+            <button style={{ ...button, marginBottom: 8 }} disabled={busy || !newOwner} onClick={() => void changeOwner()}>
+              Save owner
+            </button>
+          </div>
+        )}
         {k.active && (
           <button style={{ ...button, background: "#475569" }} disabled={busy} onClick={() => void deactivate()}>
             Deactivate check

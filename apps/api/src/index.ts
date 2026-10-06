@@ -2325,7 +2325,10 @@ server.get("/tenant-users", async (request, reply) => {
     where: { tenantId: session.tenantId },
     include: { user: { select: { id: true, displayName: true, email: true } } },
   });
-  const users = memberships.map((m) => m.user);
+  // Owner Pickers: include the membership role (additive) so pickers can show who is who.
+  const users = memberships
+    .map((m) => ({ ...m.user, role: m.role }))
+    .sort((a, b) => a.displayName.localeCompare(b.displayName));
   return reply.send({ users });
 });
 
@@ -2826,6 +2829,13 @@ server.patch("/ai-risks/:id", async (request, reply) => {
   }
   if (treatmentChanged) {
     auditEvents.push({ action: "ai_risk.treatment_changed", metadataJson: { from: existing.treatment, to: body.treatment } });
+  }
+  // Owner Pickers: governance-significant treatment-planning fields get their own audit events.
+  if ((existing.treatmentOwnerUserId ?? null) !== (updated.treatmentOwnerUserId ?? null)) {
+    auditEvents.push({ action: "ai_risk.treatment_owner_changed", metadataJson: { from: existing.treatmentOwnerUserId ?? null, to: updated.treatmentOwnerUserId ?? null } });
+  }
+  if ((existing.treatmentTargetDate?.toISOString() ?? null) !== (updated.treatmentTargetDate?.toISOString() ?? null)) {
+    auditEvents.push({ action: "ai_risk.treatment_target_date_changed", metadataJson: { from: existing.treatmentTargetDate?.toISOString() ?? null, to: updated.treatmentTargetDate?.toISOString() ?? null } });
   }
   if (auditEvents.length === 0) {
     auditEvents.push({ action: "ai_risk.updated" });
