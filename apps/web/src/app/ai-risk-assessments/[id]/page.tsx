@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
+import TenantUserSelect from "../../tenant-user-select";
 
 const LIKELIHOOD_LABELS: Record<number, string> = { 1: "Rare", 2: "Unlikely", 3: "Possible", 4: "Likely", 5: "Almost Certain" };
 const IMPACT_LABELS: Record<number, string> = { 1: "Insignificant", 2: "Minor", 3: "Moderate", 4: "Major", 5: "Severe" };
@@ -30,6 +31,8 @@ type Risk = {
   residualRating: string | null;
   treatment: string | null;
   treatmentRationale: string | null;
+  treatmentOwnerUserId?: string | null;
+  treatmentTargetDate?: string | null;
 };
 
 type AssessmentDetail = {
@@ -62,6 +65,10 @@ function RiskCard({ risk, onUpdate }: { risk: Risk; onUpdate: () => void }) {
   const [residualImpact, setResidualImpact] = useState(risk.residualImpact || "");
   const [treatment, setTreatment] = useState(risk.treatment || "");
   const [treatmentRationale, setTreatmentRationale] = useState(risk.treatmentRationale || "");
+  const [treatmentOwnerUserId, setTreatmentOwnerUserId] = useState(risk.treatmentOwnerUserId ?? "");
+  const [treatmentTargetDate, setTreatmentTargetDate] = useState(risk.treatmentTargetDate ? risk.treatmentTargetDate.slice(0, 10) : "");
+  const [planSaving, setPlanSaving] = useState(false);
+  const [planMessage, setPlanMessage] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -96,6 +103,42 @@ function RiskCard({ risk, onUpdate }: { risk: Risk; onUpdate: () => void }) {
       setError("Something went wrong saving this risk.");
     } finally {
       setSaving(false);
+    }
+  }
+
+  // Owner Pickers: saves ONLY treatment-planning fields, so it also works after the assessment is COMPLETED
+  // (assessed fields are locked then; treatment planning is allowed).
+  async function handleSavePlan() {
+    setPlanSaving(true);
+    setError("");
+    setPlanMessage("");
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/ai-risks/${risk.id}`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          treatment: treatment || null,
+          treatmentRationale: treatmentRationale || undefined,
+          treatmentOwnerUserId: treatmentOwnerUserId || null,
+          treatmentTargetDate: treatmentTargetDate || null,
+        }),
+      });
+      if (res.status === 403) {
+        setError("You don't have permission to update this risk.");
+        return;
+      }
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        setError(body?.error || "Something went wrong saving the treatment plan.");
+        return;
+      }
+      setPlanMessage("Treatment plan saved.");
+      onUpdate();
+    } catch {
+      setError("Something went wrong saving the treatment plan.");
+    } finally {
+      setPlanSaving(false);
     }
   }
 
@@ -196,6 +239,25 @@ function RiskCard({ risk, onUpdate }: { risk: Risk; onUpdate: () => void }) {
           <input style={selectStyle} value={treatmentRationale} onChange={(e) => setTreatmentRationale(e.target.value)} placeholder="Why this treatment decision..." />
         </div>
       </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr auto", gap: 12, alignItems: "end", marginBottom: 14 }}>
+        <div>
+          <div style={labelStyle}>Treatment Owner (required before Risk Acceptance)</div>
+          <TenantUserSelect value={treatmentOwnerUserId} onChange={setTreatmentOwnerUserId} emptyLabel="Not assigned" style={selectStyle} />
+        </div>
+        <div>
+          <div style={labelStyle}>Treatment Target Date</div>
+          <input type="date" style={{ ...selectStyle, colorScheme: "dark" }} value={treatmentTargetDate} onChange={(e) => setTreatmentTargetDate(e.target.value)} />
+        </div>
+        <button
+          onClick={() => void handleSavePlan()}
+          disabled={planSaving}
+          style={{ background: "#0f766e", color: "#fff", border: "none", borderRadius: 8, padding: "8px 16px", fontSize: 12.5, fontWeight: 600, cursor: planSaving ? "not-allowed" : "pointer", opacity: planSaving ? 0.6 : 1 }}
+        >
+          {planSaving ? "Saving..." : "Save Treatment Plan"}
+        </button>
+      </div>
+      {planMessage && <div style={{ fontSize: 12, color: "#4ade80", marginBottom: 10 }}>{planMessage}</div>}
 
       <button
         onClick={handleSave}

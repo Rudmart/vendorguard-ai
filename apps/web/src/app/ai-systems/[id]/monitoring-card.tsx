@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, type CSSProperties } from "react";
+import TenantUserSelect from "../../tenant-user-select";
 
 const API = process.env.NEXT_PUBLIC_API_URL;
 
@@ -50,7 +51,7 @@ export default function MonitoringCard({ aiSystemId }: { aiSystemId: string }) {
   const [adding, setAdding] = useState(false);
   const [busy, setBusy] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
-  const [form, setForm] = useState({ title: "", whatToReview: "", expectation: "", category: "HUMAN_OVERSIGHT", cadence: "MONTHLY", ownerEmail: "" });
+  const [form, setForm] = useState({ title: "", whatToReview: "", expectation: "", category: "HUMAN_OVERSIGHT", cadence: "MONTHLY", ownerUserId: "" });
 
   useEffect(() => {
     fetch(`${API}/ai-systems/${aiSystemId}/monitoring`, { credentials: "include" })
@@ -70,7 +71,7 @@ export default function MonitoringCard({ aiSystemId }: { aiSystemId: string }) {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...form, ownerEmail: form.ownerEmail || undefined }),
+      body: JSON.stringify({ ...form, ownerUserId: form.ownerUserId || undefined }),
     });
     setBusy(false);
     if (!res.ok) {
@@ -79,7 +80,7 @@ export default function MonitoringCard({ aiSystemId }: { aiSystemId: string }) {
       return;
     }
     setAdding(false);
-    setForm({ title: "", whatToReview: "", expectation: "", category: "HUMAN_OVERSIGHT", cadence: "MONTHLY", ownerEmail: "" });
+    setForm({ title: "", whatToReview: "", expectation: "", category: "HUMAN_OVERSIGHT", cadence: "MONTHLY", ownerUserId: "" });
     setReloadKey((k) => k + 1);
   }
 
@@ -134,8 +135,8 @@ export default function MonitoringCard({ aiSystemId }: { aiSystemId: string }) {
               </option>
             ))}
           </select>
-          <span style={label}>Owner email (blank = you)</span>
-          <input style={field} value={form.ownerEmail} onChange={(e) => setForm({ ...form, ownerEmail: e.target.value })} />
+          <span style={label}>Owner (blank = you)</span>
+          <TenantUserSelect value={form.ownerUserId} onChange={(v) => setForm({ ...form, ownerUserId: v })} emptyLabel="Me (default)" style={field} />
           <button style={button} disabled={busy || !form.title || !form.whatToReview || !form.expectation} onClick={() => void addCheck()}>
             Save check
           </button>
