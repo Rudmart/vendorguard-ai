@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
+import { useCurrentUser } from "../../../current-user";
 import { useParams } from "next/navigation";
 
 const API = process.env.NEXT_PUBLIC_API_URL;
@@ -118,6 +119,8 @@ function ControlEditor({ row, users, onSaved }: { row: ControlRow; users: UserOp
   const [implementation, setImplementation] = useState(row.implementationStatus);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const { can } = useCurrentUser();
+  const canUpdate = can("ai-system:update");
 
   const changes: Record<string, unknown> = {};
   if (applicability !== row.applicability) {
@@ -197,6 +200,7 @@ function ControlEditor({ row, users, onSaved }: { row: ControlRow; users: UserOp
         </p>
       )}
 
+      <fieldset disabled={!canUpdate} style={{ border: "none", padding: 0, margin: 0, minWidth: 0 }}>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12, marginTop: 12 }}>
         <Field label="Applicability to this AI system">
           <select style={input} value={applicability} onChange={(e) => setApplicability(e.target.value)}>
@@ -244,13 +248,16 @@ function ControlEditor({ row, users, onSaved }: { row: ControlRow; users: UserOp
           />
         </Field>
       </div>
+      </fieldset>
 
       <ErrorText message={error} />
+      {canUpdate && (
       <div style={{ marginTop: 10 }}>
         <button type="button" style={dirty ? button : { ...quietButton, cursor: "default" }} onClick={save} disabled={!dirty || saving}>
           {saving ? "Saving..." : dirty ? "Save changes" : "No changes"}
         </button>
       </div>
+      )}
     </div>
   );
 }
@@ -275,6 +282,7 @@ export default function AiControlSetPage() {
   const [mapping, setMapping] = useState(false);
   const [mapResult, setMapResult] = useState<string | null>(null);
   const [mapError, setMapError] = useState<string | null>(null);
+  const { can: canDo } = useCurrentUser();
 
   useEffect(() => {
     if (!id) {
@@ -488,6 +496,7 @@ export default function AiControlSetPage() {
         </p>
       </section>
 
+      {canDo("ai-system:update") && (
       <section style={card}>
         <h2 style={{ fontSize: 15, marginTop: 0 }}>Map controls from the library</h2>
         {mappableFrameworks.length === 0 ? (
@@ -550,6 +559,7 @@ export default function AiControlSetPage() {
           </>
         )}
       </section>
+      )}
 
       <section style={card}>
         <h2 style={{ fontSize: 15, marginTop: 0 }}>Controls assigned to this AI system</h2>

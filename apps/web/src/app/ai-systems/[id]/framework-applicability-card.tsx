@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, type CSSProperties } from "react";
+import { useCurrentUser } from "../../current-user";
 
 const API = process.env.NEXT_PUBLIC_API_URL;
 
@@ -80,6 +81,7 @@ function FrameworkDecision({ aiSystemId, row, onSaved }: { aiSystemId: string; r
   const [rationale, setRationale] = useState(current?.rationale ?? "");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const { can } = useCurrentUser();
 
   async function save() {
     setError(null);
@@ -179,7 +181,7 @@ function FrameworkDecision({ aiSystemId, row, onSaved }: { aiSystemId: string; r
             </button>
           </div>
         </div>
-      ) : (
+      ) : !can("ai-system:update") ? null : (
         <div style={{ marginTop: 10 }}>
           <button type="button" style={quietButton} onClick={() => setEditing(true)}>
             {current ? "Edit decision" : "Record decision"}

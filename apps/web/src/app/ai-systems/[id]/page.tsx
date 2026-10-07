@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { useCurrentUser } from "../../current-user";
 import { useParams } from "next/navigation";
 import ImpactAssessmentCard from "./impact-assessment-card";
 import FrameworkApplicabilityCard from "./framework-applicability-card";
@@ -81,6 +82,8 @@ export default function AiSystemDetailPage() {
   const [linking, setLinking] = useState(false);
 
   const [govOwnerUserId, setGovOwnerUserId] = useState("");
+  const { can } = useCurrentUser();
+  const canUpdate = can("ai-system:update");
   const [govBusinessCriticality, setGovBusinessCriticality] = useState("");
   const [govDecisionRole, setGovDecisionRole] = useState("");
   const [govHumanOversight, setGovHumanOversight] = useState("");
@@ -320,13 +323,18 @@ export default function AiSystemDetailPage() {
 
         <label style={fieldLabelStyle}>
           Owner
+          {canUpdate ? (
           <select style={selectStyle} value={govOwnerUserId} onChange={(e) => setGovOwnerUserId(e.target.value)}>
             <option value="">Not assigned</option>
             {tenantUsers.map((u) => (
               <option key={u.id} value={u.id}>{u.displayName} ({u.email})</option>
             ))}
           </select>
+          ) : (
+            <div style={{ ...selectStyle, color: "#c5cbdb" }}>{aiSystem.owner ? aiSystem.owner.displayName + " (" + aiSystem.owner.email + ")" : "Not assigned"}</div>
+          )}
         </label>
+        <fieldset disabled={!canUpdate} style={{ border: "none", padding: 0, margin: 0, minWidth: 0 }}>
         <p style={helpTextStyle}>The person accountable for this AI system's governance.</p>
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginTop: 16 }}>
@@ -432,7 +440,9 @@ export default function AiSystemDetailPage() {
             <div style={valueStyle}>{new Date(aiSystem.updatedAt).toLocaleDateString()}</div>
           </div>
         </div>
+        </fieldset>
 
+        {canUpdate && (
         <button
           onClick={handleGovernanceSave}
           disabled={govSaving}
@@ -444,6 +454,7 @@ export default function AiSystemDetailPage() {
         >
           {govSaving ? "Saving..." : "Save Governance Profile"}
         </button>
+        )}
         {govError && (
           <div style={{ background: "#2a1a1a", border: "1px solid #ef4444", borderRadius: 8, padding: "10px 14px", color: "#f87171", fontSize: 12.5, marginTop: 10 }}>
             {govError}
@@ -453,6 +464,7 @@ export default function AiSystemDetailPage() {
 
       <div style={cardStyle}>
         <h2 style={{ fontSize: 15, marginTop: 0, marginBottom: 16 }}>Lifecycle</h2>
+        {canUpdate ? (
         <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 8 }}>
           <select style={{ ...selectStyle, width: "auto" }} value={lifecycleDraft} onChange={(e) => setLifecycleDraft(e.target.value)}>
             {LIFECYCLE_OPTIONS.map((l) => (
@@ -472,6 +484,9 @@ export default function AiSystemDetailPage() {
             {lifecycleSaving ? "Saving..." : "Update Lifecycle"}
           </button>
         </div>
+        ) : (
+          <p style={{ color: "#c5cbdb", fontSize: 13.5, margin: 0 }}>{aiSystem.lifecycleStatus.replace(/_/g, " ")}</p>
+        )}
         {lifecycleError && (
           <div style={{ background: "#2a1a1a", border: "1px solid #ef4444", borderRadius: 8, padding: "10px 14px", color: "#f87171", fontSize: 12.5, marginTop: 8 }}>
             {lifecycleError}
@@ -505,17 +520,20 @@ export default function AiSystemDetailPage() {
                   <span style={{ fontWeight: 600, fontSize: 13.5 }}>{link.vendor.legalName}</span>
                   <span style={{ color: "#8b96ac", fontSize: 12, marginLeft: 8 }}>{link.role.replace(/_/g, " ")}</span>
                 </div>
+                {can("ai-system:link-vendor") && (
                 <button
                   onClick={() => handleUnlink(link.id)}
                   style={{ background: "none", border: "1px solid #5d6786", color: "#8b96ac", borderRadius: 6, padding: "4px 10px", fontSize: 12, cursor: "pointer" }}
                 >
                   Unlink
                 </button>
+                )}
               </div>
             ))}
           </div>
         )}
 
+        {can("ai-system:link-vendor") && (
         <form onSubmit={handleLinkVendor} style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
           <select style={{ ...selectStyle, width: "auto" }} value={linkVendorId} onChange={(e) => setLinkVendorId(e.target.value)} required>
             <option value="">Select a vendor...</option>
@@ -541,6 +559,7 @@ export default function AiSystemDetailPage() {
             {linking ? "Linking..." : "Link Vendor"}
           </button>
         </form>
+        )}
         {linkError && (
           <div style={{ background: "#2a1a1a", border: "1px solid #ef4444", borderRadius: 8, padding: "10px 14px", color: "#f87171", fontSize: 12.5, marginTop: 10 }}>
             {linkError}

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useCurrentUser } from "../../current-user";
 import VersionList, { readableStatus, summarizeVersions, type VersionRow } from "./assessment-versions";
 
 const API = process.env.NEXT_PUBLIC_API_URL;
@@ -24,6 +25,7 @@ export default function RiskAssessmentCard({ aiSystemId }: { aiSystemId: string 
   const [items, setItems] = useState<RiskAssessmentRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
+  const { can } = useCurrentUser();
 
   useEffect(() => {
     let cancelled = false;
@@ -94,7 +96,7 @@ export default function RiskAssessmentCard({ aiSystemId }: { aiSystemId: string 
         </p>
       )}
 
-      {items !== null && canStart && (
+      {items !== null && canStart && can("ai-system:update") && (
         <button type="button" onClick={startAssessment} disabled={starting} style={buttonStyle}>
           {starting ? "Starting..." : latest ? "Start new version" : "Start risk assessment"}
         </button>

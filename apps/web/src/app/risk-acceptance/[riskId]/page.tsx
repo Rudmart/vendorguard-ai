@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, type CSSProperties } from "react";
+import { GovernanceInfo, useCurrentUser } from "../../current-user";
 import { useParams } from "next/navigation";
 
 const API = process.env.NEXT_PUBLIC_API_URL;
@@ -87,6 +88,7 @@ export default function RiskAcceptanceForRiskPage() {
   const [expiresAt, setExpiresAt] = useState("");
   const [findingId, setFindingId] = useState("");
   const [rationale, setRationale] = useState("");
+  const { can } = useCurrentUser();
 
   useEffect(() => {
     if (!riskId) {
@@ -158,7 +160,7 @@ export default function RiskAcceptanceForRiskPage() {
         </p>
       </section>
 
-      {!pending && !active && (
+      {!pending && !active && can("ai-system:update") && (
         <section style={card}>
           <h2 style={heading}>Request Risk Acceptance</h2>
           <p style={muted}>ADMIN or ANALYST. The request is not an acceptance - an independent ADMIN or REVIEWER must decide.</p>
@@ -201,7 +203,8 @@ export default function RiskAcceptanceForRiskPage() {
         </section>
       )}
 
-      {pending && (
+      {pending && !can("risk:accept") && <GovernanceInfo>Risk Acceptance decision required - risk acceptance authority required.</GovernanceInfo>}
+      {pending && can("risk:accept") && (
         <section style={card}>
           <h2 style={heading}>Decision (independent review)</h2>
           <p style={muted}>ADMIN or REVIEWER. You cannot decide a request you made.</p>

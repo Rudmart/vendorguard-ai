@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, type CSSProperties, type FormEvent, type ReactNode } from "react";
+import { GovernanceInfo, useCurrentUser } from "../../current-user";
 import { useParams } from "next/navigation";
 
 const API = process.env.NEXT_PUBLIC_API_URL;
@@ -566,6 +567,8 @@ export default function AiImpactAssessmentPage() {
   const [rationale, setRationale] = useState("");
   const [reviewError, setReviewError] = useState<string | null>(null);
   const [reviewing, setReviewing] = useState(false);
+  const { can } = useCurrentUser();
+  const canUpdate = can("ai-system:update");
 
   useEffect(() => {
     if (!id) {
@@ -694,7 +697,7 @@ export default function AiImpactAssessmentPage() {
           <Detail label="AI system">{current.aiSystem.name}</Detail>
         </div>
 
-        {!locked && (
+        {!locked && canUpdate && (
           <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", marginTop: 16 }}>
             <select
               aria-label="Assessment status"
@@ -788,10 +791,10 @@ export default function AiImpactAssessmentPage() {
         </p>
         {current.impacts.length === 0 && <p style={{ color: colors.muted }}>No impacts recorded yet.</p>}
         {current.impacts.map((impact) => (
-          <ImpactCard key={impact.id} impact={impact} locked={locked} onChanged={reload} />
+          <ImpactCard key={impact.id} impact={impact} locked={locked || !canUpdate} onChanged={reload} />
         ))}
 
-        {!locked && (
+        {!locked && canUpdate && (
           <div style={{ ...insetStyle, borderStyle: "dashed", marginTop: 8 }}>
             <h3 style={{ fontSize: 14, marginTop: 0 }}>Add an impact</h3>
             <ImpactForm
@@ -855,7 +858,8 @@ export default function AiImpactAssessmentPage() {
           <p style={{ color: colors.muted }}>No review decision has been recorded yet.</p>
         )}
 
-        {!locked && (
+        {!locked && !can("ai-impact-assessment:review") && <GovernanceInfo>Review required - reviewer permission required.</GovernanceInfo>}
+        {!locked && can("ai-impact-assessment:review") && (
           <form onSubmit={submitReview}>
             <div style={{ display: "grid", gridTemplateColumns: "minmax(160px, 220px) 1fr", gap: 12 }}>
               <Field label="Decision">

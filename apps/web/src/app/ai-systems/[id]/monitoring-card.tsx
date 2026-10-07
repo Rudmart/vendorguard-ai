@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, type CSSProperties } from "react";
+import { useCurrentUser } from "../../current-user";
 import TenantUserSelect from "../../tenant-user-select";
 
 const API = process.env.NEXT_PUBLIC_API_URL;
@@ -49,6 +50,7 @@ export default function MonitoringCard({ aiSystemId }: { aiSystemId: string }) {
   const [data, setData] = useState<Overview | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
+  const { can } = useCurrentUser();
   const [busy, setBusy] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
   const [form, setForm] = useState({ title: "", whatToReview: "", expectation: "", category: "HUMAN_OVERSIGHT", cadence: "MONTHLY", ownerUserId: "" });
@@ -107,7 +109,7 @@ export default function MonitoringCard({ aiSystemId }: { aiSystemId: string }) {
           {k.lastReview ? " | last result: " + words(k.lastReview.result) : " | not reviewed yet"}
         </p>
       ))}
-      {!adding ? (
+      {!can("ai-system:update") ? null : !adding ? (
         <button style={{ ...button, marginTop: 6 }} onClick={() => setAdding(true)}>
           Add monitoring check
         </button>

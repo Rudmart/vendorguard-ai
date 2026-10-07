@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, type CSSProperties } from "react";
+import { useCurrentUser } from "../../../../current-user";
 import { useParams } from "next/navigation";
 
 const API = process.env.NEXT_PUBLIC_API_URL;
@@ -110,6 +111,7 @@ export default function ReassessmentDetailPage() {
   const [newImpact, setNewImpact] = useState("");
   const [conclusion, setConclusion] = useState("");
   const [rationale, setRationale] = useState("");
+  const { can } = useCurrentUser();
 
   useEffect(() => {
     if (!id) {
@@ -191,7 +193,7 @@ export default function ReassessmentDetailPage() {
         <AssessmentLine title="Prior impact assessment" a={data.priorImpactAssessment} kind="impact" />
         <AssessmentLine title="New risk assessment" a={data.newRiskAssessment} kind="risk" />
         <AssessmentLine title="New impact assessment" a={data.newImpactAssessment} kind="impact" />
-        {inProgress && (
+        {inProgress && can("ai-system:update") && (
           <div style={{ marginTop: 10 }}>
             <p style={muted}>
               To produce a new assessment, start a new version from the{" "}
@@ -261,7 +263,9 @@ export default function ReassessmentDetailPage() {
 
       <section style={card}>
         <h2 style={heading}>Conclusion</h2>
-        {inProgress ? (
+        {inProgress && !can("ai-system:update") ? (
+          <p style={muted}>In progress - completed by an authorized analyst or administrator.</p>
+        ) : inProgress ? (
           <>
             {CONCLUSIONS.map((c) => (
               <label key={c.value} style={{ ...muted, display: "block", marginBottom: 6 }}>
