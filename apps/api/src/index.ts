@@ -30,6 +30,7 @@ const OPEN_RISK_ASSESSMENT_ERROR = "An unfinished risk assessment already exists
 const OPEN_IMPACT_ASSESSMENT_ERROR = "An unfinished impact assessment already exists for this AI system. Complete it before starting a new version.";
 import { registerGlobalListRoutes } from "./aiGlobalLists.js";
 import { registerWorkQueueRoutes } from "./aiWorkQueues.js";
+import { registerAiUseCaseRoutes } from "./aiUseCases.js";
 import { registerAuthRoutes } from "./auth-routes.js";
 import { requireFindingReviewAuthority, requireRiskAcceptanceAuthority, AuthorizationError, requestContextSchema, assertOwnedByTenant, requirePermission } from "@vendorguard/auth";
 import type { Role } from "@vendorguard/shared";
@@ -66,6 +67,7 @@ server.register(registerReassessmentRoutes);
 server.register(registerMonitoringRoutes);
 server.register(registerGlobalListRoutes);
 server.register(registerWorkQueueRoutes);
+server.register(registerAiUseCaseRoutes);
 
 server.get("/health", async () => {
   return { status: "ok", service: "vendorguard-api" };

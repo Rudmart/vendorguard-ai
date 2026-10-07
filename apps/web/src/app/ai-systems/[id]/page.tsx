@@ -7,6 +7,7 @@ import FrameworkApplicabilityCard from "./framework-applicability-card";
 import ReassessmentsCard from "./reassessments-card";
 import MonitoringCard from "./monitoring-card";
 import RiskAssessmentCard from "./risk-assessment-card";
+import UseCasesCard from "./use-cases-card";
 import GovernancePosture, { type AssessmentPosture } from "./governance-posture";
 
 type TenantUser = { id: string; displayName: string; email: string };
@@ -568,6 +569,7 @@ export default function AiSystemDetailPage() {
       </div>
     
       <h2 id="risk-impact" style={sectionHeadingStyle}>Risk & Impact</h2>
+      <UseCasesCard aiSystemId={String(id)} />
       <RiskAssessmentCard aiSystemId={String(id)} />
       <ImpactAssessmentCard aiSystemId={String(id)} />
       <div style={{ height: 20 }} />

@@ -57,13 +57,23 @@ describe("AI workflow guides - stages", () => {
     expect(stages("AI_TPRM_STAGES")).toHaveLength(12);
   });
 
-  it("AI Use Cases, AI Incident Management and Retirement are labelled PLANNED", () => {
+  it("AI Incident Management and Retirement are labelled PLANNED", () => {
     const gov = stages("AI_GOVERNANCE_STAGES");
-    for (const title of ["Define AI Use Case", "AI Incident", "Retirement"]) {
+    for (const title of ["AI Incident", "Retirement"]) {
       const stage = gov.find((s) => s.includes(`title: "${title}"`));
       expect(stage, title).toBeDefined();
       expect(stage).toContain('status: "PLANNED"');
     }
+  });
+
+  it("AI Use Cases V1: Define AI Use Case is AVAILABLE and links to the real AI Use Cases page (19 available, 2 planned)", () => {
+    const gov = stages("AI_GOVERNANCE_STAGES");
+    const stage = gov.find((s) => s.includes('title: "Define AI Use Case"'));
+    expect(stage).toContain('status: "AVAILABLE"');
+    expect(stage).toContain('href: "/ai-use-cases"');
+    expect(routeExists("/ai-use-cases")).toBe(true);
+    expect(gov.filter((s) => s.includes('status: "AVAILABLE"'))).toHaveLength(19);
+    expect(gov.filter((s) => s.includes('status: "PLANNED"'))).toHaveLength(2);
   });
 
   it("every PLANNED stage has no links (no dead links to unbuilt features)", () => {
