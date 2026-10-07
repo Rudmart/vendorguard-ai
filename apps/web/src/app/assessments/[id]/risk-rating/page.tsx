@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { GovernanceInfo, useCurrentUser } from "../../../current-user";
 import { useParams } from "next/navigation";
 
 type FactorContribution = {
@@ -49,6 +50,7 @@ export default function RiskRatingPage() {
   const [controlEffectiveness, setControlEffectiveness] = useState("0");
   const [result, setResult] = useState<RiskRatingResult | null>(null);
   const [calculating, setCalculating] = useState(false);
+  const { can } = useCurrentUser();
 
   function setInput(key: string, value: string) {
     setInputs((prev) => ({ ...prev, [key]: value }));
@@ -152,6 +154,7 @@ export default function RiskRatingPage() {
         </div>
       </div>
 
+      {can("assessment:create") ? (
       <button
         disabled={calculating}
         onClick={calculate}
@@ -168,6 +171,9 @@ export default function RiskRatingPage() {
       >
         Calculate Risk Rating
       </button>
+      ) : (
+        <GovernanceInfo>Calculating a risk rating requires assessment create permission. Recorded ratings appear in the vendor executive report.</GovernanceInfo>
+      )}
 
       {result && (
         <div>

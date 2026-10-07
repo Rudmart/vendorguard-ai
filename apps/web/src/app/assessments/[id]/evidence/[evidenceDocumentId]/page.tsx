@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { GovernanceInfo, useCurrentUser } from "../../../../current-user";
 import { useParams } from "next/navigation";
 
 type EvidenceDoc = {
@@ -65,6 +66,7 @@ export default function EvidenceAnalysisPage() {
   const [reviewingId, setReviewingId] = useState<string | null>(null);
   const [rationale, setRationale] = useState("");
   const [finalStatus, setFinalStatus] = useState("INSUFFICIENT_EVIDENCE");
+  const { can } = useCurrentUser();
 
   useEffect(() => {
     async function loadDoc() {
@@ -123,7 +125,7 @@ export default function EvidenceAnalysisPage() {
     <main style={{ maxWidth: 800, margin: "0 auto", padding: "32px 24px" }}>
       <h1 style={{ fontSize: 24, marginBottom: 4 }}>Evidence Analysis</h1>
       <p style={{ color: "#8b96ac", fontSize: 13, marginBottom: 24 }}>
-        AI-assisted review is advisory only - every finding requires human review before it counts as final.
+        AI proposal - requires human review. AI-assisted review is advisory only - every finding requires human review before it counts as final.
       </p>
 
       <div style={panelStyle}>
@@ -138,12 +140,15 @@ export default function EvidenceAnalysisPage() {
               {document.expirationDate && ` \u00b7 Expires ${new Date(document.expirationDate).toLocaleDateString()}`}
             </div>
           </>
+        ) : !(can("evidence:read") || can("evidence:read-metadata")) ? (
+          <GovernanceInfo>Evidence details are restricted - evidence read permission required.</GovernanceInfo>
         ) : (
           <p style={{ color: "#e5484d" }}>Evidence document not found.</p>
         )}
       </div>
 
-      {!analysis && (
+      {!analysis && !can("finding:propose") && <GovernanceInfo>Running AI evidence analysis requires finding proposal permission.</GovernanceInfo>}
+      {!analysis && can("finding:propose") && (
         <button
           onClick={runAnalysis}
           disabled={analyzing || !document}
@@ -238,7 +243,8 @@ export default function EvidenceAnalysisPage() {
                       <div style={{ color: "#8b96ac", fontSize: 12, marginTop: 4 }}>Awaiting human review</div>
                     )}
 
-                    {f.requiresHumanReview &&
+                    {f.requiresHumanReview && !can("finding:review") && <GovernanceInfo>Human review required - reviewer permission required.</GovernanceInfo>}
+                    {f.requiresHumanReview && can("finding:review") &&
                       (reviewingId === f.id ? (
                         <div style={{ marginTop: 10 }}>
                           <textarea

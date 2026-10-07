@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
+import { useCurrentUser } from "../../current-user";
 
 interface PendingFinding {
   id: string;
@@ -29,10 +30,20 @@ export default function ReviewQueuePage() {
   const [decisions, setDecisions] = useState<Record<string, string>>({});
   const [rationales, setRationales] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState<string | null>(null);
+  const { can, loading: userLoading } = useCurrentUser();
 
+  // D3b: only roles with finding:review load the queue; others see the existing notice without calling the API.
   useEffect(() => {
-    loadQueue();
-  }, []);
+    if (userLoading) {
+      return;
+    }
+    if (can("finding:review")) {
+      void loadQueue();
+    } else {
+      setForbidden(true);
+      setLoading(false);
+    }
+  }, [userLoading]);
 
   async function loadQueue() {
     setLoading(true);

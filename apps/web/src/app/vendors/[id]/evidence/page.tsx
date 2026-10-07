@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState, useRef } from "react";
+import { GovernanceInfo, useCurrentUser } from "../../../current-user";
 import { useParams } from "next/navigation";
 
 type Evidence = {
@@ -22,6 +23,9 @@ export default function EvidenceLibraryPage() {
   const [expiration, setExpiration] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [uploadError, setUploadError] = useState("");
+  const { can, loading: userLoading } = useCurrentUser();
+  const canSeeMetadata = can("evidence:read") || can("evidence:read-metadata");
+  const canDownload = can("evidence:read");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   async function load() {
@@ -90,6 +94,7 @@ export default function EvidenceLibraryPage() {
         {evidence.length} documents on record
       </p>
 
+      {can("evidence:upload") && (
       <div
         style={{
           background: "#1a2340",
@@ -148,8 +153,11 @@ export default function EvidenceLibraryPage() {
           {submitting ? "Uploading..." : "Upload Evidence"}
         </button>
       </div>
+      )}
 
-      {loading ? (
+      {!userLoading && !canSeeMetadata ? (
+        <GovernanceInfo>AI vendor evidence is restricted - evidence read permission required.</GovernanceInfo>
+      ) : loading ? (
         <p style={{ color: "#8b96ac" }}>Loading...</p>
       ) : evidence.length === 0 ? (
         <p style={{ color: "#8b96ac" }}>No evidence on record yet.</p>
@@ -158,9 +166,9 @@ export default function EvidenceLibraryPage() {
           {evidence.map((e) => (
             <div
               key={e.id}
-              onClick={() => window.open(`${process.env.NEXT_PUBLIC_API_URL}/evidence/${e.id}/download`, "_blank")}
+              onClick={canDownload ? () => window.open(`${process.env.NEXT_PUBLIC_API_URL}/evidence/${e.id}/download`, "_blank") : undefined}
               style={{
-                cursor: "pointer",
+                cursor: canDownload ? "pointer" : "default",
                 background: "#1a2340",
                 border: "1px solid #2e3d63",
                 borderRadius: 10,
@@ -172,6 +180,7 @@ export default function EvidenceLibraryPage() {
                 {e.documentType} &middot; {e.state} &middot; {formatSize(e.sizeBytes)}
                 {e.expirationDate && ` \u00b7 Expires ${new Date(e.expirationDate).toLocaleDateString()}`}
               </div>
+              {!canDownload && <div style={{ color: "#fbbf24", fontSize: 11, marginTop: 4 }}>Metadata only - file download requires evidence read permission.</div>}
             </div>
           ))}
         </div>

@@ -1,7 +1,8 @@
 "use client";
 import { useState } from "react";
+import { useCurrentUser } from "./current-user";
 
-export default function RegisterVendorButton({ children }: { children: React.ReactNode }) {
+function RegisterVendorButtonUnguarded({ children }: { children: React.ReactNode }) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -24,4 +25,10 @@ export default function RegisterVendorButton({ children }: { children: React.Rea
       {open && <div style={{ marginTop: 16 }}>{children}</div>}
     </div>
   );
+}
+
+// D3b: creating an AI vendor requires vendor:create (UX only - POST /vendors enforces it server-side).
+export default function RegisterVendorButton(props: Parameters<typeof RegisterVendorButtonUnguarded>[0]) {
+  const { can } = useCurrentUser();
+  return can("vendor:create") ? <RegisterVendorButtonUnguarded {...props} /> : null;
 }

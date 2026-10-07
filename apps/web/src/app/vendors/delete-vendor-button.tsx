@@ -1,11 +1,13 @@
 ﻿"use client";
 
 import { useRouter } from "next/navigation";
+import { useCurrentUser } from "../current-user";
 import { useState } from "react";
 
 export default function DeleteVendorButton({ id }: { id: string }) {
   const router = useRouter();
   const [deleting, setDeleting] = useState(false);
+  const { can } = useCurrentUser();
 
   async function handleDelete() {
     if (!confirm("Delete this vendor? This cannot be undone from the UI.")) {
@@ -24,6 +26,10 @@ export default function DeleteVendorButton({ id }: { id: string }) {
       alert("Something went wrong deleting this vendor.");
       setDeleting(false);
     }
+  }
+
+  if (!can("vendor:delete")) {
+    return null;
   }
 
   return (

@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import { useCurrentUser } from "./current-user";
 import { useRouter } from "next/navigation";
 
-export default function AddVendorForm() {
+function AddVendorFormUnguarded() {
   const router = useRouter();
   const [legalName, setLegalName] = useState("");
   const [serviceDescription, setServiceDescription] = useState("");
@@ -201,4 +202,10 @@ export default function AddVendorForm() {
       </button>
     </form>
   );
+}
+
+// D3b: creating an AI vendor requires vendor:create (UX only - POST /vendors enforces it server-side).
+export default function AddVendorForm() {
+  const { can } = useCurrentUser();
+  return can("vendor:create") ? <AddVendorFormUnguarded /> : null;
 }

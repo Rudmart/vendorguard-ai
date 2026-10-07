@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { GovernanceInfo, useCurrentUser } from "../../../current-user";
 import { useParams } from "next/navigation";
 
 type Question = {
@@ -38,6 +39,7 @@ export default function QuestionnairePage() {
   const [answers, setAnswers] = useState<Record<string, boolean | string | string[]>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const { can, loading: userLoading } = useCurrentUser();
 
   async function loadOrCreate() {
     setLoading(true);
@@ -67,9 +69,18 @@ export default function QuestionnairePage() {
     }
   }
 
+  // D3b: the only way to open a questionnaire is POST (load-or-create, assessment:create). Roles without that
+  // permission never send the POST; they get a notice instead (backlog: no read-by-assessment endpoint).
   useEffect(() => {
-    loadOrCreate();
-  }, [assessmentId]);
+    if (userLoading) {
+      return;
+    }
+    if (can("assessment:create")) {
+      void loadOrCreate();
+    } else {
+      setLoading(false);
+    }
+  }, [assessmentId, userLoading]);
 
   function setAnswer(key: string, value: boolean | string | string[]) {
     setAnswers((prev) => ({ ...prev, [key]: value }));
@@ -101,6 +112,16 @@ export default function QuestionnairePage() {
 
   if (loading) {
     return <main style={{ padding: 32, color: "#8b96ac" }}>Loading questionnaire...</main>;
+  }
+  if (!userLoading && !can("assessment:create")) {
+    return (
+      <main style={{ padding: 32 }}>
+        <GovernanceInfo>
+          The AI vendor questionnaire can only be opened by roles that work on AI vendor assessments (assessment create permission). A read-only
+          view is not available yet.
+        </GovernanceInfo>
+      </main>
+    );
   }
   if (!questionnaire) {
     return <main style={{ padding: 32, color: "#8b96ac" }}>Questionnaire not found.</main>;
@@ -265,6 +286,8 @@ export default function QuestionnairePage() {
         >
           Submit
         </button>
+        {can("questionnaire:review") ? (
+          <>
         <button
           disabled={saving}
           onClick={() => transition("review")}
@@ -295,6 +318,10 @@ export default function QuestionnairePage() {
         >
           Approve
         </button>
+          </>
+        ) : (
+          <GovernanceInfo>Review and approval are human decisions - questionnaire review permission required.</GovernanceInfo>
+        )}
       </div>
     </main>
   );
