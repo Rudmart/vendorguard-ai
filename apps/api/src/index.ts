@@ -452,6 +452,24 @@ server.get("/vendors/:id/risk-acceptance", async (request, reply) => {
   return reply.status(200).send({ riskAcceptances });
 });
 
+// Third-Party AI read authorization hardening (Option A - enforce the existing permission catalog).
+function hasAnyPermission(session: { tenantId: string; role: string }, permissions: string[]): boolean {
+  return permissions.some((permission) => {
+    try {
+      requirePermission({ tenantId: session.tenantId, role: session.role as Role }, permission);
+      return true;
+    } catch {
+      return false;
+    }
+  });
+}
+// storageKey is an internal storage name: the server uses it to fetch files; clients never need it.
+function withoutStorageKey<T extends { storageKey: string }>(document: T): Omit<T, "storageKey"> {
+  const copy: Partial<T> = { ...document };
+  delete copy.storageKey;
+  return copy as Omit<T, "storageKey">;
+}
+
 server.get("/evidence/:evidenceDocumentId", async (request, reply) => {
   const session = await resolveSession(request);
   if (!session) {
@@ -464,7 +482,10 @@ server.get("/evidence/:evidenceDocumentId", async (request, reply) => {
   if (!document) {
     return reply.status(404).send({ error: "Evidence document not found" });
   }
-  return reply.status(200).send(document);
+  if (!hasAnyPermission(session, ["evidence:read", "evidence:read-metadata"])) {
+    return reply.status(403).send({ error: "Not authorized to view evidence" });
+  }
+  return reply.status(200).send(withoutStorageKey(document));
 });
 
 server.get("/vendors/:id/executive-report", async (request, reply) => {
@@ -503,6 +524,9 @@ server.get("/evidence/:evidenceDocumentId/download", async (request, reply) => {
   });
   if (!document) {
     return reply.status(404).send({ error: "Evidence document not found" });
+  }
+  if (!hasAnyPermission(session, ["evidence:read"])) {
+    return reply.status(403).send({ error: "Not authorized to download evidence" });
   }
 
   const containerName = process.env.AZURE_STORAGE_CONTAINER_EVIDENCE ?? "evidence";
@@ -1463,13 +1487,16 @@ server.get("/vendors/:id/evidence", async (request, reply) => {
     return reply.status(401).send({ error: "Not logged in" });
   }
   const { id: vendorId } = request.params as { id: string };
+  if (!hasAnyPermission(session, ["evidence:read", "evidence:read-metadata"])) {
+    return reply.status(403).send({ error: "Not authorized to view evidence" });
+  }
 
   const evidence = await prisma.evidenceDocument.findMany({
     where: { vendorId, deletedAt: null, tenantId: session.tenantId },
     orderBy: { createdAt: "desc" },
   });
 
-  return { evidence };
+  return { evidence: evidence.map(withoutStorageKey) };
 });
 
 server.post("/vendors/:id/remediations", async (request, reply) => {
@@ -1547,6 +1574,9 @@ server.get("/vendors/:id/remediations", async (request, reply) => {
     return reply.status(401).send({ error: "Not logged in" });
   }
   const { id: vendorId } = request.params as { id: string };
+  if (!hasAnyPermission(session, ["remediation:read"])) {
+    return reply.status(403).send({ error: "Not authorized to view remediations" });
+  }
 
   const remediations = await prisma.remediationAction.findMany({
     where: { vendorId, tenantId: session.tenantId },

@@ -79,6 +79,7 @@ export const ROLE_PERMISSIONS: Record<Role, readonly string[]> = {
     "tenant:manage",
     "framework:manage",
     "vendor:*",
+    "evidence:*",
     "ai-system:*",
     "ai-risk-assessment:review",
     "ai-impact-assessment:review",
