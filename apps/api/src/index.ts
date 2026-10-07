@@ -257,6 +257,14 @@ server.post("/assessments/:id/evidence/:evidenceDocumentId/analyze", async (requ
     id: string;
     evidenceDocumentId: string;
   };
+  // Third-Party AI authorization hardening: the analysis proposes ControlFindings, so it needs the same
+  // permission as proposing a finding. Tenant ownership of the assessment and the evidence is enforced
+  // inside runEvidenceAnalysis (findFirst with tenantId) and is not duplicated here.
+  try {
+    requirePermission({ tenantId: session.tenantId, role: session.role as Role }, "finding:propose");
+  } catch {
+    return reply.status(403).send({ error: "Not authorized to run evidence analysis" });
+  }
   try {
     const result = await runEvidenceAnalysis({
       tenantId: session.tenantId,
@@ -818,6 +826,17 @@ server.post("/assessments/:id/ai-risk-score", async (request, reply) => {
   if (!assessment) {
     return reply.status(404).send({ error: "Assessment not found" });
   }
+  // Third-Party AI authorization hardening: tenant ownership (404, same as neighbouring routes) then RBAC (403).
+  try {
+    assertOwnedByTenant(assessment, session, "Assessment");
+  } catch {
+    return reply.status(404).send({ error: "Assessment not found" });
+  }
+  try {
+    requirePermission({ tenantId: session.tenantId, role: session.role as Role }, "assessment:create");
+  } catch {
+    return reply.status(403).send({ error: "Not authorized to score assessments" });
+  }
 
   const inherentResult = calculateAIInherentRisk({
     modelRisk: body.modelRisk,
@@ -877,6 +896,17 @@ server.post("/assessments/:id/ai-impact-score", async (request, reply) => {
   const assessment = await prisma.assessment.findUnique({ where: { id } });
   if (!assessment) {
     return reply.status(404).send({ error: "Assessment not found" });
+  }
+  // Third-Party AI authorization hardening: tenant ownership (404, same as neighbouring routes) then RBAC (403).
+  try {
+    assertOwnedByTenant(assessment, session, "Assessment");
+  } catch {
+    return reply.status(404).send({ error: "Assessment not found" });
+  }
+  try {
+    requirePermission({ tenantId: session.tenantId, role: session.role as Role }, "assessment:create");
+  } catch {
+    return reply.status(403).send({ error: "Not authorized to score assessments" });
   }
 
   const impactResult = calculateAIImpactScore({
@@ -1218,6 +1248,17 @@ server.post("/assessments/:id/risk-rating", async (request, reply) => {
   const assessment = await prisma.assessment.findUnique({ where: { id } });
   if (!assessment) {
     return reply.status(404).send({ error: "Assessment not found" });
+  }
+  // Third-Party AI authorization hardening: tenant ownership (404, same as neighbouring routes) then RBAC (403).
+  try {
+    assertOwnedByTenant(assessment, session, "Assessment");
+  } catch {
+    return reply.status(404).send({ error: "Assessment not found" });
+  }
+  try {
+    requirePermission({ tenantId: session.tenantId, role: session.role as Role }, "assessment:create");
+  } catch {
+    return reply.status(403).send({ error: "Not authorized to rate assessments" });
   }
 
   const controlEffectiveness = body.controlEffectiveness ?? 0;
@@ -1644,14 +1685,11 @@ server.post("/vendors", async (request, reply) => {
     return reply.status(400).send({ error: "legalName is required" });
   }
 
-  const tenant = await prisma.tenant.findFirst();
-  if (!tenant) {
-    return reply.status(500).send({ error: "No tenant exists yet" });
-  }
+  // Third-Party AI authorization hardening: the vendor belongs to the authenticated tenant (was: first tenant in the database).
 
   const vendor = await prisma.vendor.create({
     data: {
-      tenantId: tenant.id,
+      tenantId: session.tenantId,
       legalName: body.legalName,
       serviceDescription: body.serviceDescription || "",
       serviceCategory: body.serviceCategory || "",
@@ -1669,7 +1707,7 @@ server.post("/vendors", async (request, reply) => {
 
   await prisma.auditEvent.create({
     data: {
-      tenantId: tenant.id,
+      tenantId: session.tenantId,
       actorUserId: session.userId,
       action: "vendor.created",
       targetType: "Vendor",
