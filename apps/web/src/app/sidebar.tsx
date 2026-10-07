@@ -23,6 +23,7 @@ const navSections: NavSectionDef[] = [
     title: "AI Governance",
     items: [
       { label: "AI Inventory", href: "/ai-inventory", built: true, icon: "\u2728" },
+      { label: "AI Use Cases", href: "/ai-use-cases", built: true, icon: "\uD83E\uDDED" },
       { label: "Pending Reviews", href: "/reviews/pending", built: true, icon: "\u2611" },
     ],
   },

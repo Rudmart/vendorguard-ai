@@ -134,6 +134,7 @@ model Tenant {
   aiSystemControls               AiSystemControl[]
   aiImpacts            AiImpact[]
   aiRisks              AiRisk[]
+  aiUseCases           AiUseCase[]
 
   @@map("tenants")
 }
@@ -171,6 +172,9 @@ model User {
   governanceFindingsOwned    GovernanceFinding[]        @relation("GovernanceFindingOwner")
   governanceFindingReviews   GovernanceFindingReview[]  @relation("GovernanceFindingReviewer")
   remediationVerifications   RemediationVerification[]  @relation("RemediationVerifier")
+  aiUseCasesOwned            AiUseCase[]                @relation("AiUseCaseOwner")
+  aiUseCasesCreated          AiUseCase[]                @relation("AiUseCaseCreatedBy")
+  aiUseCasesReviewed         AiUseCase[]                @relation("AiUseCaseReviewer")
 
   @@map("users")
 }
@@ -942,6 +946,7 @@ enum AiAssessmentReviewDecision {
 
 model AiSystem {
   monitoringChecks AiMonitoringCheck[] // Step 15
+  useCases AiUseCase[] // AI Use Cases V1
   reassessments AiReassessment[] // Step 14
   id              String                  @id @default(uuid())
   tenantId        String
@@ -1650,4 +1655,55 @@ model AiMonitoringReview {
   @@index([tenantId])
   @@index([tenantId, checkId])
   @@map("ai_monitoring_reviews")
+}
+
+// ---------------------------------------------------------------------------
+// AI Use Cases V1 - HOW and WHY an AI system is used (business context).
+// One AiSystem has many AiUseCases. Risk and Impact Assessments stay at the
+// AiSystem level in V1 (no aiUseCaseId on assessments). Approval is a human
+// review (ai-use-case:review) with separation of duties: the reviewer can be
+// neither the creator nor the business owner. AI never approves a use case.
+// ---------------------------------------------------------------------------
+enum AiUseCaseStatus {
+  DRAFT
+  PENDING_REVIEW
+  APPROVED
+  SUSPENDED // V1: value only - transition not built
+  RETIRED // V1: value only - transition not built
+}
+
+model AiUseCase {
+  id              String                   @id @default(uuid())
+  tenantId        String
+  aiSystemId      String
+  name            String
+  businessPurpose String
+  description     String?
+  ownerUserId     String? // accountable business owner; validated tenant member; required to submit
+  department      String?
+  intendedUsers   String?
+  affectedParties String[] // AFFECTED_POPULATIONS whitelist (same as AiSystem.affectedPopulation)
+  decisionRole    AiSystemDecisionRole? // required to submit
+  humanOversight  AiSystemHumanOversight? // required to submit
+  dataSensitivity AiSystemDataSensitivity?
+  status          AiUseCaseStatus          @default(DRAFT)
+  createdByUserId String
+  submittedAt     DateTime?
+  reviewerUserId  String?
+  reviewDecision  AiAssessmentReviewDecision?
+  reviewRationale String?
+  reviewedAt      DateTime?
+  createdAt       DateTime                 @default(now())
+  updatedAt       DateTime                 @updatedAt
+
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  aiSystem  AiSystem @relation(fields: [aiSystemId], references: [id], onDelete: Cascade)
+  owner     User?    @relation("AiUseCaseOwner", fields: [ownerUserId], references: [id])
+  createdBy User     @relation("AiUseCaseCreatedBy", fields: [createdByUserId], references: [id])
+  reviewer  User?    @relation("AiUseCaseReviewer", fields: [reviewerUserId], references: [id])
+
+  @@index([tenantId])
+  @@index([tenantId, aiSystemId])
+  @@index([tenantId, status])
+  @@map("ai_use_cases")
 }
