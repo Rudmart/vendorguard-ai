@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, type CSSProperties } from "react";
+import { useCurrentUser } from "../../current-user";
 
 const API = process.env.NEXT_PUBLIC_API_URL;
 
@@ -64,6 +65,7 @@ export default function ReassessmentsCard({ aiSystemId }: { aiSystemId: string }
   const [acceptanceId, setAcceptanceId] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const { can } = useCurrentUser();
 
   useEffect(() => {
     fetch(`${API}/ai-systems/${aiSystemId}/reassessments`, { credentials: "include" })
@@ -127,6 +129,8 @@ export default function ReassessmentsCard({ aiSystemId }: { aiSystemId: string }
             Continue it
           </a>
         </p>
+      ) : !can("ai-system:update") ? (
+        <p style={muted}>No reassessment in progress.</p>
       ) : (
         <div style={{ marginTop: 8 }}>
           <span style={label}>Reason</span>

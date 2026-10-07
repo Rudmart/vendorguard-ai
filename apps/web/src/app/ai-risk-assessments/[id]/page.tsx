@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { GovernanceInfo, useCurrentUser } from "../../current-user";
 import { useParams } from "next/navigation";
 import TenantUserSelect from "../../tenant-user-select";
 
@@ -33,6 +34,7 @@ type Risk = {
   treatmentRationale: string | null;
   treatmentOwnerUserId?: string | null;
   treatmentTargetDate?: string | null;
+  treatmentOwner?: { displayName: string; email: string } | null;
 };
 
 type AssessmentDetail = {
@@ -71,6 +73,8 @@ function RiskCard({ risk, onUpdate }: { risk: Risk; onUpdate: () => void }) {
   const [planMessage, setPlanMessage] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const { can } = useCurrentUser();
+  const canUpdate = can("ai-system:update");
 
   async function handleSave() {
     setSaving(true);
@@ -157,9 +161,11 @@ function RiskCard({ risk, onUpdate }: { risk: Risk; onUpdate: () => void }) {
           <div style={{ fontWeight: 700, fontSize: 14.5 }}>{risk.title}</div>
           <div style={{ fontSize: 11.5, color: "#8b96ac", textTransform: "uppercase" as const, letterSpacing: 0.5, marginTop: 2 }}>{risk.category.replace(/_/g, " ")}</div>
         </div>
+        {canUpdate && (
         <button onClick={handleDelete} style={{ background: "none", border: "1px solid #5d6786", color: "#8b96ac", borderRadius: 6, padding: "4px 10px", fontSize: 11, cursor: "pointer" }}>
           Delete
         </button>
+        )}
       </div>
       <p style={{ fontSize: 13, color: "#c5cbdb", marginBottom: 14 }}>{risk.statement}</p>
 
@@ -181,6 +187,7 @@ function RiskCard({ risk, onUpdate }: { risk: Risk; onUpdate: () => void }) {
         </div>
       </div>
 
+      <fieldset disabled={!canUpdate} style={{ border: "none", padding: 0, margin: 0, minWidth: 0 }}>
       <div style={{ marginBottom: 14 }}>
         <div style={labelStyle}>Existing Controls</div>
         <textarea
@@ -239,7 +246,9 @@ function RiskCard({ risk, onUpdate }: { risk: Risk; onUpdate: () => void }) {
           <input style={selectStyle} value={treatmentRationale} onChange={(e) => setTreatmentRationale(e.target.value)} placeholder="Why this treatment decision..." />
         </div>
       </div>
+      </fieldset>
 
+      {canUpdate ? (
       <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr auto", gap: 12, alignItems: "end", marginBottom: 14 }}>
         <div>
           <div style={labelStyle}>Treatment Owner (required before Risk Acceptance)</div>
@@ -257,8 +266,14 @@ function RiskCard({ risk, onUpdate }: { risk: Risk; onUpdate: () => void }) {
           {planSaving ? "Saving..." : "Save Treatment Plan"}
         </button>
       </div>
+      ) : (
+        <p style={{ fontSize: 12.5, color: "#c5cbdb", marginBottom: 14 }}>
+          Treatment owner: {risk.treatmentOwner ? risk.treatmentOwner.displayName + " (" + risk.treatmentOwner.email + ")" : risk.treatmentOwnerUserId ? "Assigned" : "Not assigned"} | Target date: {risk.treatmentTargetDate ? risk.treatmentTargetDate.slice(0, 10) : "Not set"}
+        </p>
+      )}
       {planMessage && <div style={{ fontSize: 12, color: "#4ade80", marginBottom: 10 }}>{planMessage}</div>}
 
+      {canUpdate && (
       <button
         onClick={handleSave}
         disabled={saving}
@@ -266,6 +281,7 @@ function RiskCard({ risk, onUpdate }: { risk: Risk; onUpdate: () => void }) {
       >
         {saving ? "Saving..." : "Save Risk"}
       </button>
+      )}
       {error && (
         <div style={{ background: "#2a1a1a", border: "1px solid #ef4444", borderRadius: 8, padding: "8px 12px", color: "#f87171", fontSize: 12, marginTop: 8 }}>
           {error}
@@ -294,6 +310,7 @@ export default function AiRiskAssessmentPage() {
   const [reviewRationale, setReviewRationale] = useState("");
   const [reviewError, setReviewError] = useState("");
   const [reviewing, setReviewing] = useState(false);
+  const { can } = useCurrentUser();
 
   function loadAssessment() {
     fetch(`${process.env.NEXT_PUBLIC_API_URL}/ai-risk-assessments/${id}`, { credentials: "include" })
@@ -455,6 +472,7 @@ export default function AiRiskAssessmentPage() {
           <RiskCard key={risk.id} risk={risk} onUpdate={loadAssessment} />
         ))}
 
+        {can("ai-system:update") && (
         <form onSubmit={handleAddRisk} style={{ background: "#0a0f1a", border: "1px dashed #2e3d63", borderRadius: 10, padding: 16 }}>
           <h3 style={{ fontSize: 13.5, marginTop: 0, marginBottom: 12 }}>Add a Risk</h3>
           <label style={labelStyle}>
@@ -504,6 +522,7 @@ export default function AiRiskAssessmentPage() {
             </div>
           )}
         </form>
+        )}
       </div>
 
       <div style={cardStyle}>
@@ -524,6 +543,7 @@ export default function AiRiskAssessmentPage() {
           <p style={{ color: "#8b96ac", fontSize: 13, marginBottom: 16 }}>No review decision has been recorded yet.</p>
         )}
 
+        {can("ai-risk-assessment:review") ? (
         <form onSubmit={handleSubmitReview}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: 12, marginBottom: 12 }}>
             <label style={labelStyle}>
@@ -550,6 +570,9 @@ export default function AiRiskAssessmentPage() {
             </div>
           )}
         </form>
+        ) : assessment.status !== "COMPLETED" ? (
+          <GovernanceInfo>Review required - reviewer permission required.</GovernanceInfo>
+        ) : null}
       </div>
     </main>
   );

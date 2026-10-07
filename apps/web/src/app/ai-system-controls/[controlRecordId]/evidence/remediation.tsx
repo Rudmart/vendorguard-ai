@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, type CSSProperties } from "react";
+import { GovernanceInfo, useCurrentUser } from "../../../current-user";
 
 const API = process.env.NEXT_PUBLIC_API_URL;
 
@@ -69,6 +70,7 @@ export default function FindingRemediation({ findingId, findingStatus, onChanged
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
+  const { can } = useCurrentUser();
 
   useEffect(() => {
     let cancelled = false;
@@ -123,7 +125,7 @@ export default function FindingRemediation({ findingId, findingStatus, onChanged
       {error && <p style={{ ...muted, color: "#fca5a5" }}>{error}</p>}
       {message && <p style={{ ...muted, color: "#86efac" }}>{message}</p>}
 
-      {!rem && findingStatus === "OPEN" && (
+      {!rem && findingStatus === "OPEN" && can("remediation:create") && (
         <div>
           <span style={label}>Corrective action title</span>
           <input style={field} placeholder="e.g. Require an approval record before final decision" value={title} onChange={(e) => setTitle(e.target.value)} />
@@ -177,7 +179,7 @@ export default function FindingRemediation({ findingId, findingStatus, onChanged
             {rem.overdue ? " (overdue)" : ""}
           </p>
 
-          {rem.status === "OPEN" && (
+          {rem.status === "OPEN" && (can("remediation:update") || can("remediation:create")) && (
             <button style={button} disabled={busy} onClick={() => void run(() => send("PATCH", `${API}/governance-remediations/${rem.id}`, { status: "IN_PROGRESS" }), "Work started.")}>
               Start work (In Progress)
             </button>
@@ -190,7 +192,8 @@ export default function FindingRemediation({ findingId, findingStatus, onChanged
               <span style={muted}>Owner only. This says the work is done - it does not verify it.</span>
             </>
           )}
-          {rem.status === "PENDING_VERIFICATION" && (
+          {rem.status === "PENDING_VERIFICATION" && !can("remediation:verify") && <GovernanceInfo>Independent verification required - verifier permission required.</GovernanceInfo>}
+          {rem.status === "PENDING_VERIFICATION" && can("remediation:verify") && (
             <div>
               <span style={label}>Verification rationale (required)</span>
               <textarea

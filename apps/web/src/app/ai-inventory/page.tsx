@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { Can } from "../current-user";
 import Link from "next/link";
 import RegisterAiSystemButton from "./register-ai-system";
 import AddAiSystemForm from "./add-ai-system-form";
@@ -91,9 +92,11 @@ export default function AIInventoryPage() {
         {systems.length} AI system{systems.length === 1 ? "" : "s"} on record - internal and third-party, in one place. AI assists; humans govern.
       </p>
 
+      <Can permission="ai-system:create">
       <RegisterAiSystemButton>
         <AddAiSystemForm onCreated={load} />
       </RegisterAiSystemButton>
+      </Can>
 
       <div style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
         <input

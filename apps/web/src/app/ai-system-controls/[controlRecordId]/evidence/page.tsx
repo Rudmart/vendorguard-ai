@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, type CSSProperties } from "react";
+import { GovernanceInfo, useCurrentUser } from "../../../current-user";
 import { useParams } from "next/navigation";
 import ControlTestingSection from "./control-testing";
 import FindingsSection from "./findings";
@@ -126,6 +127,8 @@ export default function ControlEvidencePage() {
   const [newName, setNewName] = useState("");
   const [newType, setNewType] = useState("");
   const [newExpiry, setNewExpiry] = useState("");
+  const { can } = useCurrentUser();
+  const canUpdate = can("ai-system:update");
   const [file, setFile] = useState<File | null>(null);
   const [rationales, setRationales] = useState<Record<string, string>>({});
 
@@ -214,6 +217,7 @@ export default function ControlEvidencePage() {
       {error && <div style={{ ...card, borderColor: "#7f1d1d", color: "#fca5a5" }}>{error}</div>}
       {message && <div style={{ ...card, borderColor: "#14532d", color: "#86efac" }}>{message}</div>}
 
+      {canUpdate && (
       <section style={card}>
         <h2 style={heading}>Add AI-system evidence</h2>
         <input style={field} placeholder="Document type (e.g. Model card, Bias test report)" value={newType} onChange={(e) => setNewType(e.target.value)} />
@@ -256,7 +260,9 @@ export default function ControlEvidencePage() {
           <span style={muted}>PDF, DOCX or XLSX, max 25 MB. Uses the document type above.</span>
         </div>
       </section>
+      )}
 
+      {canUpdate && (
       <section style={card}>
         <h2 style={heading}>Submit evidence for review</h2>
         {notApplicable ? (
@@ -293,6 +299,7 @@ export default function ControlEvidencePage() {
           </>
         )}
       </section>
+      )}
 
       <section style={card}>
         <h2 style={heading}>Submissions and review history</h2>
@@ -317,7 +324,8 @@ export default function ControlEvidencePage() {
               <span style={muted}>Record only (no file attached)</span>
             )}
 
-            {link.status === "PENDING_REVIEW" && (
+            {link.status === "PENDING_REVIEW" && !can("ai-control-evidence:review") && <GovernanceInfo>Evidence review required - reviewer permission required.</GovernanceInfo>}
+            {link.status === "PENDING_REVIEW" && can("ai-control-evidence:review") && (
               <div style={{ marginTop: 10 }}>
                 <textarea
                   style={field}
@@ -348,7 +356,7 @@ export default function ControlEvidencePage() {
               </div>
             )}
 
-            {link.status === "REJECTED" && (
+            {link.status === "REJECTED" && canUpdate && (
               <button
                 style={{ ...button, marginTop: 8 }}
                 disabled={busy}

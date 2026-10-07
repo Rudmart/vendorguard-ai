@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, type CSSProperties } from "react";
+import { GovernanceInfo, useCurrentUser } from "../../../current-user";
 import FindingRemediation from "./remediation";
 
 const API = process.env.NEXT_PUBLIC_API_URL;
@@ -81,6 +82,7 @@ export default function FindingsSection({ controlRecordId, aiSystemId, refreshKe
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
+  const { can } = useCurrentUser();
 
   useEffect(() => {
     let cancelled = false;
@@ -149,6 +151,8 @@ export default function FindingsSection({ controlRecordId, aiSystemId, refreshKe
         <div style={{ ...muted, fontWeight: 600, marginBottom: 8 }}>Create a Finding from a deficient control test</div>
         {eligible.length === 0 ? (
           <p style={muted}>No completed Partially Effective or Ineffective test without a Finding. Only deficient test results can become Findings.</p>
+        ) : !can("ai-finding:create") ? (
+          <GovernanceInfo>A deficient test result is waiting - Finding creation permission required.</GovernanceInfo>
         ) : (
           <>
             <p style={muted}>ADMIN, REVIEWER or AUDITOR. One Finding per control test.</p>
@@ -236,7 +240,8 @@ export default function FindingsSection({ controlRecordId, aiSystemId, refreshKe
             {new Date(f.createdAt).toLocaleString()} | Owner: {f.owner ? f.owner.displayName + " (" + f.owner.email + ")" : "Not assigned"}
           </p>
 
-          {f.status === "PENDING_REVIEW" && (
+          {f.status === "PENDING_REVIEW" && !can("finding:review") && <GovernanceInfo>Finding review required - reviewer permission required.</GovernanceInfo>}
+          {f.status === "PENDING_REVIEW" && can("finding:review") && (
             <div style={{ marginTop: 8 }}>
               <textarea
                 style={field}

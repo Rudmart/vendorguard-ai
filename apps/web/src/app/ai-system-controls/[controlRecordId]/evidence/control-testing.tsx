@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, type CSSProperties } from "react";
+import { GovernanceInfo, useCurrentUser } from "../../../current-user";
 
 const API = process.env.NEXT_PUBLIC_API_URL;
 
@@ -185,6 +186,7 @@ export default function ControlTestingSection({
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
+  const { can } = useCurrentUser();
 
   useEffect(() => {
     let cancelled = false;
@@ -299,6 +301,8 @@ export default function ControlTestingSection({
 
       {disabled ? (
         <p style={muted}>This control is marked Not Applicable, so it cannot be tested.</p>
+      ) : !can("ai-control-test:perform") ? (
+        <GovernanceInfo>Control testing - tester permission required.</GovernanceInfo>
       ) : inProgress ? (
         <div style={inner}>
           <div style={{ ...muted, fontWeight: 600 }}>

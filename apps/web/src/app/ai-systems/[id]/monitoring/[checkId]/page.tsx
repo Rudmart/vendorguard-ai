@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, type CSSProperties } from "react";
+import { GovernanceInfo, useCurrentUser } from "../../../../current-user";
 import { useParams } from "next/navigation";
 import TenantUserSelect from "../../../../tenant-user-select";
 
@@ -62,6 +63,7 @@ export default function MonitoringCheckPage() {
   const [busy, setBusy] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
   const [newOwner, setNewOwner] = useState("");
+  const { can } = useCurrentUser();
   const [form, setForm] = useState({ periodCovered: "", observation: "", observedValue: "", unit: "", result: "", rationale: "" });
 
   useEffect(() => {
@@ -155,7 +157,7 @@ export default function MonitoringCheckPage() {
         <h2 style={heading}>What to review</h2>
         <p style={muted}>{k.whatToReview}</p>
         <p style={muted}>Expectation: {k.expectation}</p>
-        {k.active && (
+        {k.active && can("ai-system:update") && (
           <div style={{ display: "flex", gap: 8, alignItems: "flex-end", margin: "10px 0" }}>
             <div style={{ flex: 1 }}>
               <span style={label}>Change owner</span>
@@ -166,14 +168,15 @@ export default function MonitoringCheckPage() {
             </button>
           </div>
         )}
-        {k.active && (
+        {k.active && can("ai-system:update") && (
           <button style={{ ...button, background: "#475569" }} disabled={busy} onClick={() => void deactivate()}>
             Deactivate check
           </button>
         )}
       </section>
 
-      {k.active && (
+      {k.active && !can("ai-monitoring:review") && <GovernanceInfo>Monitoring review due - monitoring review permission required.</GovernanceInfo>}
+      {k.active && can("ai-monitoring:review") && (
         <section style={card}>
           <h2 style={heading}>Record a monitoring review</h2>
           <p style={muted}>ADMIN, ANALYST or REVIEWER. A recorded review cannot be edited - record a new one if needed.</p>
@@ -217,7 +220,7 @@ export default function MonitoringCheckPage() {
               <a href={`/ai-systems/${aiSystemId}/reassessments/${r.reassessmentId}`} style={{ color: "#93c5fd", fontSize: 12.5 }}>
                 Reassessment started from this review
               </a>
-            ) : r.result !== "ACCEPTABLE" ? (
+            ) : r.result !== "ACCEPTABLE" && can("ai-system:update") ? (
               <button style={{ ...button, background: "#b45309" }} disabled={busy} onClick={() => void startReassessment(r.id)}>
                 Start reassessment (ADMIN / ANALYST)
               </button>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useCurrentUser } from "../../current-user";
 import VersionList, { summarizeVersions } from "./assessment-versions";
 
 const API = process.env.NEXT_PUBLIC_API_URL;
@@ -54,6 +55,7 @@ export default function ImpactAssessmentCard({ aiSystemId }: { aiSystemId: strin
   const [items, setItems] = useState<ImpactAssessmentListItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
+  const { can } = useCurrentUser();
 
   useEffect(() => {
     if (!aiSystemId) {
@@ -156,7 +158,7 @@ export default function ImpactAssessmentCard({ aiSystemId }: { aiSystemId: strin
             View impact assessment
           </a>
         )}
-        {canStart && (
+        {canStart && can("ai-system:update") && (
           <button type="button" onClick={startAssessment} disabled={starting} style={buttonStyle}>
             {starting ? "Starting..." : latest ? "Start new version" : "Start impact assessment"}
           </button>
