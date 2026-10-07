@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { GovernanceInfo, useCurrentUser } from "../current-user";
 
 type Remediation = {
   id: string;
@@ -44,6 +45,7 @@ function sourceLabel(item: Remediation): string {
 export default function RemediationTrackerPage() {
   const [items, setItems] = useState<Remediation[]>([]);
   const [loading, setLoading] = useState(true);
+  const { can, loading: userLoading } = useCurrentUser();
 
   async function load() {
     const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/remediations`, {
@@ -79,7 +81,9 @@ export default function RemediationTrackerPage() {
         {openCount} open of {items.length} total actions across your portfolio
       </p>
 
-      {loading ? (
+      {!userLoading && !can("remediation:read") ? (
+        <GovernanceInfo>Remediation tracking requires remediation read permission.</GovernanceInfo>
+      ) : loading ? (
         <p style={{ color: "#8b96ac" }}>Loading...</p>
       ) : items.length === 0 ? (
         <p style={{ color: "#8b96ac" }}>No remediation actions yet. Add one from a vendor detail page or from an AI Finding.</p>
@@ -127,6 +131,7 @@ export default function RemediationTrackerPage() {
                   ) : (
                     <select
                       value={item.status}
+                      disabled={!can("remediation:update")}
                       onChange={(e) => updateStatus(item.id, e.target.value)}
                       style={{
                         background: "#141b2d",

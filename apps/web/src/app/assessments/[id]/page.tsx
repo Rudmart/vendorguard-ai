@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { useCurrentUser } from "../../current-user";
 import { useParams } from "next/navigation";
 
 type Control = {
@@ -42,6 +43,7 @@ export default function AssessmentDetailPage() {
   const [data, setData] = useState<AssessmentDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [savingControlId, setSavingControlId] = useState<string | null>(null);
+  const { can } = useCurrentUser();
 
   async function load() {
     const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/assessments/${assessmentId}`, {
@@ -174,7 +176,7 @@ export default function AssessmentDetailPage() {
                     </div>
                     <select
                       value={status}
-                      disabled={savingControlId === control.id}
+                      disabled={savingControlId === control.id || !can("finding:propose")}
                       onChange={(e) => setStatus(control.id, e.target.value)}
                       style={{
                         background: "#141b2d",

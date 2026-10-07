@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { GovernanceInfo, useCurrentUser } from "../../../../current-user";
 import { useRouter, useParams } from "next/navigation";
 
 const AVAILABLE_FRAMEWORKS = [
@@ -23,6 +24,7 @@ export default function NewAssessmentPage() {
   const [selected, setSelected] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const { can } = useCurrentUser();
 
   function toggle(id: string) {
     setSelected((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
@@ -90,6 +92,7 @@ export default function NewAssessmentPage() {
 
       {error && <p style={{ color: "#ef4444", fontSize: 13, marginBottom: 12 }}>{error}</p>}
 
+      {can("assessment:create") ? (
       <button
         onClick={handleStart}
         disabled={submitting}
@@ -107,6 +110,9 @@ export default function NewAssessmentPage() {
       >
         {submitting ? "Starting..." : "Start Assessment"}
       </button>
+      ) : (
+        <GovernanceInfo>Starting an AI vendor assessment requires assessment create permission.</GovernanceInfo>
+      )}
     </main>
   );
 }

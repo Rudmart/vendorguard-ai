@@ -1,4 +1,5 @@
 import { cookies } from "next/headers";
+import { Can } from "../../current-user";
 import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
 import DeleteVendorButton from "../delete-vendor-button";
@@ -66,21 +67,27 @@ export default async function VendorDetailPage({ params }: { params: { id: strin
       <Link href="/" style={{ color: "#8b96ac", fontSize: 13, textDecoration: "none" }}>
         Back to vendors
       </Link>
+      <Can permission="vendor:update">
       <Link href={`/vendors/${vendor.id}/edit`} style={{ float: "right", color: "#3b82f6", fontSize: 13, textDecoration: "none" }}>
         Edit
       </Link>
+      </Can>
 
       <div style={{ marginTop: 16 }}>
         <h1 style={{ fontSize: 26, marginBottom: 4 }}>{vendor.legalName}</h1>
       </div>
       <div style={{ marginTop: 12 }}>
         <DeleteVendorButton id={vendor.id} />
+        <Can permission="assessment:create">
         <Link href={`/vendors/${vendor.id}/assessment/new`} style={{ marginLeft: 12, color: "#3b82f6", fontSize: 13, textDecoration: "none" }}>
           Start Assessment
         </Link>
+        </Can>
+        <Can anyOf={["evidence:read", "evidence:read-metadata"]}>
         <Link href={`/vendors/${vendor.id}/evidence`} style={{ marginLeft: 12, color: "#3b82f6", fontSize: 13, textDecoration: "none" }}>
           View Evidence
         </Link>
+        </Can>
         <Link href={`/vendors/${vendor.id}/executive-report`} style={{ marginLeft: 12, color: "#3b82f6", fontSize: 13, textDecoration: "none" }}>
           View Executive Report
         </Link>

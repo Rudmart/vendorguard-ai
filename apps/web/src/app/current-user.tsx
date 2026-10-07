@@ -64,9 +64,21 @@ export function useCurrentUser(): CurrentUserContextValue {
 }
 
 /** Renders children only when the current user's role grants the permission. */
-export function Can({ permission, children, fallback = null }: { permission: string; children: ReactNode; fallback?: ReactNode }) {
+export function Can({
+  permission,
+  anyOf,
+  children,
+  fallback = null,
+}: {
+  permission?: string;
+  /** D3b: allowed when the user holds ANY of these permissions (e.g. evidence:read OR evidence:read-metadata). */
+  anyOf?: string[];
+  children: ReactNode;
+  fallback?: ReactNode;
+}) {
   const { can } = useCurrentUser();
-  return <>{can(permission) ? children : fallback}</>;
+  const allowed = (permission ? can(permission) : false) || (anyOf ?? []).some((p) => can(p));
+  return <>{allowed ? children : fallback}</>;
 }
 
 /** Non-actionable note for a human governance decision the current user is not authorized to make. */

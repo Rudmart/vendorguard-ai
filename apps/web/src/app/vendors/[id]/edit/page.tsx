@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import { useState, useEffect } from "react";
+import { GovernanceInfo, useCurrentUser } from "../../../current-user";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 
@@ -45,6 +46,8 @@ export default function EditVendorPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const { can } = useCurrentUser();
+  const canEdit = can("vendor:update");
 
   useEffect(() => {
     fetch(`${process.env.NEXT_PUBLIC_API_URL}/vendors/${id}`, { credentials: "include" })
@@ -113,7 +116,9 @@ export default function EditVendorPage() {
       </Link>
       <h1 style={{ fontSize: 26, margin: "16px 0 24px 0" }}>Edit Vendor</h1>
 
+      {!canEdit && <GovernanceInfo>Read-only - editing an AI vendor requires vendor update permission.</GovernanceInfo>}
       <form onSubmit={handleSubmit} style={{ background: "#111a2b", border: "1px solid #233150", borderRadius: 10, padding: 24 }}>
+      <fieldset disabled={!canEdit} style={{ border: "none", padding: 0, margin: 0, minWidth: 0 }}>
         <label style={labelStyle}>
           Vendor Name
           <input
@@ -187,6 +192,7 @@ export default function EditVendorPage() {
 
         {error && <p style={{ color: "#f87171", fontSize: 13, marginBottom: 16 }}>{error}</p>}
 
+        {canEdit && (
         <button
           type="submit"
           disabled={saving}
@@ -203,6 +209,8 @@ export default function EditVendorPage() {
         >
           {saving ? "Saving..." : "Save Changes"}
         </button>
+        )}
+      </fieldset>
       </form>
     </main>
   );
