@@ -56,8 +56,8 @@ const navSections: NavSectionDef[] = [
   {
     title: "Learning Center",
     items: [
-      { label: "GRC Workflow Guide", href: "/grc-guide", built: true, icon: "\uD83C\uDF93", color: "#86efac" },
-      { label: "TPRM Workflow Guide", href: "/tprm-guide", built: true, icon: "\uD83D\uDCDA", color: "#86efac" },
+      { label: "AI Governance Workflow", href: "/grc-guide", built: true, icon: "\uD83C\uDF93", color: "#86efac" },
+      { label: "AI TPRM Workflow", href: "/tprm-guide", built: true, icon: "\uD83D\uDCDA", color: "#86efac" },
     ],
   },
   { title: "System", items: [{ label: "Audit Logs", href: "/audit-log", built: true, icon: "\uD83D\uDCC4" }] },
