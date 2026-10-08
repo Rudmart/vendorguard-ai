@@ -7,6 +7,7 @@ import FrameworkApplicabilityCard from "./framework-applicability-card";
 import ReassessmentsCard from "./reassessments-card";
 import MonitoringCard from "./monitoring-card";
 import RiskAssessmentCard from "./risk-assessment-card";
+import IncidentsCard from "./incidents-card";
 import UseCasesCard from "./use-cases-card";
 import GovernancePosture, { type AssessmentPosture } from "./governance-posture";
 
@@ -569,6 +570,7 @@ export default function AiSystemDetailPage() {
       </div>
     
       <h2 id="risk-impact" style={sectionHeadingStyle}>Risk & Impact</h2>
+      <IncidentsCard aiSystemId={String(id)} />
       <UseCasesCard aiSystemId={String(id)} />
       <RiskAssessmentCard aiSystemId={String(id)} />
       <ImpactAssessmentCard aiSystemId={String(id)} />

@@ -50,6 +50,7 @@ const navSections: NavSectionDef[] = [
     title: "Monitoring",
     items: [
       { label: "Governance Monitoring", href: "/governance-monitoring", built: true, icon: "\uD83D\uDCE1" },
+      { label: "AI Incidents", href: "/ai-incidents", built: true, icon: "!" },
       { label: "Reassessments", href: "/reassessments", built: true, icon: "\uD83D\uDD04" },
     ],
   },

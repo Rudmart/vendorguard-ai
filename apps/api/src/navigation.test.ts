@@ -26,7 +26,7 @@ describe("Alignment Phase A - navigation", () => {
     expect(hrefs).not.toContain("/evidence");
     expect(sidebar).not.toContain('badge: "3"');
     expect(sidebar).not.toContain("Ruddy A Martinez");
-    for (const label of ["AI Incidents", "AI Agents", "Administration", "Vendor Reports", "Third-party risk", "Policies", "Exceptions", "Evidence Library"]) {
+    for (const label of ["AI Agents", "Administration", "Vendor Reports", "Third-party risk", "Policies", "Exceptions", "Evidence Library"]) {
       expect(sidebar).not.toContain(`label: "${label}"`);
     }
   });
@@ -35,7 +35,7 @@ describe("Alignment Phase A - navigation", () => {
     for (const title of ["Overview", "AI Governance", "AI Risk", "Third-Party AI Risk", "Compliance & Assurance", "Learning Center", "System"]) {
       expect(sidebar).toContain(`title: "${title}"`);
     }
-    for (const label of ["Dashboard", "AI Inventory", "AI Use Cases", "Pending Reviews", "Risk Acceptance", "Remediation", "Vendor Inventory", "Vendor Assessments", "Compliance Frameworks", "Audit Logs"]) {
+    for (const label of ["AI Incidents", "Dashboard", "AI Inventory", "AI Use Cases", "Pending Reviews", "Risk Acceptance", "Remediation", "Vendor Inventory", "Vendor Assessments", "Compliance Frameworks", "Audit Logs"]) {
       expect(sidebar).toContain(`label: "${label}"`);
     }
     for (const old of ["Executive Dashboard", "Remediation Tracker", "AI inventory", ">TPRM Workflow<", ">Governance &amp; Reference<"]) {

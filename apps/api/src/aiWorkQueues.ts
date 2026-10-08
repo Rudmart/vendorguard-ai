@@ -106,6 +106,10 @@ export async function pendingReviewsFor(session: Session): Promise<PendingItem[]
     }
   }
 
+  if (hasPermission(session, "ai-incident:review")) {
+    const incidents = await prisma.aiIncident.findMany({ where: { tenantId: t, status: "PENDING_REVIEW", ownerUserId: { not: me }, reporterUserId: { not: me }, closureSubmitterUserId: { not: me } }, include: { aiSystem: { select: { name: true } } } });
+    for (const i of incidents) if (i.ownerUserId && i.closureSubmitterUserId) items.push({ type: "INCIDENT_CLOSURE_REVIEW", id: i.id, title: i.title, context: i.aiSystem.name, since: i.submittedAt, why: "Incident closure awaiting independent review", href: `/ai-incidents/${i.id}` });
+  }
   items.sort((x, y) => (x.since?.getTime() ?? 0) - (y.since?.getTime() ?? 0));
   return items;
 }
@@ -120,6 +124,11 @@ export async function myWorkFor(session: Session): Promise<WorkItem[]> {
   const t = session.tenantId;
   const now = Date.now();
   const items: WorkItem[] = [];
+
+  if (hasPermission(session, "ai-system:update")) {
+    const incidents = await prisma.aiIncident.findMany({ where: { tenantId: t, ownerUserId: me, status: { in: ["OPEN", "IN_PROGRESS"] } }, include: { aiSystem: { select: { name: true } } } });
+    for (const i of incidents) items.push({ type: "AI_INCIDENT", id: i.id, title: i.title, context: i.aiSystem.name, state: i.status, due: null, href: `/ai-incidents/${i.id}`, priority: SEVERITY_PRIORITY[i.severity] ?? 3 });
+  }
 
   const findings = await prisma.governanceFinding.findMany({
     where: { tenantId: t, ownerUserId: me, status: "OPEN" },

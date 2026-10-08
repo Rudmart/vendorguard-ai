@@ -57,23 +57,24 @@ describe("AI workflow guides - stages", () => {
     expect(stages("AI_TPRM_STAGES")).toHaveLength(12);
   });
 
-  it("AI Incident Management and Retirement are labelled PLANNED", () => {
+  it("Retirement remains PLANNED; AI Incidents is AVAILABLE", () => {
     const gov = stages("AI_GOVERNANCE_STAGES");
-    for (const title of ["AI Incident", "Retirement"]) {
+    expect(gov.find(s => s.includes('title: "AI Incident"'))).toContain('status: "AVAILABLE"');
+    for (const title of ["Retirement"]) {
       const stage = gov.find((s) => s.includes(`title: "${title}"`));
       expect(stage, title).toBeDefined();
       expect(stage).toContain('status: "PLANNED"');
     }
   });
 
-  it("AI Use Cases V1: Define AI Use Case is AVAILABLE and links to the real AI Use Cases page (19 available, 2 planned)", () => {
+  it("AI Use Cases V1: Define AI Use Case is AVAILABLE and links to the real AI Use Cases page (20 available, 1 planned)", () => {
     const gov = stages("AI_GOVERNANCE_STAGES");
     const stage = gov.find((s) => s.includes('title: "Define AI Use Case"'));
     expect(stage).toContain('status: "AVAILABLE"');
     expect(stage).toContain('href: "/ai-use-cases"');
     expect(routeExists("/ai-use-cases")).toBe(true);
-    expect(gov.filter((s) => s.includes('status: "AVAILABLE"'))).toHaveLength(19);
-    expect(gov.filter((s) => s.includes('status: "PLANNED"'))).toHaveLength(2);
+    expect(gov.filter((s) => s.includes('status: "AVAILABLE"'))).toHaveLength(20);
+    expect(gov.filter((s) => s.includes('status: "PLANNED"'))).toHaveLength(1);
   });
 
   it("every PLANNED stage has no links (no dead links to unbuilt features)", () => {
