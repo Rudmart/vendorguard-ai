@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, type CSSProperties } from "react";
+import { ROLES, roleHasPermission, type Role } from "@vendorguard/shared/domain";
 
 const API = process.env.NEXT_PUBLIC_API_URL;
 
@@ -17,12 +18,14 @@ export default function TenantUserSelect({
   emptyLabel = "Select a person",
   style,
   disabled,
+  requiredPermission,
 }: {
   value: string;
   onChange: (userId: string) => void;
   emptyLabel?: string;
   style?: object;
   disabled?: boolean;
+  requiredPermission?: string;
 }) {
   const [users, setUsers] = useState<TenantUser[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -60,14 +63,15 @@ export default function TenantUserSelect({
     };
   }, []);
 
-  const unknownCurrent = Boolean(value) && users !== null && !users.some((u) => u.id === value);
+  const eligibleUsers = (users ?? []).filter((u) => !requiredPermission || (ROLES.includes(u.role as Role) && roleHasPermission(u.role as Role, requiredPermission)));
+  const unknownCurrent = Boolean(value) && users !== null && !eligibleUsers.some((u) => u.id === value);
 
   return (
     <>
       <select style={style as CSSProperties} value={value} disabled={disabled || users === null} onChange={(e) => onChange(e.target.value)}>
         <option value="">{users === null ? "Loading people..." : emptyLabel}</option>
-        {unknownCurrent && <option value={value}>Current owner</option>}
-        {(users ?? []).map((u) => (
+        {unknownCurrent && <option value={value} disabled={Boolean(requiredPermission)}>{requiredPermission ? "Current owner is unavailable or ineligible — select an eligible owner" : "Current owner"}</option>}
+        {eligibleUsers.map((u) => (
           <option key={u.id} value={u.id}>
             {u.displayName + " - " + u.email + (u.role ? " (" + u.role + ")" : "")}
           </option>

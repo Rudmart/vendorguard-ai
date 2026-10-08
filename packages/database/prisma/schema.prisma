@@ -140,6 +140,11 @@ model Tenant {
 }
 
 model User {
+  incidentsReported AiIncident[] @relation("IncidentReporter")
+  incidentsOwned AiIncident[] @relation("IncidentOwner")
+  incidentsSubmitted AiIncident[] @relation("IncidentSubmitter")
+  incidentReviews AiIncidentReview[]
+
   id          String   @id @default(uuid())
   // Entra ID object id in production; a stable synthetic id for the dev
   // persona adapter (see packages/shared env.ts fail-closed rules - the
@@ -445,6 +450,8 @@ model QuestionnaireResponse {
 // ---------------------------------------------------------------------------
 
 model EvidenceDocument {
+  incidentLinks AiIncidentEvidence[]
+
   id             String        @id @default(uuid())
   tenantId       String
   vendorId       String? // optional since Step 9: evidence belongs to a vendor OR an AI system (API requires one)
@@ -945,6 +952,8 @@ enum AiAssessmentReviewDecision {
 }
 
 model AiSystem {
+  incidents AiIncident[]
+
   monitoringChecks AiMonitoringCheck[] // Step 15
   useCases AiUseCase[] // AI Use Cases V1
   reassessments AiReassessment[] // Step 14
@@ -1441,6 +1450,8 @@ enum GovernanceFindingDecision {
 }
 
 model GovernanceFinding {
+  incidentLinks AiIncidentFinding[]
+
   riskAcceptances RiskAcceptance[] // Step 13: context only
   id              String                  @id @default(uuid())
   tenantId        String
@@ -1521,6 +1532,7 @@ model RemediationVerification {
 // Never clones controls, evidence, tests, Findings, remediation or acceptances. No triggers, no scheduler.
 // ---------------------------------------------------------------------------
 enum AiReassessmentReason {
+  INCIDENT
   PERIODIC_REVIEW
   MATERIAL_CHANGE
   REMEDIATION_COMPLETED
@@ -1542,6 +1554,8 @@ enum AiReassessmentConclusion {
 }
 
 model AiReassessment {
+  incidents AiIncident[]
+
   monitoringReview AiMonitoringReview? // Step 15: set when started from a Monitoring Review
   id                        String                    @id @default(uuid())
   tenantId                  String
@@ -1635,6 +1649,8 @@ model AiMonitoringCheck {
 }
 
 model AiMonitoringReview {
+  incidents AiIncident[]
+
   id             String             @id @default(uuid())
   tenantId       String
   checkId        String
@@ -1673,6 +1689,8 @@ enum AiUseCaseStatus {
 }
 
 model AiUseCase {
+  incidents AiIncident[]
+
   id              String                   @id @default(uuid())
   tenantId        String
   aiSystemId      String
@@ -1706,4 +1724,97 @@ model AiUseCase {
   @@index([tenantId, aiSystemId])
   @@index([tenantId, status])
   @@map("ai_use_cases")
+}
+
+// AI Incidents V1: manual governance response; independent closure review.
+enum AiIncidentStatus {
+  OPEN
+  IN_PROGRESS
+  PENDING_REVIEW
+  CLOSED
+}
+
+model AiIncident {
+  id String @id @default(uuid())
+  tenantId String
+  aiSystemId String
+  aiUseCaseId String?
+  monitoringReviewId String?
+  reassessmentId String?
+  title String
+  description String
+  severity ControlSeverity
+  status AiIncidentStatus @default(OPEN)
+  detectedAt DateTime
+  occurredAt DateTime?
+  reporterUserId String
+  ownerUserId String?
+  investigationSummary String?
+  responseSummary String?
+  followUpPlan String?
+  closureRationale String?
+  closureSubmitterUserId String?
+  submittedAt DateTime?
+  closedAt DateTime?
+  revision Int @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  aiSystem AiSystem @relation(fields: [aiSystemId], references: [id], onDelete: Restrict)
+  aiUseCase AiUseCase? @relation(fields: [aiUseCaseId], references: [id], onDelete: Restrict)
+  monitoringReview AiMonitoringReview? @relation(fields: [monitoringReviewId], references: [id], onDelete: Restrict)
+  reassessment AiReassessment? @relation(fields: [reassessmentId], references: [id], onDelete: Restrict)
+  reporter User @relation("IncidentReporter", fields: [reporterUserId], references: [id], onDelete: Restrict)
+  owner User? @relation("IncidentOwner", fields: [ownerUserId], references: [id], onDelete: Restrict)
+  closureSubmitter User? @relation("IncidentSubmitter", fields: [closureSubmitterUserId], references: [id], onDelete: Restrict)
+  reviews AiIncidentReview[]
+  evidence AiIncidentEvidence[]
+  findings AiIncidentFinding[]
+
+  @@index([tenantId, aiSystemId])
+  @@index([tenantId, status])
+  @@index([tenantId, ownerUserId])
+  @@map("ai_incidents")
+}
+
+model AiIncidentReview {
+  id String @id @default(uuid())
+  tenantId String
+  incidentId String
+  reviewerUserId String
+  decision AiAssessmentReviewDecision
+  rationale String
+  previousStatus AiIncidentStatus
+  newStatus AiIncidentStatus
+  createdAt DateTime @default(now())
+  incident AiIncident @relation(fields: [incidentId], references: [id], onDelete: Restrict)
+  reviewer User @relation(fields: [reviewerUserId], references: [id], onDelete: Restrict)
+  @@index([tenantId, incidentId])
+  @@map("ai_incident_reviews")
+}
+
+model AiIncidentEvidence {
+  id String @id @default(uuid())
+  tenantId String
+  incidentId String
+  evidenceDocumentId String
+  createdAt DateTime @default(now())
+  incident AiIncident @relation(fields: [incidentId], references: [id], onDelete: Restrict)
+  evidenceDocument EvidenceDocument @relation(fields: [evidenceDocumentId], references: [id], onDelete: Restrict)
+  @@unique([incidentId, evidenceDocumentId])
+  @@index([tenantId])
+  @@map("ai_incident_evidence")
+}
+
+model AiIncidentFinding {
+  id String @id @default(uuid())
+  tenantId String
+  incidentId String
+  findingId String
+  createdAt DateTime @default(now())
+  incident AiIncident @relation(fields: [incidentId], references: [id], onDelete: Restrict)
+  finding GovernanceFinding @relation(fields: [findingId], references: [id], onDelete: Restrict)
+  @@unique([incidentId, findingId])
+  @@index([tenantId])
+  @@map("ai_incident_findings")
 }
