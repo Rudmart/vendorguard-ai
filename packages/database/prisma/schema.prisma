@@ -109,6 +109,7 @@ enum AssessmentStatus {
 // ---------------------------------------------------------------------------
 
 model Tenant {
+  retirements AiSystemRetirement[]
   id               String           @id @default(uuid())
   name             String
   industry         IndustryVertical @default(GENERAL)
@@ -140,6 +141,11 @@ model Tenant {
 }
 
 model User {
+  retirementRequests AiSystemRetirement[] @relation("RetirementRequester")
+  retirementSubmissions AiSystemRetirement[] @relation("RetirementSubmitter")
+  retirementOwnership AiSystemRetirement[] @relation("RetirementOwner")
+  retirementReviews AiSystemRetirementReview[]
+  retirementEvidenceLinks AiSystemRetirementEvidence[]
   incidentsReported AiIncident[] @relation("IncidentReporter")
   incidentsOwned AiIncident[] @relation("IncidentOwner")
   incidentsSubmitted AiIncident[] @relation("IncidentSubmitter")
@@ -450,6 +456,7 @@ model QuestionnaireResponse {
 // ---------------------------------------------------------------------------
 
 model EvidenceDocument {
+  retirementLinks AiSystemRetirementEvidence[]
   incidentLinks AiIncidentEvidence[]
 
   id             String        @id @default(uuid())
@@ -952,6 +959,8 @@ enum AiAssessmentReviewDecision {
 }
 
 model AiSystem {
+  retirements AiSystemRetirement[]
+  retiredAt DateTime?
   incidents AiIncident[]
 
   monitoringChecks AiMonitoringCheck[] // Step 15
@@ -1817,4 +1826,87 @@ model AiIncidentFinding {
   @@unique([incidentId, findingId])
   @@index([tenantId])
   @@map("ai_incident_findings")
+}
+
+// AI System Retirement V1: permanent, independently approved, history retained.
+enum AiSystemRetirementStatus {
+  DRAFT
+  PENDING_REVIEW
+  COMPLETED
+  CANCELLED
+}
+enum AiSystemRetirementReason {
+  REPLACED
+  NO_LONGER_NEEDED
+  RISK_OR_COMPLIANCE
+  VENDOR_SERVICE_ENDED
+  OTHER
+}
+model AiSystemRetirement {
+  id String @id @default(uuid())
+  tenantId String
+  aiSystemId String
+  status AiSystemRetirementStatus @default(DRAFT)
+  revision Int @default(0)
+  activeRequestKey String? @unique
+  requesterUserId String
+  submitterUserId String?
+  ownerAtSubmissionUserId String?
+  reason AiSystemRetirementReason
+  businessJustification String
+  requestedRetirementDate DateTime
+  cessationConfirmed Boolean @default(false)
+  cessationNotApplicableReason String?
+  useCaseDisposition String
+  monitoringDisposition String
+  retentionStatement String
+  warningDispositions Json @default("[]")
+  readinessSnapshot Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  submittedAt DateTime?
+  completedAt DateTime?
+  cancelledAt DateTime?
+  cancellationRationale String?
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  aiSystem AiSystem @relation(fields: [aiSystemId], references: [id], onDelete: Restrict)
+  requester User @relation("RetirementRequester", fields: [requesterUserId], references: [id], onDelete: Restrict)
+  submitter User? @relation("RetirementSubmitter", fields: [submitterUserId], references: [id], onDelete: Restrict)
+  ownerAtSubmission User? @relation("RetirementOwner", fields: [ownerAtSubmissionUserId], references: [id], onDelete: Restrict)
+  reviews AiSystemRetirementReview[]
+  evidence AiSystemRetirementEvidence[]
+  @@index([tenantId, aiSystemId])
+  @@index([tenantId, status])
+  @@map("ai_system_retirements")
+}
+model AiSystemRetirementReview {
+  id String @id @default(uuid())
+  tenantId String
+  retirementId String
+  reviewerUserId String
+  decision AiAssessmentReviewDecision
+  rationale String
+  previousStatus AiSystemRetirementStatus
+  newStatus AiSystemRetirementStatus
+  reviewedSnapshot Json
+  acknowledgedWarningKeys String[]
+  createdAt DateTime @default(now())
+  retirement AiSystemRetirement @relation(fields: [retirementId], references: [id], onDelete: Restrict)
+  reviewer User @relation(fields: [reviewerUserId], references: [id], onDelete: Restrict)
+  @@index([tenantId, retirementId])
+  @@map("ai_system_retirement_reviews")
+}
+model AiSystemRetirementEvidence {
+  id String @id @default(uuid())
+  tenantId String
+  retirementId String
+  evidenceDocumentId String
+  linkedByUserId String
+  createdAt DateTime @default(now())
+  retirement AiSystemRetirement @relation(fields: [retirementId], references: [id], onDelete: Restrict)
+  evidenceDocument EvidenceDocument @relation(fields: [evidenceDocumentId], references: [id], onDelete: Restrict)
+  linkedBy User @relation(fields: [linkedByUserId], references: [id], onDelete: Restrict)
+  @@unique([retirementId, evidenceDocumentId])
+  @@index([tenantId])
+  @@map("ai_system_retirement_evidence")
 }

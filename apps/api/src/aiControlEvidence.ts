@@ -9,12 +9,12 @@
  */
 import { randomUUID } from "node:crypto";
 import type { FastifyInstance, FastifyRequest } from "fastify";
-import { prisma } from "@vendorguard/database";
+import { prisma, databaseClient, type Prisma } from "@vendorguard/database";
 import { getSessionFromCookie, requirePermission } from "@vendorguard/auth";
 import { resolveSession } from "./session.js";
 import type { Role } from "@vendorguard/shared";
 import { getStorageClient } from "@vendorguard/storage-client";
-import { extractAndSaveEvidenceChunks } from "./evidenceExtraction.js";
+import { extractEvidenceText, evidenceTextHash } from "./evidenceExtraction.js";
 
 export type Session = NonNullable<ReturnType<typeof getSessionFromCookie>>;
 export type Permission = Parameters<typeof requirePermission>[1];
@@ -192,70 +192,302 @@ export async function registerAiControlEvidenceRoutes(app: FastifyInstance): Pro
       return reply.status(401).send({ error: "Not logged in" });
     }
     if (!hasPermission(session, "ai-system:update")) {
-      return reply.status(403).send({ error: "Not authorized to upload AI system evidence" });
+      return reply
+        .status(403)
+        .send({ error: "Not authorized to upload AI system evidence" });
     }
     const userId = session.userId;
     if (!userId) {
-      return reply.status(403).send({ error: "A signed-in user identity is required" });
+      return reply
+        .status(403)
+        .send({ error: "A signed-in user identity is required" });
     }
     const { id } = request.params as { id: string };
     const aiSystem = await loadAiSystem(id, session.tenantId);
     if (!aiSystem) {
       return reply.status(404).send({ error: "AI system not found" });
     }
+    const query = request.query as Record<string, unknown>;
+    if (
+      Object.keys(query).some(
+        (key) => !["incidentId", "remediationId"].includes(key),
+      )
+    )
+      return reply.code(400).send({ error: "Unknown upload context" });
+    const incidentId =
+      query.incidentId === undefined ? null : cleanText(query.incidentId, 200);
+    const remediationId =
+      query.remediationId === undefined
+        ? null
+        : cleanText(query.remediationId, 200);
+    if (
+      (query.incidentId !== undefined && !incidentId) ||
+      (query.remediationId !== undefined && !remediationId) ||
+      (incidentId && remediationId)
+    )
+      return reply
+        .code(400)
+        .send({ error: "Specify one valid historical follow-up context" });
+    function fail(statusCode: number, message: string): never {
+      throw Object.assign(new Error(message), { statusCode });
+    }
+    async function checked<T>(
+      operation: (
+        tx: Prisma.TransactionClient,
+        contextToken: string,
+      ) => Promise<T>,
+    ): Promise<T> {
+      return databaseClient
+        .$transaction(
+          async (tx) => {
+            await tx.$queryRaw`SELECT 1 FROM pg_advisory_xact_lock(hashtextextended(${session!.tenantId}, 0))`;
+            await tx.$queryRaw`SELECT id FROM ai_systems WHERE id=${id} AND "tenantId"=${session!.tenantId} FOR UPDATE`;
+            const membership = await tx.tenantMembership.findUnique({
+              where: {
+                tenantId_userId: { tenantId: session!.tenantId, userId },
+              },
+            });
+            if (!membership) fail(401, "Tenant membership is no longer active");
+            const current = { ...session!, role: membership.role };
+            if (
+              !hasPermission(current, "ai-system:update") ||
+              !hasPermission(current, "evidence:upload")
+            )
+              fail(403, "Not authorized to upload evidence");
+            const system = await tx.aiSystem.findFirst({
+              where: { id, tenantId: session!.tenantId },
+            });
+            if (!system) fail(404, "AI System not found");
+            let token = "operational";
+            if (incidentId) {
+              const incident = await tx.aiIncident.findFirst({
+                where: {
+                  id: incidentId,
+                  tenantId: session!.tenantId,
+                  aiSystemId: id,
+                },
+              });
+              if (!incident) fail(404, "Incident not found for this AI System");
+              if (!["OPEN", "IN_PROGRESS"].includes(incident.status))
+                fail(409, "Incident follow-up is locked");
+              if (current.role !== "ADMIN" && incident.ownerUserId !== userId)
+                fail(
+                  403,
+                  "Only the incident owner or ADMIN may upload follow-up evidence",
+                );
+              token = JSON.stringify([
+                incident.id,
+                incident.revision,
+                incident.ownerUserId,
+                incident.status,
+              ]);
+            } else if (remediationId) {
+              const remediation = await tx.remediationAction.findFirst({
+                where: {
+                  id: remediationId,
+                  tenantId: session!.tenantId,
+                  OR: [
+                    {
+                      aiRisk: {
+                        assessment: {
+                          aiSystemId: id,
+                          tenantId: session!.tenantId,
+                        },
+                      },
+                    },
+                    {
+                      governanceFinding: {
+                        tenantId: session!.tenantId,
+                        OR: [
+                          {
+                            aiControlTest: {
+                              aiSystemControl: { aiSystemId: id },
+                            },
+                          },
+                          {
+                            incidentLinks: {
+                              some: {
+                                incident: {
+                                  aiSystemId: id,
+                                  tenantId: session!.tenantId,
+                                },
+                              },
+                            },
+                          },
+                        ],
+                      },
+                    },
+                  ],
+                },
+              });
+              if (!remediation)
+                fail(404, "Remediation not found for this AI System");
+              if (
+                !["OPEN", "IN_PROGRESS", "OVERDUE"].includes(remediation.status)
+              )
+                fail(409, "Remediation follow-up is locked");
+              if (
+                current.role !== "ADMIN" &&
+                remediation.ownerUserId !== userId
+              )
+                fail(
+                  403,
+                  "Only the remediation owner or ADMIN may upload follow-up evidence",
+                );
+              token = JSON.stringify([
+                remediation.id,
+                remediation.updatedAt,
+                remediation.ownerUserId,
+                remediation.status,
+              ]);
+            } else if (system.lifecycleStatus === "RETIRED")
+              fail(
+                409,
+                "Operational evidence uploads are prohibited after retirement; an authorized historical follow-up context is required",
+              );
+            return operation(tx, token);
+          },
+          { maxWait: 15000, timeout: 10000 },
+        )
+        .catch(async (error: unknown) => {
+          const status = (error as { statusCode?: number }).statusCode;
+          if (status)
+            await audit(
+              session!,
+              "ai_system_evidence.upload_blocked",
+              "AiSystem",
+              id,
+              { status },
+              "DENIED",
+            );
+          throw error;
+        });
+    }
+    const contextToken = await checked(async (_tx, token) => token);
+    // No multipart reading, storage calls or text extraction occur while locked.
     const data = await request.file();
-    if (!data) {
-      return reply.status(400).send({ error: "No file uploaded" });
-    }
-    if (!ALLOWED_MIME_TYPES.has(data.mimetype)) {
-      return reply.status(400).send({ error: "Unsupported file type. Allowed: PDF, DOCX, XLSX." });
-    }
-    const documentType = cleanText((data.fields.documentType as { value?: unknown } | undefined)?.value, 200);
-    if (!documentType) {
-      return reply.status(400).send({ error: "documentType is required" });
-    }
-    const expirationDate = parseOptionalDate((data.fields.expirationDate as { value?: unknown } | undefined)?.value);
-    if (expirationDate === "invalid") {
-      return reply.status(400).send({ error: "expirationDate must be a valid date" });
-    }
+    if (!data) return reply.code(400).send({ error: "No file uploaded" });
+    if (!ALLOWED_MIME_TYPES.has(data.mimetype))
+      return reply
+        .code(400)
+        .send({ error: "Unsupported file type. Allowed: PDF, DOCX, XLSX." });
+    const documentType = cleanText(
+      (data.fields.documentType as { value?: unknown } | undefined)?.value,
+      200,
+    );
+    if (!documentType)
+      return reply.code(400).send({ error: "documentType is required" });
+    const expirationDate = parseOptionalDate(
+      (data.fields.expirationDate as { value?: unknown } | undefined)?.value,
+    );
+    if (expirationDate === "invalid")
+      return reply
+        .code(400)
+        .send({ error: "expirationDate must be a valid date" });
     const buffer = await data.toBuffer();
-    if (buffer.byteLength > MAX_FILE_SIZE_BYTES) {
-      return reply.status(400).send({ error: "File exceeds 25 MB limit" });
-    }
-    const safeName = data.filename.replace(/[^A-Za-z0-9._-]/g, "_").slice(0, 200);
-    const storageKey = "evidence/ai-systems/" + aiSystem.id + "/" + Date.now() + "-" + safeName;
-    const containerName = process.env.AZURE_STORAGE_CONTAINER_EVIDENCE ?? "evidence";
-    const uploadResult = await getStorageClient().uploadFile(containerName, storageKey, buffer, data.mimetype);
-
-    const evidence = await prisma.evidenceDocument.create({
-      data: {
-        tenantId: session.tenantId,
-        aiSystemId: aiSystem.id,
-        displayFilename: data.filename.slice(0, 255),
-        storageKey: uploadResult.storageKey,
-        mimeType: uploadResult.mimeType,
-        sizeBytes: uploadResult.sizeBytes,
-        sha256Hash: uploadResult.sha256Hash,
-        documentType,
-        state: "UPLOADED",
-        expirationDate,
-        uploadedByUserId: userId,
-      },
-    });
-    let chunksExtracted = 0;
+    if (buffer.byteLength > MAX_FILE_SIZE_BYTES)
+      return reply.code(400).send({ error: "File exceeds 25 MB limit" });
+    let chunks: string[] = [];
     try {
-      const result = await extractAndSaveEvidenceChunks({
-        tenantId: session.tenantId,
-        documentId: evidence.id,
-        buffer,
-        mimeType: uploadResult.mimeType,
-      });
-      chunksExtracted = result.chunksCreated;
-    } catch (extractionError) {
-      request.log.error(extractionError, "Evidence text extraction failed");
+      chunks = await extractEvidenceText(buffer, data.mimetype);
+    } catch (error) {
+      request.log.error(error, "Evidence text extraction failed");
     }
-    await audit(session, "ai_system_evidence.uploaded", "EvidenceDocument", evidence.id, { aiSystemId: aiSystem.id, documentType });
-    return reply.status(201).send({ ...evidence, chunksExtracted });
+    const storageKey = `evidence/ai-systems/${id}/${randomUUID()}`;
+    const containerName =
+      process.env.AZURE_STORAGE_CONTAINER_EVIDENCE ?? "evidence";
+    const storage = getStorageClient();
+    const uploadResult = await storage.uploadFile(
+      containerName,
+      storageKey,
+      buffer,
+      data.mimetype,
+    );
+    try {
+      const evidence = await checked(async (tx, freshToken) => {
+        if (contextToken !== freshToken)
+          fail(
+            409,
+            "Historical follow-up context changed during upload; retry",
+          );
+        const doc = await tx.evidenceDocument.create({
+          data: {
+            tenantId: session.tenantId,
+            aiSystemId: id,
+            displayFilename: data.filename.slice(0, 255),
+            storageKey: uploadResult.storageKey,
+            mimeType: uploadResult.mimeType,
+            sizeBytes: uploadResult.sizeBytes,
+            sha256Hash: uploadResult.sha256Hash,
+            documentType,
+            state: "UPLOADED",
+            expirationDate,
+            uploadedByUserId: userId,
+          },
+        });
+        for (const [chunkIndex, text] of chunks.entries())
+          await tx.evidenceChunk.create({
+            data: {
+              tenantId: session.tenantId,
+              documentId: doc.id,
+              chunkIndex,
+              page: null,
+              section: null,
+              text,
+              contentHash: evidenceTextHash(text),
+            },
+          });
+        await tx.auditEvent.create({
+          data: {
+            tenantId: session.tenantId,
+            actorUserId: userId,
+            action: "ai_system_evidence.uploaded",
+            targetType: "EvidenceDocument",
+            targetId: doc.id,
+            outcome: "SUCCESS",
+            metadataJson: {
+              aiSystemId: id,
+              ...(incidentId ? { incidentId } : {}),
+              ...(remediationId ? { remediationId } : {}),
+            },
+          },
+        });
+        return doc;
+      });
+      return reply
+        .code(201)
+        .send({ ...evidence, chunksExtracted: chunks.length });
+    } catch (error) {
+      try {
+        await storage.deleteFile(containerName, uploadResult.storageKey);
+      } catch (cleanupError) {
+        request.log.error(
+          { err: cleanupError, storageKey: uploadResult.storageKey },
+          "Evidence upload compensation failed; operator cleanup required",
+        );
+        await audit(
+          session,
+          "ai_system_evidence.cleanup_failed",
+          "AiSystem",
+          id,
+          { storageKey: uploadResult.storageKey },
+          "DENIED",
+        );
+        fail(
+          500,
+          "Evidence persistence failed and blob cleanup failed; operator cleanup is required",
+        );
+      }
+      await audit(
+        session,
+        "ai_system_evidence.upload_rolled_back",
+        "AiSystem",
+        id,
+        { compensated: true },
+        "DENIED",
+      );
+      throw error;
+    }
   });
 
   // 3. Evidence available to this AI system: its own evidence + evidence of its linked vendors.

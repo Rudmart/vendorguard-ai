@@ -46,7 +46,7 @@ export async function pendingReviewsFor(session: Session): Promise<PendingItem[]
 
   if (hasPermission(session, "ai-control-evidence:review")) {
     const links = await prisma.aiSystemControlEvidence.findMany({
-      where: { tenantId: t, status: "PENDING_REVIEW" },
+      where: { tenantId: t, status: "PENDING_REVIEW", aiSystemControl: {aiSystem:{lifecycleStatus:{not:"RETIRED"}}} },
       include: { evidenceDocument: { select: { uploadedByUserId: true, displayFilename: true } } },
     });
     const eligible = links.filter((l) => l.submittedByUserId !== me && l.evidenceDocument.uploadedByUserId !== me);
@@ -110,6 +110,16 @@ export async function pendingReviewsFor(session: Session): Promise<PendingItem[]
     const incidents = await prisma.aiIncident.findMany({ where: { tenantId: t, status: "PENDING_REVIEW", ownerUserId: { not: me }, reporterUserId: { not: me }, closureSubmitterUserId: { not: me } }, include: { aiSystem: { select: { name: true } } } });
     for (const i of incidents) if (i.ownerUserId && i.closureSubmitterUserId) items.push({ type: "INCIDENT_CLOSURE_REVIEW", id: i.id, title: i.title, context: i.aiSystem.name, since: i.submittedAt, why: "Incident closure awaiting independent review", href: `/ai-incidents/${i.id}` });
   }
+  if (hasPermission(session, "ai-retirement:review")) {
+    const requests = await prisma.aiSystemRetirement.findMany({ where: { tenantId: t, status: "PENDING_REVIEW" }, include: { aiSystem: true } });
+    for (const r of requests) if (![r.requesterUserId, r.submitterUserId, r.ownerAtSubmissionUserId, r.aiSystem.ownerUserId].includes(me)) items.push({ type: "AI_RETIREMENT_REVIEW", id: r.id, title: `Retirement: ${r.aiSystem.name}`, context: r.aiSystem.name, since: r.submittedAt, why: "Permanent retirement awaiting independent human review", href: `/ai-retirements/${r.id}` });
+  }
+  // Unfinished work remains historical after retirement, rather than executable.
+  const retired = await prisma.aiSystem.findMany({ where: { tenantId: t, lifecycleStatus: "RETIRED" }, select: { id: true } });
+  const riskIds = await prisma.aiRiskAssessment.findMany({ where: { tenantId: t, aiSystemId: { in: retired.map(x=>x.id) } }, select: { id:true } });
+  const impactIds = await prisma.aiImpactAssessment.findMany({ where: { tenantId: t, aiSystemId: { in: retired.map(x=>x.id) } }, select: { id:true } });
+  const blocked = new Set([...riskIds, ...impactIds].map(x=>x.id));
+  for (let n=items.length-1;n>=0;n--) if (["RISK_ASSESSMENT_REVIEW", "IMPACT_ASSESSMENT_REVIEW"].includes(items[n]!.type) && blocked.has(items[n]!.id)) items.splice(n,1);
   items.sort((x, y) => (x.since?.getTime() ?? 0) - (y.since?.getTime() ?? 0));
   return items;
 }
@@ -151,7 +161,7 @@ export async function myWorkFor(session: Session): Promise<WorkItem[]> {
   }
 
   const risks = await prisma.aiRisk.findMany({
-    where: { tenantId: t, treatmentOwnerUserId: me },
+    where: { tenantId: t, treatmentOwnerUserId: me, assessment: { aiSystem: { lifecycleStatus: { not: "RETIRED" } } } },
     select: { id: true, title: true, treatment: true, residualRating: true, treatmentTargetDate: true, assessmentId: true, assessment: { select: { aiSystemId: true, version: true, aiSystem: { select: { name: true } } } } },
   });
   const latest = await latestCompletedRiskAssessmentIds(t, Array.from(new Set(risks.map((r) => r.assessment.aiSystemId))));
@@ -169,15 +179,19 @@ export async function myWorkFor(session: Session): Promise<WorkItem[]> {
     items.push({ type: "MONITORING_CHECK", id: c.id, title: c.title, context: c.aiSystem.name, state: state.toLowerCase().replace(/_/g, " "), due: next, href: `/ai-systems/${c.aiSystem.id}/monitoring/${c.id}`, priority: state === "OVERDUE" ? 1 : state === "DUE_SOON" ? 15 : 50 });
   }
 
-  const riskAsmts = await prisma.aiRiskAssessment.findMany({ where: { tenantId: t, assessorUserId: me, status: { in: ["DRAFT", "IN_PROGRESS"] } }, select: { id: true, name: true, version: true, status: true, aiSystem: { select: { name: true } } } });
+  const riskAsmts = await prisma.aiRiskAssessment.findMany({ where: { tenantId: t, assessorUserId: me, aiSystem: { lifecycleStatus: { not: "RETIRED" } }, status: { in: ["DRAFT", "IN_PROGRESS"] } }, select: { id: true, name: true, version: true, status: true, aiSystem: { select: { name: true } } } });
   for (const a of riskAsmts) {
     items.push({ type: "RISK_ASSESSMENT", id: a.id, title: `${a.name} (v${a.version})`, context: a.aiSystem.name, state: a.status.toLowerCase().replace(/_/g, " "), due: null, href: `/ai-risk-assessments/${a.id}`, priority: 25 });
   }
-  const impactAsmts = await prisma.aiImpactAssessment.findMany({ where: { tenantId: t, assessorUserId: me, status: { in: ["DRAFT", "IN_PROGRESS"] } }, select: { id: true, name: true, version: true, status: true, aiSystem: { select: { name: true } } } });
+  const impactAsmts = await prisma.aiImpactAssessment.findMany({ where: { tenantId: t, assessorUserId: me, aiSystem: { lifecycleStatus: { not: "RETIRED" } }, status: { in: ["DRAFT", "IN_PROGRESS"] } }, select: { id: true, name: true, version: true, status: true, aiSystem: { select: { name: true } } } });
   for (const a of impactAsmts) {
     items.push({ type: "IMPACT_ASSESSMENT", id: a.id, title: `${a.name} (v${a.version})`, context: a.aiSystem.name, state: a.status.toLowerCase().replace(/_/g, " "), due: null, href: `/ai-impact-assessments/${a.id}`, priority: 25 });
   }
 
+  if (hasPermission(session, "ai-system:update")) {
+    const requests = await prisma.aiSystemRetirement.findMany({ where: { tenantId: t, status: "DRAFT", OR: [{ requesterUserId: me }, { aiSystem: { ownerUserId: me } }] }, include: { aiSystem: true } });
+    for (const r of requests) items.push({ type: "AI_RETIREMENT", id: r.id, title: `Retirement: ${r.aiSystem.name}`, context: r.aiSystem.name, state: "draft preparation", due: r.requestedRetirementDate, href: `/ai-retirements/${r.id}`, priority: 25 });
+  }
   items.sort((x, y) => x.priority - y.priority || (x.due?.getTime() ?? Infinity) - (y.due?.getTime() ?? Infinity));
   return items;
 }

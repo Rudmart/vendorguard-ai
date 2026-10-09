@@ -1,3 +1,5 @@
+import { registerGovernanceWriteGuard } from "./aiGovernanceWriteGuard.js";
+import { registerRetirementRoutes } from "./aiSystemRetirement.js";
 import "dotenv/config";
 import { randomUUID } from "node:crypto";
 import Fastify from "fastify";
@@ -58,6 +60,8 @@ server.register(rateLimit, {
   timeWindow: "1 minute",
 });
 
+registerGovernanceWriteGuard(server);
+server.register(registerRetirementRoutes);
 server.register(registerAuthRoutes);
 server.register(registerAiControlEvidenceRoutes);
 server.register(registerAiControlTestRoutes);
