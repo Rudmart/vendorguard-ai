@@ -40,18 +40,7 @@ export async function extractAndSaveEvidenceChunks(params: {
   buffer: Buffer;
   mimeType: string;
 }): Promise<{ chunksCreated: number }> {
-  if (params.mimeType !== "application/pdf") {
-    return { chunksCreated: 0 };
-  }
-
-  const parsed = await pdfParse(params.buffer);
-  const fullText = parsed.text.trim();
-
-  if (!fullText) {
-    return { chunksCreated: 0 };
-  }
-
-  const textChunks = chunkText(fullText, CHUNK_SIZE_CHARS);
+  const textChunks = await extractEvidenceText(params.buffer, params.mimeType);
 
   let chunkIndex = 0;
   for (const chunkContent of textChunks) {
@@ -74,3 +63,15 @@ export async function extractAndSaveEvidenceChunks(params: {
 
   return { chunksCreated: chunkIndex };
 }
+/** Parse before acquiring governance locks; persistence remains transactional. */
+export async function extractEvidenceText(
+  buffer: Buffer,
+  mimeType: string,
+): Promise<string[]> {
+  if (mimeType !== "application/pdf") return [];
+  const parsed = await pdfParse(buffer);
+  return chunkText(parsed.text.trim(), CHUNK_SIZE_CHARS)
+    .map((x) => x.trim())
+    .filter(Boolean);
+}
+export const evidenceTextHash = sha256Hex;

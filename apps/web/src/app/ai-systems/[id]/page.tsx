@@ -47,7 +47,7 @@ type VendorLink = {
 
 type Vendor = { id: string; legalName: string };
 
-const LIFECYCLE_OPTIONS = ["PROPOSED", "DEVELOPMENT", "TESTING", "ASSESSMENT", "PENDING_APPROVAL", "APPROVED", "PRODUCTION", "SUSPENDED", "RETIRED"];
+const LIFECYCLE_OPTIONS = ["PROPOSED", "DEVELOPMENT", "TESTING", "ASSESSMENT", "PENDING_APPROVAL", "APPROVED", "PRODUCTION", "SUSPENDED"];
 const VENDOR_ROLES = ["PRIMARY_PROVIDER", "MODEL_PROVIDER", "PLATFORM_PROVIDER", "AI_SERVICE_PROVIDER", "DATA_PROVIDER", "DEVELOPMENT_PROVIDER", "OTHER"];
 const BUSINESS_CRITICALITY_OPTIONS = ["LOW", "MEDIUM", "HIGH", "CRITICAL"];
 const DECISION_ROLE_OPTIONS = ["ADVISORY", "RECOMMENDS", "DECIDES", "EXECUTES"];
@@ -85,7 +85,7 @@ export default function AiSystemDetailPage() {
 
   const [govOwnerUserId, setGovOwnerUserId] = useState("");
   const { can } = useCurrentUser();
-  const canUpdate = can("ai-system:update");
+  const canUpdate = can("ai-system:update") && aiSystem?.lifecycleStatus !== "RETIRED";
   const [govBusinessCriticality, setGovBusinessCriticality] = useState("");
   const [govDecisionRole, setGovDecisionRole] = useState("");
   const [govHumanOversight, setGovHumanOversight] = useState("");
@@ -522,7 +522,7 @@ export default function AiSystemDetailPage() {
                   <span style={{ fontWeight: 600, fontSize: 13.5 }}>{link.vendor.legalName}</span>
                   <span style={{ color: "#8b96ac", fontSize: 12, marginLeft: 8 }}>{link.role.replace(/_/g, " ")}</span>
                 </div>
-                {can("ai-system:link-vendor") && (
+                {can("ai-system:link-vendor") && aiSystem.lifecycleStatus !== "RETIRED" && (
                 <button
                   onClick={() => handleUnlink(link.id)}
                   style={{ background: "none", border: "1px solid #5d6786", color: "#8b96ac", borderRadius: 6, padding: "4px 10px", fontSize: 12, cursor: "pointer" }}
@@ -535,7 +535,7 @@ export default function AiSystemDetailPage() {
           </div>
         )}
 
-        {can("ai-system:link-vendor") && (
+        {can("ai-system:link-vendor") && aiSystem.lifecycleStatus !== "RETIRED" && (
         <form onSubmit={handleLinkVendor} style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
           <select style={{ ...selectStyle, width: "auto" }} value={linkVendorId} onChange={(e) => setLinkVendorId(e.target.value)} required>
             <option value="">Select a vendor...</option>
@@ -570,6 +570,7 @@ export default function AiSystemDetailPage() {
       </div>
     
       <h2 id="risk-impact" style={sectionHeadingStyle}>Risk & Impact</h2>
+      <section style={{ marginBottom: 20 }}><h2>Governed retirement</h2>{aiSystem.lifecycleStatus === "RETIRED" && <p>This system is permanently retired. Historical records and authorized incident/remediation follow-up remain available.</p>}<a href={`/ai-systems/${id}/retirement`}>Retirement preparation and history</a></section>
       <IncidentsCard aiSystemId={String(id)} />
       <UseCasesCard aiSystemId={String(id)} />
       <RiskAssessmentCard aiSystemId={String(id)} />

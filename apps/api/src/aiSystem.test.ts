@@ -327,7 +327,7 @@ describe("GET /ai-systems/:id and PATCH /ai-systems/:id (tenant isolation, valid
     expect(event).not.toBeNull();
   });
 
-  it("generates ai_system.retired when lifecycleStatus is set to RETIRED", async () => {
+  it("rejects direct retirement without independent approval", async () => {
     const created = await server.inject({
       method: "POST", url: "/ai-systems",
       cookies: { vg_session: cookieFor(adminUserId, "ADMIN", tenantAId) },
@@ -340,10 +340,10 @@ describe("GET /ai-systems/:id and PATCH /ai-systems/:id (tenant isolation, valid
       cookies: { vg_session: cookieFor(adminUserId, "ADMIN", tenantAId) },
       payload: { lifecycleStatus: "RETIRED" },
     });
-    expect(res.statusCode).toBe(200);
+    expect(res.statusCode).toBe(409);
 
     const event = await prisma.auditEvent.findFirst({ where: { tenantId: tenantAId, action: "ai_system.retired", targetId: id } });
-    expect(event).not.toBeNull();
+    expect(event).toBeNull();
   });
 });
 

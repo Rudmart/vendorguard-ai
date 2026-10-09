@@ -304,9 +304,9 @@ describe("Lifecycle audit enrichment", () => {
     expect(upd).not.toBeNull();
     expect(upd?.metadataJson ?? null).toBeNull();
     expect(await prisma.auditEvent.count({ where: { tenantId: tenantAId, action: "ai_system.lifecycle_changed", targetId: sysId } })).toBe(1);
-    expect((await call("PATCH", `/ai-systems/${sysId}`, adminUserId, "ADMIN", { lifecycleStatus: "RETIRED" })).status).toBe(200);
-    expect(await prisma.auditEvent.count({ where: { tenantId: tenantAId, action: "ai_system.lifecycle_changed", targetId: sysId } })).toBe(2);
-    expect(await prisma.auditEvent.count({ where: { tenantId: tenantAId, action: "ai_system.retired", targetId: sysId } })).toBe(1);
+    expect((await call("PATCH", `/ai-systems/${sysId}`, adminUserId, "ADMIN", { lifecycleStatus: "RETIRED" })).status).toBe(409);
+    expect(await prisma.auditEvent.count({ where: { tenantId: tenantAId, action: "ai_system.lifecycle_changed", targetId: sysId } })).toBe(1);
+    expect(await prisma.auditEvent.count({ where: { tenantId: tenantAId, action: "ai_system.retired", targetId: sysId } })).toBe(0);
   });
 });
 
