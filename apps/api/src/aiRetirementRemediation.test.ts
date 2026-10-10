@@ -1,4 +1,12 @@
-import { beforeAll, afterAll, beforeEach, it, expect, vi } from "vitest";
+import {
+  beforeAll,
+  afterAll,
+  beforeEach,
+  afterEach,
+  it as test,
+  expect,
+  vi,
+} from "vitest";
 const mocks = vi.hoisted(() => {
   const originalUrl = process.env.DATABASE_URL!;
   const url = new URL(originalUrl);
@@ -33,6 +41,34 @@ import { server } from "./index.js";
 let tenant: string;
 const users: Record<string, string> = {};
 let sequence = 0;
+const pending = new Set<Promise<unknown>>();
+const releases = new Set<() => void>();
+let draining = false;
+function tracked<T>(operation: Promise<T>): Promise<T> {
+  pending.add(operation);
+  void operation.then(
+    () => pending.delete(operation),
+    () => pending.delete(operation),
+  );
+  return operation;
+}
+// Vitest timeouts do not cancel test bodies; drain those too, since they can
+// start an upload after an earlier fixture request finally completes.
+function it(name: string, body: () => Promise<void>) {
+  test(name, () => tracked(Promise.resolve().then(body)));
+}
+async function drainPending() {
+  draining = true;
+  try {
+    do {
+      for (const release of releases) release();
+      await Promise.allSettled([...pending]);
+    } while (pending.size);
+  } finally {
+    releases.clear();
+    draining = false;
+  }
+}
 const cookie = (role = "ADMIN") =>
   createSessionCookie({
     tenantId: tenant,
@@ -133,20 +169,24 @@ async function upload(id: string, query = "", role = "ADMIN") {
   const payload = Buffer.from(
     `--${boundary}\r\nContent-Disposition: form-data; name="documentType"\r\n\r\nFollow-up\r\n--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="fixture.pdf"\r\nContent-Type: application/pdf\r\n\r\nfixture\r\n--${boundary}--\r\n`,
   );
-  const r = await server.inject({
-    method: "POST",
-    url: `/ai-systems/${id}/evidence/upload${query}`,
-    payload,
-    headers: { "content-type": `multipart/form-data; boundary=${boundary}` },
-    cookies: { vg_session: cookie(role) },
-    remoteAddress: `10.92.0.${++sequence}`,
-  });
+  const r = await tracked(
+    server.inject({
+      method: "POST",
+      url: `/ai-systems/${id}/evidence/upload${query}`,
+      payload,
+      headers: { "content-type": `multipart/form-data; boundary=${boundary}` },
+      cookies: { vg_session: cookie(role) },
+      remoteAddress: `10.92.0.${++sequence}`,
+    }),
+  );
   return { status: r.statusCode, body: r.json() };
 }
 function delayed() {
   let entered!: () => void, release!: () => void;
   const started = new Promise<void>((r) => (entered = r)),
     wait = new Promise<void>((r) => (release = r));
+  releases.add(release);
+  if (draining) release();
   mocks.upload.mockImplementationOnce(async (_c: string, key: string) => {
     entered();
     await wait;
@@ -192,7 +232,8 @@ beforeAll(async () => {
     return next(params);
   });
 }, 30000);
-beforeEach(() => {
+beforeEach(async () => {
+  await drainPending();
   mocks.fail = false;
   mocks.upload.mockReset();
   mocks.cleanup.mockReset();
@@ -206,7 +247,9 @@ beforeEach(() => {
   mocks.cleanup.mockResolvedValue(undefined);
   mocks.parse.mockResolvedValue(["Fixture text"]);
 });
+afterEach(drainPending);
 afterAll(async () => {
+  await drainPending();
   mocks.fail = false;
   if (!tenant) {
     await databaseClient.$disconnect();

@@ -28,7 +28,7 @@ type ReportData = {
     overdueItems: { id: string; title: string; linkedFindingControlId: string | null; linkedFindingSeverity: string | null }[];
   };
   frameworkCoverage: { framework: string; applicable: number; assessed: number; coveragePercent: number }[];
-  evidenceStatus: { total: number; current: number; expiringSoon: number; expired: number };
+  evidenceStatus: { access: "AVAILABLE"; total: number; current: number; expiringSoon: number; expired: number } | { access: "RESTRICTED" };
 };
 
 const box = { background: "#1a2340", border: "1px solid #2e3d63", borderRadius: 10, padding: 18, marginBottom: 18 };
@@ -154,22 +154,23 @@ export default function ExecutiveReportPage() {
       </div>
 
       <div style={box}>
-        <div style={heading}>Framework and Control Coverage</div>
+        <div style={heading}>Applicable Controls with Recorded Findings</div>
         {report.frameworkCoverage.map((fw) => (
           <div key={fw.framework} style={{ fontSize: 13, marginBottom: 6 }}>
-            {fw.framework}: {fw.assessed} of {fw.applicable} assessed ({fw.coveragePercent}%)
+            {fw.framework}: {fw.assessed} of {fw.applicable} with recorded findings ({fw.coveragePercent}%)
           </div>
         ))}
       </div>
 
       <div style={box}>
-        <div style={heading}>Evidence Status</div>
-        <div style={{ display: "flex", gap: 24 }}>
+        <div style={heading}>Evidence Expiration Status</div>
+        <p style={label}>Expiration and recorded-finding coverage do not establish usability, acceptance or compliance.</p>
+        {report.evidenceStatus.access === "RESTRICTED" ? <p>Restricted by evidence permissions.</p> : <div style={{ display: "flex", gap: 24 }}>
           <div><div style={label}>Total</div><div style={value}>{report.evidenceStatus.total}</div></div>
-          <div><div style={label}>Current</div><div style={value}>{report.evidenceStatus.current}</div></div>
+          <div><div style={label}>Not expiring within 30 days / no expiration</div><div style={value}>{report.evidenceStatus.current}</div></div>
           <div><div style={label}>Expiring Soon</div><div style={value}>{report.evidenceStatus.expiringSoon}</div></div>
           <div><div style={label}>Expired</div><div style={{ ...value, color: report.evidenceStatus.expired > 0 ? "#ea580c" : undefined }}>{report.evidenceStatus.expired}</div></div>
-        </div>
+        </div>}
       </div>
 
       <p style={{ color: "#8b96ac", fontSize: 11, fontStyle: "italic", marginTop: 20 }}>

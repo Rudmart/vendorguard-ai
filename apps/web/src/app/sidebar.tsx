@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
+import { useCurrentUser } from "./current-user";
 import SignOutButton from "./sign-out-button";
 
 type NavItem = {
@@ -54,7 +55,7 @@ const navSections: NavSectionDef[] = [
       { label: "Reassessments", href: "/reassessments", built: true, icon: "\uD83D\uDD04" },
     ],
   },
-  { title: "Reporting", items: [] },
+  { title: "Reporting", items: [{ label: "Governance Report", href: "/reports/ai-governance", built: true, icon: "\uD83D\uDCCA" }] },
   {
     title: "Learning Center",
     items: [
@@ -181,6 +182,7 @@ function NavSection({ items, pathname }: { items: NavItem[]; pathname: string })
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const { can } = useCurrentUser();
   const [remediationBadge, setRemediationBadge] = useState<string | undefined>(undefined);
 
   useEffect(() => {
@@ -207,6 +209,7 @@ export default function Sidebar() {
       </div>
 
       {navSections
+        .map(section => ({ ...section, items: section.items.filter(item => (item.href !== "/reports/ai-governance" || can("report:read")) && (item.href !== "/audit-log" || can("audit:read"))) }))
         .filter((section) => section.items.length > 0)
         .map((section, index) => (
           <div key={section.title}>

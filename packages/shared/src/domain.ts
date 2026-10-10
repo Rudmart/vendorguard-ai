@@ -76,6 +76,7 @@ export const RISK_ACCEPTANCE_ROLES: readonly Role[] = ["ADMIN", "REVIEWER"];
 /** Central role -> permitted actions map used by the authorization package. */
 export const ROLE_PERMISSIONS: Record<Role, readonly string[]> = {
   ADMIN: [
+    "report:read", "report:export",
     "tenant:manage",
     "framework:manage",
     "vendor:*",
@@ -115,6 +116,7 @@ export const ROLE_PERMISSIONS: Record<Role, readonly string[]> = {
     "remediation:read",
   ],
   REVIEWER: [
+    "report:read",
     "vendor:read",
     "ai-system:read",
     "ai-risk-assessment:review",
@@ -136,6 +138,7 @@ export const ROLE_PERMISSIONS: Record<Role, readonly string[]> = {
     "risk:accept",
   ],
   AUDITOR: [
+    "report:read", "report:export",
     "vendor:read",
     "ai-system:read",
     "assessment:read",

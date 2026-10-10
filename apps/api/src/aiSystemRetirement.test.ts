@@ -1,4 +1,13 @@
-import { beforeAll, afterAll, describe, it, expect, vi } from "vitest";
+import {
+  beforeAll,
+  afterAll,
+  beforeEach,
+  afterEach,
+  describe,
+  it as test,
+  expect,
+  vi,
+} from "vitest";
 import { prisma, databaseClient, type Role } from "@vendorguard/database";
 import { createSessionCookie } from "@vendorguard/auth";
 import { server } from "./index.js";
@@ -7,6 +16,35 @@ let tenant: string, foreign: string, framework: string, controlId: string;
 const users: Record<string, string> = {};
 let sequence = 0;
 let rollbackId: string | null = null;
+const pendingOperations = new Set<Promise<unknown>>();
+const releases = new Set<() => void>();
+let draining = false;
+function tracked<T>(operation: Promise<T>): Promise<T> {
+  pendingOperations.add(operation);
+  void operation.then(
+    () => pendingOperations.delete(operation),
+    () => pendingOperations.delete(operation),
+  );
+  return operation;
+}
+// Vitest timeouts do not cancel bodies; they can start more fixture requests.
+function it(name: string, body: () => void | Promise<void>) {
+  test(name, () => tracked(Promise.resolve().then(body)));
+}
+async function drainPending() {
+  draining = true;
+  try {
+    do {
+      for (const release of releases) release();
+      await Promise.allSettled([...pendingOperations]);
+    } while (pendingOperations.size);
+  } finally {
+    releases.clear();
+    draining = false;
+  }
+}
+beforeEach(drainPending);
+afterEach(drainPending);
 function session(role = "ADMIN", t = tenant) {
   return {
     userId: users[role]!,
@@ -23,13 +61,15 @@ async function call(
   role = "ADMIN",
   t = tenant,
 ) {
-  const r = await server.inject({
-    method,
-    url: path,
-    payload,
-    cookies: { vg_session: createSessionCookie(session(role, t)) },
-    remoteAddress: `10.91.${Math.floor(++sequence / 250)}.${sequence % 250}`,
-  });
+  const r = await tracked(
+    server.inject({
+      method,
+      url: path,
+      payload,
+      cookies: { vg_session: createSessionCookie(session(role, t)) },
+      remoteAddress: `10.91.${Math.floor(++sequence / 250)}.${sequence % 250}`,
+    }),
+  );
   return { status: r.statusCode, body: JSON.parse(r.body) };
 }
 async function sys(owner = users.ANALYST!, t = tenant) {
@@ -221,7 +261,7 @@ beforeAll(async () => {
   framework = (
     await prisma.framework.create({
       data: {
-        catalogId: `retirement-${stamp}`,
+        catalogId: `s8-test-retirement-${stamp}`,
         name: "Retirement fixture",
         scope: "VENDOR_ASSESSMENT",
         industries: [],
@@ -278,6 +318,7 @@ async function cleanupCatalogFixtures(
 }
 
 afterAll(async () => {
+  await drainPending();
   rollbackId = null;
   const tenantIds = [tenant, foreign].filter((id): id is string => !!id);
   const where = { tenantId: { in: tenantIds } };
@@ -1148,24 +1189,30 @@ describe("Retirement governed edge cases", () => {
     let release!: () => void, locked!: () => void;
     const barrier = new Promise<void>((resolve) => (locked = resolve)),
       continueCommit = new Promise<void>((resolve) => (release = resolve));
-    const blocker = databaseClient.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT 1 FROM pg_advisory_xact_lock(hashtextextended(${tenant},0))`;
-      await tx.$queryRaw`SELECT id FROM ai_systems WHERE id=${p.aiSystemId} FOR UPDATE`;
-      await tx.aiIncident.create({
-        data: {
-          tenantId: tenant,
-          aiSystemId: p.aiSystemId,
-          title: "Concurrent blocker",
-          description: "Fixture",
-          severity: "HIGH",
-          detectedAt: new Date(),
-          reporterUserId: users.ADMIN!,
-          ownerUserId: users.ANALYST!,
-        },
-      });
-      locked();
-      await continueCommit;
-    });
+    releases.add(release);
+    if (draining) release();
+    const blocker = tracked(
+      databaseClient.$transaction(async (tx) => {
+        await tx.$queryRaw`SELECT 1 FROM pg_advisory_xact_lock(hashtextextended(${tenant},0))`;
+        await tx.$queryRaw`SELECT id FROM ai_systems WHERE id=${p.aiSystemId} FOR UPDATE`;
+        await tx.aiIncident.create({
+          data: {
+            tenantId: tenant,
+            aiSystemId: p.aiSystemId,
+            title: "Concurrent blocker",
+            description: "Fixture",
+            severity: "HIGH",
+            detectedAt: new Date(),
+            reporterUserId: users.ADMIN!,
+            ownerUserId: users.ANALYST!,
+          },
+        });
+        locked();
+        await continueCommit;
+      }),
+    );
+    // A rejected transaction must also wake the body waiting for the barrier.
+    void blocker.then(locked, locked);
     await barrier;
     const decision = approve(p);
     release();

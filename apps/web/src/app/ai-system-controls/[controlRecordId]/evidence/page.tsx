@@ -305,7 +305,7 @@ export default function ControlEvidencePage() {
         <h2 style={heading}>Submissions and review history</h2>
         {links.length === 0 && <p style={muted}>No evidence submitted yet.</p>}
         {links.map((link) => (
-          <div key={link.id} style={{ borderTop: "1px solid #1f2937", padding: "12px 0" }}>
+          <div key={link.id} id={"evidence-" + link.evidenceDocument.id} style={{ borderTop: "1px solid #1f2937", padding: "12px 0" }}>
             <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
               <strong style={{ fontSize: 14 }}>
                 {link.evidenceDocument.displayFilename} <span style={muted}>({link.evidenceDocument.documentType})</span>

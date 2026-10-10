@@ -1,3 +1,5 @@
+import { registerGovernanceReportRoutes } from "./aiGovernanceReporting.js";
+import { registerAuditEventRoutes } from "./auditEvents.js";
 import { registerGovernanceWriteGuard } from "./aiGovernanceWriteGuard.js";
 import { registerRetirementRoutes } from "./aiSystemRetirement.js";
 import "dotenv/config";
@@ -74,6 +76,8 @@ server.register(registerGlobalListRoutes);
 server.register(registerWorkQueueRoutes);
 server.register(registerAiUseCaseRoutes);
 server.register(registerAiIncidentRoutes);
+server.register(registerGovernanceReportRoutes);
+server.register(registerAuditEventRoutes);
 
 server.get("/health", async () => {
   return { status: "ok", service: "vendorguard-api" };
@@ -501,9 +505,15 @@ server.get("/vendors/:id/executive-report", async (request, reply) => {
   if (!session) {
     return reply.status(401).send({ error: "Not logged in" });
   }
+  reply.header("Cache-Control", "private, no-store");
+  if (!hasAnyPermission(session, ["vendor:read"])) {
+    await prisma.auditEvent.create({ data: { tenantId: session.tenantId, actorUserId: session.userId,
+      action: "report.denied", targetType: "Vendor", outcome: "DENIED" } });
+    return reply.status(403).send({ error: "Not authorized to view vendor reports" });
+  }
   const { id: vendorId } = request.params as { id: string };
 
-  const report = await buildExecutiveReport(session.tenantId, vendorId);
+  const report = await buildExecutiveReport(session.tenantId, vendorId, hasAnyPermission(session, ["evidence:read", "evidence:read-metadata"]));
   if (!report) {
     return reply.status(404).send({ error: "Vendor not found" });
   }
@@ -572,9 +582,15 @@ server.get("/vendors/:id/executive-report/export", async (request, reply) => {
   if (!session) {
     return reply.status(401).send({ error: "Not logged in" });
   }
+  reply.header("Cache-Control", "private, no-store");
+  if (!hasAnyPermission(session, ["vendor:read"])) {
+    await prisma.auditEvent.create({ data: { tenantId: session.tenantId, actorUserId: session.userId,
+      action: "report.denied", targetType: "Vendor", outcome: "DENIED" } });
+    return reply.status(403).send({ error: "Not authorized to view vendor reports" });
+  }
   const { id: vendorId } = request.params as { id: string };
 
-  const report = await buildExecutiveReport(session.tenantId, vendorId);
+  const report = await buildExecutiveReport(session.tenantId, vendorId, hasAnyPermission(session, ["evidence:read", "evidence:read-metadata"]));
   if (!report) {
     return reply.status(404).send({ error: "Vendor not found" });
   }

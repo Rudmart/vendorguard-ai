@@ -105,10 +105,10 @@ export async function renderExecutiveReportPdf(report: ExecutiveReportData): Pro
     }
     doc.moveDown(1);
 
-    doc.fillColor(COLORS.navy).fontSize(13).font("Helvetica-Bold").text("Framework and Control Coverage");
+    doc.fillColor(COLORS.navy).fontSize(13).font("Helvetica-Bold").text("Framework Applicable Controls with Recorded Findings");
     for (const fw of report.frameworkCoverage) {
       doc.fillColor(COLORS.black).fontSize(9).font("Helvetica").text(
-        `${fw.framework}: ${fw.assessed} of ${fw.applicable} assessed (${fw.coveragePercent}%)`
+        `${fw.framework}: ${fw.assessed} of ${fw.applicable} with recorded findings (${fw.coveragePercent}%)`
       );
     }
     doc.moveDown(1);
@@ -116,8 +116,12 @@ export async function renderExecutiveReportPdf(report: ExecutiveReportData): Pro
     doc.fillColor(COLORS.navy).fontSize(13).font("Helvetica-Bold").text("Evidence Status");
     const ev = report.evidenceStatus;
     doc.fillColor(COLORS.black).fontSize(10).font("Helvetica").text(
-      `Total: ${ev.total}   Current: ${ev.current}   Expiring Soon: ${ev.expiringSoon}   Expired: ${ev.expired}`
+      ev.access === "RESTRICTED" ? "Restricted by evidence permissions" :
+      `Expiration only — Total: ${ev.total}   Not expiring within 30 days/no expiration: ${ev.current}   Expiring Soon: ${ev.expiringSoon}   Expired: ${ev.expired}`
     );
+    doc.fontSize(8).text("Coverage is recorded-finding coverage, not compliance. Risk ratings identify their own assessment sources.");
+    if (report.riskRating) doc.text("Risk rating source: " + report.riskRating.id + " | assessment " + report.riskRating.assessmentId);
+    doc.text("Generated UTC: " + report.generatedAt);
     doc.moveDown(1);
 
     doc.fillColor(COLORS.grey).fontSize(8).font("Helvetica-Oblique").text(

@@ -1,10 +1,13 @@
 "use client";
 
+import type { GovernanceReport } from "@vendorguard/shared";
+import ReportSections from "./reports/ai-governance/report-sections";
 import type { CSSProperties } from "react";
 import { muted, useList } from "./_lists/ui";
 
 // Alignment Phase C: AI governance posture + attention dashboard. Read-only; every number links to its real page.
 type Summary = {
+  governanceReport?: GovernanceReport;
   attention: Record<string, number>;
   posture: { aiSystems: number; inProduction: number; withoutCompletedRiskAssessment: number; withoutCompletedImpactAssessment: number; latestAssessedResidualRisk: Record<string, number>; aiRemediationOpen: number; riskAcceptanceActive: number; reassessmentsInProgress: number; monitoringChecksActive: number };
   thirdParty: { vendors: number; aiVendors: number; openVendorRemediation: number } | null;
@@ -42,11 +45,13 @@ export default function DashboardPage() {
       {!error && !data && <p style={muted}>Loading...</p>}
       {data && (
         <>
+          {data.governanceReport && <ReportSections report={data.governanceReport} />}
           <Section
-            title="Needs attention"
+            title={data.governanceReport ? "Personal work and review queues" : "Needs attention"}
             cards={[
               { label: "Pending reviews for you", value: data.attention.pendingReviewsForMe + vendorPending, href: "/reviews/pending", warn: true },
               { label: "My work items", value: data.attention.myWork, href: "/my-work" },
+              ...(!data.governanceReport ? [
               { label: "Open Findings", value: data.attention.findingsOpen, href: "/findings", warn: true },
               { label: "Critical/high open Findings", value: data.attention.criticalOrHighOpenFindings, href: "/findings", warn: true },
               { label: "Findings awaiting review", value: data.attention.findingsPendingReview, href: "/findings" },
@@ -58,9 +63,10 @@ export default function DashboardPage() {
               { label: `Risk Acceptance expiring (${data.acceptanceExpiringDays}d)`, value: data.attention.riskAcceptanceExpiringSoon, href: "/risk-acceptance", warn: true },
               { label: "Risk Acceptance expired", value: data.attention.riskAcceptanceExpired, href: "/risk-acceptance", warn: true },
               { label: "Risk Acceptance decisions pending", value: data.attention.riskAcceptancePending, href: "/risk-acceptance" },
+              ] : []),
             ]}
           />
-          <Section
+          {!data.governanceReport && <Section
             title="AI governance posture"
             cards={[
               { label: "AI systems", value: data.posture.aiSystems, href: "/ai-inventory" },
@@ -77,6 +83,7 @@ export default function DashboardPage() {
               { label: "Reassessments in progress", value: data.posture.reassessmentsInProgress, href: "/reassessments" },
             ]}
           />
+          }
           {data.thirdParty && (
             <Section
               title="Third-Party AI Risk"
