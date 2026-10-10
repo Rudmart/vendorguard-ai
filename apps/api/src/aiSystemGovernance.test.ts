@@ -1,7 +1,8 @@
+import { issueTestSessionCookie } from "./testSession.js";
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { prisma } from "@vendorguard/database";
 import { server } from "./index.js";
-import { createSessionCookie } from "@vendorguard/auth";
+
 
 let tenantAId: string;
 let tenantBId: string;
@@ -10,8 +11,8 @@ let readOnlyUserId: string;
 let colleagueUserId: string;
 let tenantBUserId: string;
 
-function cookieFor(userId: string, role: string, tenantId: string) {
-  return createSessionCookie({ userId, tenantId, email: `${userId}@example.com`, displayName: "Test User", role });
+async function cookieFor(userId: string, role: string, tenantId: string) {
+  return await issueTestSessionCookie({ userId, tenantId, email: `${userId}@example.com`, displayName: "Test User", role });
 }
 
 beforeAll(async () => {
@@ -61,7 +62,7 @@ afterAll(async () => {
 async function createSystem(ownerRole = "ADMIN", ownerUserId = adminUserId) {
   const res = await server.inject({
     method: "POST", url: "/ai-systems",
-    cookies: { vg_session: cookieFor(ownerUserId, ownerRole, tenantAId) },
+    cookies: { vg_session: await cookieFor(ownerUserId, ownerRole, tenantAId) },
     payload: { name: "Governance Test System", origin: "INTERNAL" },
   });
   return JSON.parse(res.body).id as string;
@@ -76,7 +77,7 @@ describe("GET /tenant-users", () => {
   it("returns only users belonging to the caller's own tenant", async () => {
     const res = await server.inject({
       method: "GET", url: "/tenant-users",
-      cookies: { vg_session: cookieFor(adminUserId, "ADMIN", tenantAId) },
+      cookies: { vg_session: await cookieFor(adminUserId, "ADMIN", tenantAId) },
     });
     expect(res.statusCode).toBe(200);
     const body = JSON.parse(res.body);
@@ -92,7 +93,7 @@ describe("Ownership assignment", () => {
     const id = await createSystem();
     const res = await server.inject({
       method: "PATCH", url: `/ai-systems/${id}`,
-      cookies: { vg_session: cookieFor(adminUserId, "ADMIN", tenantAId) },
+      cookies: { vg_session: await cookieFor(adminUserId, "ADMIN", tenantAId) },
       payload: { ownerUserId: colleagueUserId },
     });
     expect(res.statusCode).toBe(200);
@@ -103,12 +104,12 @@ describe("Ownership assignment", () => {
     const id = await createSystem();
     await server.inject({
       method: "PATCH", url: `/ai-systems/${id}`,
-      cookies: { vg_session: cookieFor(adminUserId, "ADMIN", tenantAId) },
+      cookies: { vg_session: await cookieFor(adminUserId, "ADMIN", tenantAId) },
       payload: { ownerUserId: colleagueUserId },
     });
     const res = await server.inject({
       method: "GET", url: `/ai-systems/${id}`,
-      cookies: { vg_session: cookieFor(adminUserId, "ADMIN", tenantAId) },
+      cookies: { vg_session: await cookieFor(adminUserId, "ADMIN", tenantAId) },
     });
     const body = JSON.parse(res.body);
     expect(body.owner.id).toBe(colleagueUserId);
@@ -119,7 +120,7 @@ describe("Ownership assignment", () => {
     const id = await createSystem();
     const res = await server.inject({
       method: "PATCH", url: `/ai-systems/${id}`,
-      cookies: { vg_session: cookieFor(adminUserId, "ADMIN", tenantAId) },
+      cookies: { vg_session: await cookieFor(adminUserId, "ADMIN", tenantAId) },
       payload: { ownerUserId: tenantBUserId },
     });
     expect(res.statusCode).toBe(400);
@@ -129,7 +130,7 @@ describe("Ownership assignment", () => {
     const id = await createSystem();
     const res = await server.inject({
       method: "PATCH", url: `/ai-systems/${id}`,
-      cookies: { vg_session: cookieFor(adminUserId, "ADMIN", tenantAId) },
+      cookies: { vg_session: await cookieFor(adminUserId, "ADMIN", tenantAId) },
       payload: { ownerUserId: "00000000-0000-0000-0000-000000000000" },
     });
     expect(res.statusCode).toBe(400);
@@ -139,7 +140,7 @@ describe("Ownership assignment", () => {
     const id = await createSystem();
     const res = await server.inject({
       method: "PATCH", url: `/ai-systems/${id}`,
-      cookies: { vg_session: cookieFor(readOnlyUserId, "READ_ONLY", tenantAId) },
+      cookies: { vg_session: await cookieFor(readOnlyUserId, "READ_ONLY", tenantAId) },
       payload: { ownerUserId: colleagueUserId },
     });
     expect(res.statusCode).toBe(403);
@@ -149,7 +150,7 @@ describe("Ownership assignment", () => {
     const id = await createSystem();
     await server.inject({
       method: "PATCH", url: `/ai-systems/${id}`,
-      cookies: { vg_session: cookieFor(adminUserId, "ADMIN", tenantAId) },
+      cookies: { vg_session: await cookieFor(adminUserId, "ADMIN", tenantAId) },
       payload: { ownerUserId: colleagueUserId },
     });
     const event = await prisma.auditEvent.findFirst({ where: { tenantId: tenantAId, action: "ai_system.owner_changed", targetId: id } });
@@ -163,7 +164,7 @@ describe("Governance classification", () => {
     const id = await createSystem();
     const res = await server.inject({
       method: "PATCH", url: `/ai-systems/${id}`,
-      cookies: { vg_session: cookieFor(adminUserId, "ADMIN", tenantAId) },
+      cookies: { vg_session: await cookieFor(adminUserId, "ADMIN", tenantAId) },
       payload: {
         businessCriticality: "HIGH",
         decisionRole: "RECOMMENDS",
@@ -193,12 +194,12 @@ describe("Governance classification", () => {
     const id = await createSystem();
     await server.inject({
       method: "PATCH", url: `/ai-systems/${id}`,
-      cookies: { vg_session: cookieFor(adminUserId, "ADMIN", tenantAId) },
+      cookies: { vg_session: await cookieFor(adminUserId, "ADMIN", tenantAId) },
       payload: { businessCriticality: "CRITICAL", assessmentStatus: "ASSESSED" },
     });
     const res = await server.inject({
       method: "GET", url: `/ai-systems/${id}`,
-      cookies: { vg_session: cookieFor(adminUserId, "ADMIN", tenantAId) },
+      cookies: { vg_session: await cookieFor(adminUserId, "ADMIN", tenantAId) },
     });
     const body = JSON.parse(res.body);
     expect(body.businessCriticality).toBe("CRITICAL");
@@ -209,12 +210,12 @@ describe("Governance classification", () => {
     const id = await createSystem();
     await server.inject({
       method: "PATCH", url: `/ai-systems/${id}`,
-      cookies: { vg_session: cookieFor(adminUserId, "ADMIN", tenantAId) },
+      cookies: { vg_session: await cookieFor(adminUserId, "ADMIN", tenantAId) },
       payload: { riskTier: "HIGH" },
     });
     const res = await server.inject({
       method: "PATCH", url: `/ai-systems/${id}`,
-      cookies: { vg_session: cookieFor(adminUserId, "ADMIN", tenantAId) },
+      cookies: { vg_session: await cookieFor(adminUserId, "ADMIN", tenantAId) },
       payload: { businessCriticality: "LOW" },
     });
     expect(JSON.parse(res.body).riskTier).toBe("HIGH");
@@ -224,7 +225,7 @@ describe("Governance classification", () => {
     const id = await createSystem();
     const res = await server.inject({
       method: "PATCH", url: `/ai-systems/${id}`,
-      cookies: { vg_session: cookieFor(adminUserId, "ADMIN", tenantAId) },
+      cookies: { vg_session: await cookieFor(adminUserId, "ADMIN", tenantAId) },
       payload: { businessCriticality: "SUPER_HIGH" },
     });
     expect(res.statusCode).toBe(400);
@@ -234,7 +235,7 @@ describe("Governance classification", () => {
     const id = await createSystem();
     const res = await server.inject({
       method: "PATCH", url: `/ai-systems/${id}`,
-      cookies: { vg_session: cookieFor(adminUserId, "ADMIN", tenantAId) },
+      cookies: { vg_session: await cookieFor(adminUserId, "ADMIN", tenantAId) },
       payload: { decisionRole: "OVERRULES" },
     });
     expect(res.statusCode).toBe(400);
@@ -244,7 +245,7 @@ describe("Governance classification", () => {
     const id = await createSystem();
     const res = await server.inject({
       method: "PATCH", url: `/ai-systems/${id}`,
-      cookies: { vg_session: cookieFor(adminUserId, "ADMIN", tenantAId) },
+      cookies: { vg_session: await cookieFor(adminUserId, "ADMIN", tenantAId) },
       payload: { affectedPopulation: ["ALIENS"] },
     });
     expect(res.statusCode).toBe(400);
@@ -254,7 +255,7 @@ describe("Governance classification", () => {
     const id = await createSystem();
     const res = await server.inject({
       method: "PATCH", url: `/ai-systems/${id}`,
-      cookies: { vg_session: cookieFor(adminUserId, "ADMIN", tenantAId) },
+      cookies: { vg_session: await cookieFor(adminUserId, "ADMIN", tenantAId) },
       payload: { regulatoryRelevance: ["MADE_UP_LAW"] },
     });
     expect(res.statusCode).toBe(400);
@@ -264,7 +265,7 @@ describe("Governance classification", () => {
     const id = await createSystem();
     const res = await server.inject({
       method: "PATCH", url: `/ai-systems/${id}`,
-      cookies: { vg_session: cookieFor(adminUserId, "ADMIN", tenantAId) },
+      cookies: { vg_session: await cookieFor(adminUserId, "ADMIN", tenantAId) },
       payload: { assessmentStatus: "DONE" },
     });
     expect(res.statusCode).toBe(400);
@@ -274,7 +275,7 @@ describe("Governance classification", () => {
     const id = await createSystem();
     const res = await server.inject({
       method: "PATCH", url: `/ai-systems/${id}`,
-      cookies: { vg_session: cookieFor(tenantBUserId, "ADMIN", tenantBId) },
+      cookies: { vg_session: await cookieFor(tenantBUserId, "ADMIN", tenantBId) },
       payload: { businessCriticality: "HIGH" },
     });
     expect(res.statusCode).toBe(404);
@@ -284,7 +285,7 @@ describe("Governance classification", () => {
     const id = await createSystem();
     const res = await server.inject({
       method: "PATCH", url: `/ai-systems/${id}`,
-      cookies: { vg_session: cookieFor(readOnlyUserId, "READ_ONLY", tenantAId) },
+      cookies: { vg_session: await cookieFor(readOnlyUserId, "READ_ONLY", tenantAId) },
       payload: { businessCriticality: "HIGH" },
     });
     expect(res.statusCode).toBe(403);
@@ -294,7 +295,7 @@ describe("Governance classification", () => {
     const id = await createSystem();
     await server.inject({
       method: "PATCH", url: `/ai-systems/${id}`,
-      cookies: { vg_session: cookieFor(adminUserId, "ADMIN", tenantAId) },
+      cookies: { vg_session: await cookieFor(adminUserId, "ADMIN", tenantAId) },
       payload: { businessCriticality: "CRITICAL", impactLevel: "HIGH" },
     });
     const event = await prisma.auditEvent.findFirst({ where: { tenantId: tenantAId, action: "ai_system.classification_changed", targetId: id } });
@@ -308,7 +309,7 @@ describe("Governance classification", () => {
     const id = await createSystem();
     await server.inject({
       method: "PATCH", url: `/ai-systems/${id}`,
-      cookies: { vg_session: cookieFor(adminUserId, "ADMIN", tenantAId) },
+      cookies: { vg_session: await cookieFor(adminUserId, "ADMIN", tenantAId) },
       payload: { description: "just a description update" },
     });
     const event = await prisma.auditEvent.findFirst({ where: { tenantId: tenantAId, action: "ai_system.classification_changed", targetId: id } });

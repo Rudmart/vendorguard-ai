@@ -109,6 +109,7 @@ enum AssessmentStatus {
 // ---------------------------------------------------------------------------
 
 model Tenant {
+  governanceDecisions GovernanceDecision[]
   retirements AiSystemRetirement[]
   id               String           @id @default(uuid())
   name             String
@@ -141,6 +142,8 @@ model Tenant {
 }
 
 model User {
+  governanceDecisions GovernanceDecision[]
+  proposedFindings ControlFinding[] @relation("FindingProposer")
   retirementRequests AiSystemRetirement[] @relation("RetirementRequester")
   retirementSubmissions AiSystemRetirement[] @relation("RetirementSubmitter")
   retirementOwnership AiSystemRetirement[] @relation("RetirementOwner")
@@ -195,6 +198,7 @@ model User {
 // given request MUST be resolved from this table via the tenant context
 // in the request's authenticated claims, never from a client-supplied role.
 model TenantMembership {
+  sessions StoredSession[]
   id        String   @id @default(uuid())
   tenantId  String
   userId    String
@@ -598,6 +602,9 @@ model ControlMapping {
 // ---------------------------------------------------------------------------
 
 model ControlFinding {
+  proposedStatus FindingStatus?
+  proposedByUserId String?
+  proposedBy User? @relation("FindingProposer", fields: [proposedByUserId], references: [id], onDelete: Restrict)
   id                String        @id @default(uuid())
   tenantId          String
   vendorId          String
@@ -1032,6 +1039,7 @@ model AiSystemVendor {
 }
 
 model AiRiskAssessment {
+  decisionHistory GovernanceDecision[]
   reassessmentsAsPrior AiReassessment[] @relation("ReassessmentPriorRisk")
   reassessmentsAsNew   AiReassessment[] @relation("ReassessmentNewRisk")
   id             String                 @id @default(uuid())
@@ -1149,6 +1157,7 @@ enum AiImpactReversibility {
 }
 
 model AiImpactAssessment {
+  decisionHistory GovernanceDecision[]
   reassessmentsAsPrior AiReassessment[] @relation("ReassessmentPriorImpact")
   reassessmentsAsNew   AiReassessment[] @relation("ReassessmentNewImpact")
   id         String                 @id @default(uuid())
@@ -1698,6 +1707,7 @@ enum AiUseCaseStatus {
 }
 
 model AiUseCase {
+  decisionHistory GovernanceDecision[]
   incidents AiIncident[]
 
   id              String                   @id @default(uuid())
@@ -1909,4 +1919,43 @@ model AiSystemRetirementEvidence {
   @@unique([retirementId, evidenceDocumentId])
   @@index([tenantId])
   @@map("ai_system_retirement_evidence")
+}
+
+// Durable, individually revocable sessions; removing membership deletes its sessions.
+model StoredSession {
+  id String @id @default(uuid())
+  tenantId String
+  userId String
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+  revokedAt DateTime?
+  membership TenantMembership @relation(fields: [tenantId, userId], references: [tenantId, userId], onDelete: Cascade)
+  @@index([tenantId, userId])
+  @@index([expiresAt])
+  @@map("stored_sessions")
+}
+
+// Each decision has exactly one authoritative parent (enforced by migration CHECK).
+model GovernanceDecision {
+  id String @id @default(uuid())
+  tenantId String
+  actorUserId String
+  useCaseId String?
+  riskAssessmentId String?
+  impactAssessmentId String?
+  decision AiAssessmentReviewDecision
+  rationale String
+  version Int?
+  context Json
+  correlationId String @unique
+  createdAt DateTime @default(now())
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  actor User @relation(fields: [actorUserId], references: [id], onDelete: Restrict)
+  useCase AiUseCase? @relation(fields: [useCaseId], references: [id], onDelete: Cascade)
+  riskAssessment AiRiskAssessment? @relation(fields: [riskAssessmentId], references: [id], onDelete: Cascade)
+  impactAssessment AiImpactAssessment? @relation(fields: [impactAssessmentId], references: [id], onDelete: Cascade)
+  @@index([tenantId, useCaseId])
+  @@index([tenantId, riskAssessmentId])
+  @@index([tenantId, impactAssessmentId])
+  @@map("governance_decisions")
 }

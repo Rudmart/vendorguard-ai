@@ -8,9 +8,18 @@
  * evidence never implies an Effective control. Completed tests are locked; a retest
  * is a new record. Findings for AI-system controls are deferred to Step 11.
  */
+import { evidenceAllowed, independentControlTestEvidenceContext } from "@vendorguard/auth";
+import type { Role } from "@vendorguard/shared";
 import type { FastifyInstance } from "fastify";
 import { prisma } from "@vendorguard/database";
 import { sessionOf, hasPermission, cleanText, parseOptionalDate, audit, type Session } from "./aiControlEvidence.js";
+
+function visibleTest<T extends { testerUserId: string; aiSystemControl: { ownerUserId: string | null }; evidence: { evidenceLink: { submittedByUserId: string; evidenceDocument: { uploadedByUserId: string } } }[] } | null>(test: T, session: Session) {
+  if (!test) return test;
+  const allowed = evidenceAllowed(session.role as Role, "metadata");
+  const contextual = test.evidence.filter(item => independentControlTestEvidenceContext({ userId: session.userId!, role: session.role as Role }, test, item.evidenceLink));
+  return { ...test, aiSystemControl: undefined, evidence: allowed ? test.evidence : contextual.length ? contextual : null, evidenceAccess: allowed ? "ALLOWED" : contextual.length ? "REVIEW_CONTEXT" : "RESTRICTED" };
+}
 
 export const TEST_METHODS = ["DOCUMENT_REVIEW", "INTERVIEW", "OBSERVATION", "SAMPLE_TESTING", "CONFIGURATION_REVIEW", "OTHER"] as const;
 export type TestMethod = (typeof TEST_METHODS)[number];
@@ -128,6 +137,7 @@ function exceptionsWithinSample(sample: number | null, exceptions: number | null
 
 const USER_SELECT = { id: true, displayName: true, email: true } as const;
 const TEST_INCLUDE = {
+  aiSystemControl: { select: { ownerUserId: true } },
   tester: { select: USER_SELECT },
   evidence: {
     orderBy: { createdAt: "asc" },
@@ -207,7 +217,7 @@ export async function registerAiControlTestRoutes(app: FastifyInstance): Promise
     if (priorCompleted > 0) {
       await audit(session, "ai_control_test.retest_recorded", "AiControlTest", created.id, { aiSystemControlId: record.id, priorCompletedTests: priorCompleted });
     }
-    return reply.status(201).send(await loadTest(created.id, session.tenantId));
+    return reply.status(201).send(visibleTest(await loadTest(created.id, session.tenantId), session));
   });
 
   // 2. Test history for a mapped control (newest first) + latest completed result.
@@ -230,9 +240,10 @@ export async function registerAiControlTestRoutes(app: FastifyInstance): Promise
       include: TEST_INCLUDE,
     });
     return reply.send({
+      evidenceAccess: evidenceAllowed(session.role as Role, "metadata") ? "ALLOWED" : "RESTRICTED",
       aiSystemControlId: record.id,
-      latestCompleted: tests.find((test) => test.status === "COMPLETED") ?? null,
-      tests,
+      latestCompleted: visibleTest(tests.find((test) => test.status === "COMPLETED") ?? null, session),
+      tests: tests.map((test) => visibleTest(test, session)),
     });
   });
 
@@ -250,7 +261,7 @@ export async function registerAiControlTestRoutes(app: FastifyInstance): Promise
     if (!test) {
       return reply.status(404).send({ error: "Control test not found" });
     }
-    return reply.send(test);
+    return reply.send(visibleTest(test, session));
   });
 
   // 4. Update an IN_PROGRESS test (tester only).
@@ -291,7 +302,7 @@ export async function registerAiControlTestRoutes(app: FastifyInstance): Promise
       return reply.status(409).send({ error: LOCKED });
     }
     await audit(session, "ai_control_test.updated", "AiControlTest", test.id, { fields: Object.keys(f).join(",") });
-    return reply.send(await loadTest(test.id, session.tenantId));
+    return reply.send(visibleTest(await loadTest(test.id, session.tenantId), session));
   });
 
   // 5. Associate a Step 9 evidence link with an IN_PROGRESS test (tester only, separation of duties).
@@ -344,7 +355,7 @@ export async function registerAiControlTestRoutes(app: FastifyInstance): Promise
       throw err;
     }
     await audit(session, "ai_control_test.evidence_associated", "AiControlTest", test.id, { evidenceLinkId: link.id, evidenceStatus: link.status });
-    return reply.status(201).send(await loadTest(test.id, session.tenantId));
+    return reply.status(201).send(visibleTest(await loadTest(test.id, session.tenantId), session));
   });
 
   // 6. Complete a test: human conclusions + accepted evidence required, then locked.
@@ -431,6 +442,6 @@ export async function registerAiControlTestRoutes(app: FastifyInstance): Promise
       operating: test.operatingEffectiveness,
       overall: test.overallEffectiveness,
     });
-    return reply.send(await loadTest(test.id, session.tenantId));
+    return reply.send(visibleTest(await loadTest(test.id, session.tenantId), session));
   });
 }

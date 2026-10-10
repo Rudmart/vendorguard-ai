@@ -1,7 +1,8 @@
+import { issueTestSessionCookie } from "./testSession.js";
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { prisma } from "@vendorguard/database";
 import { server } from "./index.js";
-import { createSessionCookie } from "@vendorguard/auth";
+
 
 let tenantAId: string;
 let tenantBId: string;
@@ -11,14 +12,14 @@ let reviewerUserId: string;
 let readOnlyUserId: string;
 let tenantBUserId: string;
 
-function cookieFor(userId: string, role: string, tenantId: string) {
-  return createSessionCookie({ userId, tenantId, email: `${userId}@example.com`, displayName: "Test User", role });
+async function cookieFor(userId: string, role: string, tenantId: string) {
+  return await issueTestSessionCookie({ userId, tenantId, email: `${userId}@example.com`, displayName: "Test User", role });
 }
 
 async function createAiSystem(tenantId: string, role: string, userId: string, name = "Impact Assessment Test System") {
   const res = await server.inject({
     method: "POST", url: "/ai-systems",
-    cookies: { vg_session: cookieFor(userId, role, tenantId) },
+    cookies: { vg_session: await cookieFor(userId, role, tenantId) },
     payload: { name, origin: "INTERNAL" },
   });
   return JSON.parse(res.body).id as string;
@@ -27,7 +28,7 @@ async function createAiSystem(tenantId: string, role: string, userId: string, na
 async function createImpactAssessment(aiSystemId: string, tenantId: string, role: string, userId: string, payload: Record<string, unknown> = {}) {
   return server.inject({
     method: "POST", url: `/ai-systems/${aiSystemId}/impact-assessments`,
-    cookies: { vg_session: cookieFor(userId, role, tenantId) },
+    cookies: { vg_session: await cookieFor(userId, role, tenantId) },
     payload,
   });
 }
@@ -70,7 +71,7 @@ const beneficialImpact = {
 async function addImpact(assessmentId: string, payload: Record<string, unknown>, role = "ANALYST", userId?: string, tenantId?: string) {
   return server.inject({
     method: "POST", url: `/ai-impact-assessments/${assessmentId}/impacts`,
-    cookies: { vg_session: cookieFor(userId ?? analystUserId, role, tenantId ?? tenantAId) },
+    cookies: { vg_session: await cookieFor(userId ?? analystUserId, role, tenantId ?? tenantAId) },
     payload,
   });
 }
@@ -78,7 +79,7 @@ async function addImpact(assessmentId: string, payload: Record<string, unknown>,
 async function review(assessmentId: string, userId: string, role: string, decision = "APPROVED", rationale = "Reviewed", tenantId?: string) {
   return server.inject({
     method: "POST", url: `/ai-impact-assessments/${assessmentId}/review`,
-    cookies: { vg_session: cookieFor(userId, role, tenantId ?? tenantAId) },
+    cookies: { vg_session: await cookieFor(userId, role, tenantId ?? tenantAId) },
     payload: { decision, rationale },
   });
 }
@@ -179,7 +180,7 @@ describe("AI Impact Assessment - create/retrieve/update", () => {
     expect(createRes.statusCode).toBe(404);
     const getRes = await server.inject({
       method: "GET", url: `/ai-impact-assessments/${assessmentId}`,
-      cookies: { vg_session: cookieFor(tenantBUserId, "ADMIN", tenantBId) },
+      cookies: { vg_session: await cookieFor(tenantBUserId, "ADMIN", tenantBId) },
     });
     expect(getRes.statusCode).toBe(404);
   });
@@ -192,7 +193,7 @@ describe("AI Impact Assessment - create/retrieve/update", () => {
     await createImpactAssessment(sysId, tenantAId, "ANALYST", analystUserId);
     const res = await server.inject({
       method: "GET", url: `/ai-systems/${sysId}/impact-assessments`,
-      cookies: { vg_session: cookieFor(readOnlyUserId, "READ_ONLY", tenantAId) },
+      cookies: { vg_session: await cookieFor(readOnlyUserId, "READ_ONLY", tenantAId) },
     });
     expect(res.statusCode).toBe(200);
     const list = JSON.parse(res.body);
@@ -204,7 +205,7 @@ describe("AI Impact Assessment - create/retrieve/update", () => {
     const { assessmentId } = await newAssessmentId();
     const ok = await server.inject({
       method: "PATCH", url: `/ai-impact-assessments/${assessmentId}`,
-      cookies: { vg_session: cookieFor(analystUserId, "ANALYST", tenantAId) },
+      cookies: { vg_session: await cookieFor(analystUserId, "ANALYST", tenantAId) },
       payload: { status: "IN_PROGRESS" },
     });
     expect(ok.statusCode).toBe(200);
@@ -213,7 +214,7 @@ describe("AI Impact Assessment - create/retrieve/update", () => {
     expect(event).not.toBeNull();
     const bad = await server.inject({
       method: "PATCH", url: `/ai-impact-assessments/${assessmentId}`,
-      cookies: { vg_session: cookieFor(analystUserId, "ANALYST", tenantAId) },
+      cookies: { vg_session: await cookieFor(analystUserId, "ANALYST", tenantAId) },
       payload: { status: "COMPLETED" },
     });
     expect(bad.statusCode).toBe(400);
@@ -289,7 +290,7 @@ describe("AI Impact - add/update/delete and validation", () => {
     const impact = JSON.parse((await addImpact(assessmentId, adverseImpact)).body);
     const res = await server.inject({
       method: "PATCH", url: `/ai-impacts/${impact.id}`,
-      cookies: { vg_session: cookieFor(analystUserId, "ANALYST", tenantAId) },
+      cookies: { vg_session: await cookieFor(analystUserId, "ANALYST", tenantAId) },
       payload: { severity: 5, reversibility: "IRREVERSIBLE" },
     });
     expect(res.statusCode).toBe(200);
@@ -298,7 +299,7 @@ describe("AI Impact - add/update/delete and validation", () => {
     expect(event).not.toBeNull();
     const bad = await server.inject({
       method: "PATCH", url: `/ai-impacts/${impact.id}`,
-      cookies: { vg_session: cookieFor(analystUserId, "ANALYST", tenantAId) },
+      cookies: { vg_session: await cookieFor(analystUserId, "ANALYST", tenantAId) },
       payload: { vulnerablePopulations: true },
     });
     expect(bad.statusCode).toBe(400);
@@ -309,7 +310,7 @@ describe("AI Impact - add/update/delete and validation", () => {
     const impact = JSON.parse((await addImpact(assessmentId, beneficialImpact)).body);
     const res = await server.inject({
       method: "DELETE", url: `/ai-impacts/${impact.id}`,
-      cookies: { vg_session: cookieFor(analystUserId, "ANALYST", tenantAId) },
+      cookies: { vg_session: await cookieFor(analystUserId, "ANALYST", tenantAId) },
     });
     expect(res.statusCode).toBe(200);
     expect(await prisma.aiImpact.findUnique({ where: { id: impact.id } })).toBeNull();
@@ -328,13 +329,13 @@ describe("AI Impact - add/update/delete and validation", () => {
     const impact = JSON.parse((await addImpact(assessmentId, adverseImpact)).body);
     const patchRes = await server.inject({
       method: "PATCH", url: `/ai-impacts/${impact.id}`,
-      cookies: { vg_session: cookieFor(tenantBUserId, "ADMIN", tenantBId) },
+      cookies: { vg_session: await cookieFor(tenantBUserId, "ADMIN", tenantBId) },
       payload: { severity: 1 },
     });
     expect(patchRes.statusCode).toBe(404);
     const deleteRes = await server.inject({
       method: "DELETE", url: `/ai-impacts/${impact.id}`,
-      cookies: { vg_session: cookieFor(tenantBUserId, "ADMIN", tenantBId) },
+      cookies: { vg_session: await cookieFor(tenantBUserId, "ADMIN", tenantBId) },
     });
     expect(deleteRes.statusCode).toBe(404);
     const after = await prisma.aiImpact.findUnique({ where: { id: impact.id } });
@@ -359,7 +360,7 @@ describe("AI Impact Assessment - summary", () => {
 
     const res = await server.inject({
       method: "GET", url: `/ai-impact-assessments/${assessmentId}`,
-      cookies: { vg_session: cookieFor(analystUserId, "ANALYST", tenantAId) },
+      cookies: { vg_session: await cookieFor(analystUserId, "ANALYST", tenantAId) },
     });
     expect(res.statusCode).toBe(200);
     const summary = JSON.parse(res.body).impactSummary;
@@ -499,7 +500,7 @@ describe("AI Impact Assessment - immutability after COMPLETED", () => {
   it("2. blocks editing an impact on a completed assessment", async () => {
     const res = await server.inject({
       method: "PATCH", url: `/ai-impacts/${lockedImpactId}`,
-      cookies: { vg_session: cookieFor(adminUserId, "ADMIN", tenantAId) },
+      cookies: { vg_session: await cookieFor(adminUserId, "ADMIN", tenantAId) },
       payload: { severity: 1 },
     });
     expect(res.statusCode).toBe(409);
@@ -508,7 +509,7 @@ describe("AI Impact Assessment - immutability after COMPLETED", () => {
   it("3. blocks deleting an impact on a completed assessment", async () => {
     const res = await server.inject({
       method: "DELETE", url: `/ai-impacts/${lockedImpactId}`,
-      cookies: { vg_session: cookieFor(adminUserId, "ADMIN", tenantAId) },
+      cookies: { vg_session: await cookieFor(adminUserId, "ADMIN", tenantAId) },
     });
     expect(res.statusCode).toBe(409);
   });
@@ -516,7 +517,7 @@ describe("AI Impact Assessment - immutability after COMPLETED", () => {
   it("4. leaves the persisted completed assessment and its impacts unchanged", async () => {
     const renameRes = await server.inject({
       method: "PATCH", url: `/ai-impact-assessments/${lockedAssessmentId}`,
-      cookies: { vg_session: cookieFor(adminUserId, "ADMIN", tenantAId) },
+      cookies: { vg_session: await cookieFor(adminUserId, "ADMIN", tenantAId) },
       payload: { name: "Renamed after approval" },
     });
     expect(renameRes.statusCode).toBe(409);
@@ -532,14 +533,14 @@ describe("Regression - existing workflows still work", () => {
     const sysId = await createAiSystem(tenantAId, "ADMIN", adminUserId);
     const createRes = await server.inject({
       method: "POST", url: `/ai-systems/${sysId}/risk-assessments`,
-      cookies: { vg_session: cookieFor(analystUserId, "ANALYST", tenantAId) },
+      cookies: { vg_session: await cookieFor(analystUserId, "ANALYST", tenantAId) },
       payload: { name: "Regression Risk Assessment" },
     });
     expect(createRes.statusCode).toBe(201);
     const riskAssessmentId = JSON.parse(createRes.body).id;
     const getRes = await server.inject({
       method: "GET", url: `/ai-risk-assessments/${riskAssessmentId}`,
-      cookies: { vg_session: cookieFor(analystUserId, "ANALYST", tenantAId) },
+      cookies: { vg_session: await cookieFor(analystUserId, "ANALYST", tenantAId) },
     });
     expect(getRes.statusCode).toBe(200);
     expect(await prisma.aiImpactAssessment.count({ where: { aiSystemId: sysId } })).toBe(0);
@@ -548,7 +549,7 @@ describe("Regression - existing workflows still work", () => {
   it("Vendor/TPRM assessment list endpoint still responds", async () => {
     const res = await server.inject({
       method: "GET", url: "/assessments",
-      cookies: { vg_session: cookieFor(adminUserId, "ADMIN", tenantAId) },
+      cookies: { vg_session: await cookieFor(adminUserId, "ADMIN", tenantAId) },
     });
     expect(res.statusCode).toBe(200);
   });

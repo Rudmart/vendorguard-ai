@@ -1,3 +1,4 @@
+import { issueTestSessionCookie } from "./testSession.js";
 import {
   beforeAll,
   afterAll,
@@ -9,7 +10,7 @@ import {
   vi,
 } from "vitest";
 import { prisma, databaseClient, type Role } from "@vendorguard/database";
-import { createSessionCookie } from "@vendorguard/auth";
+
 import { server } from "./index.js";
 import { pendingReviewsFor, myWorkFor } from "./aiWorkQueues.js";
 let tenant: string, foreign: string, framework: string, controlId: string;
@@ -66,7 +67,7 @@ async function call(
       method,
       url: path,
       payload,
-      cookies: { vg_session: createSessionCookie(session(role, t)) },
+      cookies: { vg_session: await issueTestSessionCookie(session(role, t)) },
       remoteAddress: `10.91.${Math.floor(++sequence / 250)}.${sequence % 250}`,
     }),
   );

@@ -1,6 +1,7 @@
+import { issueTestSessionCookie } from "./testSession.js";
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { prisma } from "@vendorguard/database";
-import { createSessionCookie, getSessionFromCookie } from "@vendorguard/auth";
+import { getSessionFromCookie } from "@vendorguard/auth";
 import { server } from "./index.js";
 
 // Security PR 2: the server must never trust a session whose signature does not verify.
@@ -15,8 +16,8 @@ function nextIp() {
   ipCounter += 1;
   return "10.32." + Math.floor(ipCounter / 250) + "." + (ipCounter % 250);
 }
-function session(userId: string, role: string, tenantId: string) {
-  return createSessionCookie({ userId, tenantId, email: `${userId}@example.com`, displayName: "Test", role });
+async function session(userId: string, role: string, tenantId: string) {
+  return await issueTestSessionCookie({ userId, tenantId, email: `${userId}@example.com`, displayName: "Test", role });
 }
 function forge(value: string, changes: Record<string, string>) {
   const dot = value.lastIndexOf(".");
@@ -55,7 +56,7 @@ afterAll(async () => {
 
 describe("Signed sessions", () => {
   it("accepts a legitimately signed session", async () => {
-    const legit = session(readOnlyUserId, "READ_ONLY", tenantAId);
+    const legit = await session(readOnlyUserId, "READ_ONLY", tenantAId);
     expect(getSessionFromCookie(legit)?.role).toBe("READ_ONLY");
     const me = await req("GET", "/auth/me", legit);
     expect(me.statusCode).toBe(200);
@@ -64,7 +65,7 @@ describe("Signed sessions", () => {
   });
 
   it("rejects role escalation (READ_ONLY -> ADMIN) without the secret", async () => {
-    const forged = forge(session(readOnlyUserId, "READ_ONLY", tenantAId), { role: "ADMIN" });
+    const forged = forge(await session(readOnlyUserId, "READ_ONLY", tenantAId), { role: "ADMIN" });
     expect((await req("GET", "/auth/me", forged)).statusCode).toBe(401);
     const create = await req("POST", "/ai-systems", forged, { name: "SEC2 escalation", origin: "INTERNAL" });
     expect(create.statusCode).toBe(401);
@@ -72,21 +73,21 @@ describe("Signed sessions", () => {
   });
 
   it("rejects tenant switching", async () => {
-    const forged = forge(session(adminUserId, "ADMIN", tenantAId), { tenantId: tenantBId });
+    const forged = forge(await session(adminUserId, "ADMIN", tenantAId), { tenantId: tenantBId });
     expect((await req("GET", "/ai-systems", forged)).statusCode).toBe(401);
   });
 
   it("rejects identity changes (userId, email)", async () => {
-    const legit = session(readOnlyUserId, "READ_ONLY", tenantAId);
+    const legit = await session(readOnlyUserId, "READ_ONLY", tenantAId);
     expect((await req("GET", "/auth/me", forge(legit, { userId: adminUserId }))).statusCode).toBe(401);
     expect((await req("GET", "/auth/me", forge(legit, { email: "someone-else@example.com" }))).statusCode).toBe(401);
   });
 
   it("rejects random or transplanted signatures", async () => {
-    const legit = session(readOnlyUserId, "READ_ONLY", tenantAId);
+    const legit = await session(readOnlyUserId, "READ_ONLY", tenantAId);
     const payload = legit.slice(0, legit.lastIndexOf("."));
     expect((await req("GET", "/auth/me", payload + ".AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")).statusCode).toBe(401);
-    const otherSig = session(adminUserId, "ADMIN", tenantAId).split(".").pop() ?? "";
+    const otherSig = (await session(adminUserId, "ADMIN", tenantAId)).split(".").pop() ?? "";
     expect((await req("GET", "/auth/me", payload + "." + otherSig)).statusCode).toBe(401);
   });
 

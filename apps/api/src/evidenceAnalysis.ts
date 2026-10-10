@@ -1,14 +1,19 @@
-import { prisma } from "@vendorguard/database";
+import { prisma, controlVisibility } from "@vendorguard/database";
+import { evidenceAllowed } from "@vendorguard/auth";
+import { roleHasPermission, type Role } from "@vendorguard/shared";
+import { proposeLegacyFinding } from "./legacyFindingGovernance.js";
 import { analyzeEvidence } from "@vendorguard/ai-client";
 
 export interface RunEvidenceAnalysisParams {
+  actor: { userId: string; role: Role };
   tenantId: string;
   assessmentId: string;
   evidenceDocumentId: string;
 }
 
 export async function runEvidenceAnalysis(params: RunEvidenceAnalysisParams) {
-  const { tenantId, assessmentId, evidenceDocumentId } = params;
+  const { tenantId, assessmentId, evidenceDocumentId, actor } = params;
+  if (!evidenceAllowed(actor.role, "analysis") || !roleHasPermission(actor.role, "finding:propose")) throw new Error("Not authorized to analyze evidence");
 
   const assessment = await prisma.assessment.findFirst({
     where: { id: assessmentId, tenantId },
@@ -26,7 +31,7 @@ export async function runEvidenceAnalysis(params: RunEvidenceAnalysisParams) {
   }
 
   const candidateControls = await prisma.control.findMany({
-    where: { expectedEvidenceTypes: { has: document.documentType } },
+    where: { ...controlVisibility(tenantId), expectedEvidenceTypes: { has: document.documentType } },
   });
 
   const evidenceText =
@@ -57,43 +62,8 @@ export async function runEvidenceAnalysis(params: RunEvidenceAnalysisParams) {
       where: { tenantId, assessmentId, controlId: control.id },
     });
 
-    const findingData = {
-      status: "INSUFFICIENT_EVIDENCE" as const,
-      confidence: analysis.confidence,
-      gaps: analysis.gaps,
-      recommendations: analysis.recommendations,
-      requiresHumanReview: true,
-    };
-
-    const finding = existing
-      ? await prisma.controlFinding.update({
-          where: { id: existing.id },
-          data: findingData,
-        })
-      : await prisma.controlFinding.create({
-          data: {
-            tenantId,
-            vendorId: assessment.vendorId,
-            assessmentId,
-            controlId: control.id,
-            ...findingData,
-          },
-        });
-
-    if (firstChunk) {
-      await prisma.findingEvidence.create({
-        data: {
-          tenantId,
-          findingId: finding.id,
-          evidenceDocumentId: document.id,
-          page: firstChunk.page,
-          section: firstChunk.section,
-          chunkId: firstChunk.id,
-          excerpt: firstChunk.text.slice(0, 280),
-          contentHash: firstChunk.contentHash,
-        },
-      });
-    }
+    if (existing && (existing.proposedByUserId !== actor.userId || !existing.requiresHumanReview || await prisma.reviewDecision.count({ where: { findingId: existing.id } }))) continue;
+    const finding = await proposeLegacyFinding({ ...actor, tenantId, email: "", displayName: "" }, assessmentId, control.id, "INSUFFICIENT_EVIDENCE", undefined, { confidence: analysis.confidence, gaps: analysis.gaps, recommendations: analysis.recommendations, ...(firstChunk ? { evidence: { tenantId, evidenceDocumentId: document.id, page: firstChunk.page, section: firstChunk.section, chunkId: firstChunk.id, excerpt: firstChunk.text.slice(0, 280), contentHash: firstChunk.contentHash } } : {}) });
 
     findings.push(finding);
   }

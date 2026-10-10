@@ -1,7 +1,8 @@
+import { issueTestSessionCookie } from "./testSession.js";
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { prisma } from "@vendorguard/database";
 import { server } from "./index.js";
-import { createSessionCookie } from "@vendorguard/auth";
+
 
 let tenantId: string;
 let reviewerUserId: string;
@@ -12,8 +13,8 @@ let controlId: string;
 let findingId: string;
 let frameworkId: string;
 
-function cookieFor(userId: string, role: string) {
-  return createSessionCookie({ userId, tenantId, email: `${userId}@example.com`, displayName: "Test User", role });
+async function cookieFor(userId: string, role: string) {
+  return await issueTestSessionCookie({ userId, tenantId, email: `${userId}@example.com`, displayName: "Test User", role });
 }
 
 beforeAll(async () => {
@@ -46,7 +47,7 @@ beforeAll(async () => {
   controlId = control.id;
 
   const assessment = await prisma.assessment.create({
-    data: { tenantId, vendorId, scoringModelVersion: "test-1", startedByUserId: reviewer.id },
+    data: { tenantId, vendorId, scoringModelVersion: "test-1", startedByUserId: analyst.id },
   });
   assessmentId = assessment.id;
 
@@ -61,6 +62,8 @@ beforeAll(async () => {
       gaps: ["Missing SOC 2 evidence"],
       recommendations: ["Request vendor SOC 2 report"],
       requiresHumanReview: true,
+      proposedByUserId: analyst.id,
+      proposedStatus: "INSUFFICIENT_EVIDENCE",
     },
   });
   findingId = finding.id;
@@ -93,7 +96,7 @@ describe("POST /assessments/:id/findings/:findingId/review (RBAC)", () => {
     const res = await server.inject({
       method: "POST",
       url: `/assessments/${assessmentId}/findings/${findingId}/review`,
-      cookies: { vg_session: cookieFor(analystUserId, "ANALYST") },
+      cookies: { vg_session: await cookieFor(analystUserId, "ANALYST") },
       payload: { decision: "ACCEPT", rationale: "test" },
     });
     expect(res.statusCode).toBe(403);
@@ -105,7 +108,7 @@ describe("POST /assessments/:id/findings/:findingId/review (RBAC)", () => {
     const res = await server.inject({
       method: "POST",
       url: `/assessments/${assessmentId}/findings/${findingId}/review`,
-      cookies: { vg_session: cookieFor(reviewerUserId, "REVIEWER") },
+      cookies: { vg_session: await cookieFor(reviewerUserId, "REVIEWER") },
       payload: { decision: "OVERRIDE", rationale: "Compensating controls validated", finalStatus: "PASS" },
     });
     expect(res.statusCode).toBe(200);
@@ -128,7 +131,7 @@ describe("GET /reviews/findings (queue)", () => {
     const res = await server.inject({
       method: "GET",
       url: "/reviews/findings",
-      cookies: { vg_session: cookieFor(analystUserId, "ANALYST") },
+      cookies: { vg_session: await cookieFor(analystUserId, "ANALYST") },
     });
     expect(res.statusCode).toBe(403);
   });
@@ -137,7 +140,7 @@ describe("GET /reviews/findings (queue)", () => {
     const res = await server.inject({
       method: "GET",
       url: "/reviews/findings",
-      cookies: { vg_session: cookieFor(reviewerUserId, "REVIEWER") },
+      cookies: { vg_session: await cookieFor(reviewerUserId, "REVIEWER") },
     });
     expect(res.statusCode).toBe(200);
     const body = JSON.parse(res.body);
@@ -152,7 +155,7 @@ describe("POST /vendors/:id/risk-acceptance (higher authority bar than finding r
     const res = await server.inject({
       method: "POST",
       url: `/vendors/${vendorId}/risk-acceptance`,
-      cookies: { vg_session: cookieFor(reviewerUserId, "REVIEWER") },
+      cookies: { vg_session: await cookieFor(reviewerUserId, "REVIEWER") },
       payload: { justification: "Compensating controls in place, residual risk accepted for this quarter." },
     });
     expect(res.statusCode).toBe(200);
@@ -165,7 +168,7 @@ describe("POST /vendors/:id/risk-acceptance (higher authority bar than finding r
     const res = await server.inject({
       method: "POST",
       url: `/vendors/${vendorId}/risk-acceptance`,
-      cookies: { vg_session: cookieFor(analystUserId, "ANALYST") },
+      cookies: { vg_session: await cookieFor(analystUserId, "ANALYST") },
       payload: { justification: "test" },
     });
     expect(res.statusCode).toBe(403);
@@ -175,7 +178,7 @@ describe("POST /vendors/:id/risk-acceptance (higher authority bar than finding r
     const res = await server.inject({
       method: "POST",
       url: `/vendors/${vendorId}/risk-acceptance`,
-      cookies: { vg_session: cookieFor(reviewerUserId, "REVIEWER") },
+      cookies: { vg_session: await cookieFor(reviewerUserId, "REVIEWER") },
       payload: {},
     });
     expect(res.statusCode).toBe(400);

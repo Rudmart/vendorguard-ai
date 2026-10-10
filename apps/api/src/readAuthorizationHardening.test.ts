@@ -1,3 +1,4 @@
+import { issueTestSessionCookie } from "./testSession.js";
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { prisma } from "@vendorguard/database";
 import { server } from "./index.js";
@@ -18,7 +19,7 @@ vi.mock("@vendorguard/storage-client", async (importOriginal) => {
     }),
   };
 });
-import { createSessionCookie } from "@vendorguard/auth";
+
 
 // Third-Party AI READ authorization hardening (A1: ADMIN evidence:* + existing catalog).
 // evidence:* = ADMIN; evidence:read/upload = ANALYST; evidence:read-metadata = AUDITOR; REVIEWER / READ_ONLY = no evidence access;
@@ -46,7 +47,7 @@ async function get(url: string, role: Role, tenantId = tenantAId, userId?: strin
   const id = userId ?? usersA[role];
   const res = await server.inject({
     method: "GET", url,
-    cookies: { vg_session: createSessionCookie({ userId: id, tenantId, email: `${id}@example.com`, displayName: "RH", role }) },
+    cookies: { vg_session: await issueTestSessionCookie({ userId: id, tenantId, email: `${id}@example.com`, displayName: "RH", role }) },
     remoteAddress: nextIp(),
   });
   let body: unknown = null;
@@ -101,7 +102,7 @@ describe("Read hardening - GET /evidence/:id/download (evidence:read)", () => {
     it(`${role} -> 200 with the file bytes (ADMIN via evidence:*, ANALYST via evidence:read)`, async () => {
       const res = await server.inject({
         method: "GET", url: `/evidence/${docA}/download`,
-        cookies: { vg_session: createSessionCookie({ userId: usersA[role], tenantId: tenantAId, email: "x@example.com", displayName: "x", role }) },
+        cookies: { vg_session: await issueTestSessionCookie({ userId: usersA[role], tenantId: tenantAId, email: "x@example.com", displayName: "x", role }) },
         remoteAddress: nextIp(),
       });
       expect(res.statusCode).toBe(200);
@@ -137,7 +138,7 @@ describe("Read hardening - evidence upload authorization (evidence:upload; ADMIN
   async function upload(role: Role) {
     const res = await server.inject({
       method: "POST", url: `/vendors/${vendorA}/evidence/upload`,
-      cookies: { vg_session: createSessionCookie({ userId: usersA[role], tenantId: tenantAId, email: "x@example.com", displayName: "x", role }) },
+      cookies: { vg_session: await issueTestSessionCookie({ userId: usersA[role], tenantId: tenantAId, email: "x@example.com", displayName: "x", role }) },
       payload: {},
       remoteAddress: nextIp(),
     });
@@ -226,7 +227,7 @@ describe("Read hardening - regression", () => {
   it("a cookie claiming ADMIN cannot override the database READ_ONLY role on evidence download", async () => {
     const res = await server.inject({
       method: "GET", url: `/evidence/${docA}/download`,
-      cookies: { vg_session: createSessionCookie({ userId: usersA.READ_ONLY, tenantId: tenantAId, email: "x@example.com", displayName: "x", role: "ADMIN" }) },
+      cookies: { vg_session: await issueTestSessionCookie({ userId: usersA.READ_ONLY, tenantId: tenantAId, email: "x@example.com", displayName: "x", role: "ADMIN" }) },
       remoteAddress: nextIp(),
     });
     expect(res.statusCode).toBe(403);

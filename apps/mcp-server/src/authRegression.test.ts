@@ -1,9 +1,10 @@
+import { issueTestSessionCookie } from "./testSession.js";
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { prisma } from "@vendorguard/database";
 import { server } from "./index.js";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
-import { createSessionCookie } from "@vendorguard/auth";
+
 
 let baseUrl: string;
 let tenantAId: string;
@@ -12,8 +13,8 @@ let userAId: string;
 let vendorAId: string;
 let vendorBId: string;
 
-function cookieHeaderFor(userId: string, tenantId: string, role: string) {
-  const cookieValue = createSessionCookie({ userId, tenantId, email: `${userId}@example.com`, displayName: "Test User", role });
+async function cookieHeaderFor(userId: string, tenantId: string, role: string) {
+  const cookieValue = await issueTestSessionCookie({ userId, tenantId, email: `${userId}@example.com`, displayName: "Test User", role });
   return `vg_session=${encodeURIComponent(cookieValue)}`;
 }
 
@@ -79,7 +80,7 @@ describe("MCP server authorization regression (real client, real HTTP transport)
 
   it("allows a user to fetch their own tenant's vendor through get_vendor", async () => {
     const transport = new StreamableHTTPClientTransport(new URL(`${baseUrl}/mcp`), {
-      requestInit: { headers: { Cookie: cookieHeaderFor(userAId, tenantAId, "ADMIN") } },
+      requestInit: { headers: { Cookie: await cookieHeaderFor(userAId, tenantAId, "ADMIN") } },
     });
     const client = new Client({ name: "test-client", version: "1.0.0" }, { capabilities: {} });
     await client.connect(transport);
@@ -95,7 +96,7 @@ describe("MCP server authorization regression (real client, real HTTP transport)
 
   it("blocks a user from fetching another tenant's vendor through get_vendor, even with a valid session for their own tenant", async () => {
     const transport = new StreamableHTTPClientTransport(new URL(`${baseUrl}/mcp`), {
-      requestInit: { headers: { Cookie: cookieHeaderFor(userAId, tenantAId, "ADMIN") } },
+      requestInit: { headers: { Cookie: await cookieHeaderFor(userAId, tenantAId, "ADMIN") } },
     });
     const client = new Client({ name: "test-client", version: "1.0.0" }, { capabilities: {} });
     await client.connect(transport);
@@ -110,7 +111,7 @@ describe("MCP server authorization regression (real client, real HTTP transport)
 
   it("denies a tool call for a name outside the allowlist, even if the server would otherwise recognize it", async () => {
     const transport = new StreamableHTTPClientTransport(new URL(`${baseUrl}/mcp`), {
-      requestInit: { headers: { Cookie: cookieHeaderFor(userAId, tenantAId, "ADMIN") } },
+      requestInit: { headers: { Cookie: await cookieHeaderFor(userAId, tenantAId, "ADMIN") } },
     });
     const client = new Client({ name: "test-client", version: "1.0.0" }, { capabilities: {} });
     await client.connect(transport);

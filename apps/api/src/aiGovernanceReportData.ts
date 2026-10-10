@@ -1,6 +1,8 @@
+import { evidenceAllowed as canAccessEvidence } from "@vendorguard/auth";
+import type { Role } from "@vendorguard/shared";
 import { databaseClient, Prisma } from "@vendorguard/database";
 import type { ReportScope } from "@vendorguard/shared";
-import { hasPermission, type Session } from "./aiControlEvidence.js";
+import { type Session } from "./aiControlEvidence.js";
 export class ReportError extends Error {
   constructor(
     public statusCode: number,
@@ -359,8 +361,7 @@ export async function loadReportData(session: Session, aiSystemId?: string) {
         }),
       );
       const evidenceAllowed =
-        hasPermission(session, "evidence:read") ||
-        hasPermission(session, "evidence:read-metadata");
+        canAccessEvidence(session.role as Role, "metadata");
       const evidenceLinks = evidenceAllowed
         ? bounded(
             await tx.aiSystemControlEvidence.findMany({

@@ -1,7 +1,8 @@
+import { issueTestSessionCookie } from "./testSession.js";
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { prisma } from "@vendorguard/database";
 import { server } from "./index.js";
-import { createSessionCookie } from "@vendorguard/auth";
+
 
 let tenantAId: string;
 let tenantBId: string;
@@ -13,8 +14,8 @@ let vendorAId: string;
 let vendorA2Id: string;
 let vendorBId: string;
 
-function cookieFor(userId: string, role: string, tenantId: string) {
-  return createSessionCookie({ userId, tenantId, email: `${userId}@example.com`, displayName: "Test User", role });
+async function cookieFor(userId: string, role: string, tenantId: string) {
+  return await issueTestSessionCookie({ userId, tenantId, email: `${userId}@example.com`, displayName: "Test User", role });
 }
 
 beforeAll(async () => {
@@ -86,7 +87,7 @@ describe("POST /ai-systems", () => {
   it("rejects READ_ONLY, which lacks ai-system:create", async () => {
     const res = await server.inject({
       method: "POST", url: "/ai-systems",
-      cookies: { vg_session: cookieFor(readOnlyUserId, "READ_ONLY", tenantAId) },
+      cookies: { vg_session: await cookieFor(readOnlyUserId, "READ_ONLY", tenantAId) },
       payload: { name: "X", origin: "INTERNAL" },
     });
     expect(res.statusCode).toBe(403);
@@ -95,7 +96,7 @@ describe("POST /ai-systems", () => {
   it("rejects a missing name", async () => {
     const res = await server.inject({
       method: "POST", url: "/ai-systems",
-      cookies: { vg_session: cookieFor(adminUserId, "ADMIN", tenantAId) },
+      cookies: { vg_session: await cookieFor(adminUserId, "ADMIN", tenantAId) },
       payload: { origin: "INTERNAL" },
     });
     expect(res.statusCode).toBe(400);
@@ -104,7 +105,7 @@ describe("POST /ai-systems", () => {
   it("rejects an invalid origin", async () => {
     const res = await server.inject({
       method: "POST", url: "/ai-systems",
-      cookies: { vg_session: cookieFor(adminUserId, "ADMIN", tenantAId) },
+      cookies: { vg_session: await cookieFor(adminUserId, "ADMIN", tenantAId) },
       payload: { name: "X", origin: "NOT_REAL" },
     });
     expect(res.statusCode).toBe(400);
@@ -113,7 +114,7 @@ describe("POST /ai-systems", () => {
   it("rejects an invalid category", async () => {
     const res = await server.inject({
       method: "POST", url: "/ai-systems",
-      cookies: { vg_session: cookieFor(adminUserId, "ADMIN", tenantAId) },
+      cookies: { vg_session: await cookieFor(adminUserId, "ADMIN", tenantAId) },
       payload: { name: "X", origin: "INTERNAL", category: "NOT_REAL" },
     });
     expect(res.statusCode).toBe(400);
@@ -122,7 +123,7 @@ describe("POST /ai-systems", () => {
   it("rejects invalid dataCategories outside the controlled whitelist", async () => {
     const res = await server.inject({
       method: "POST", url: "/ai-systems",
-      cookies: { vg_session: cookieFor(adminUserId, "ADMIN", tenantAId) },
+      cookies: { vg_session: await cookieFor(adminUserId, "ADMIN", tenantAId) },
       payload: { name: "X", origin: "INTERNAL", dataCategories: ["Personal Information"] },
     });
     expect(res.statusCode).toBe(400);
@@ -131,7 +132,7 @@ describe("POST /ai-systems", () => {
   it("rejects an invalid riskTier", async () => {
     const res = await server.inject({
       method: "POST", url: "/ai-systems",
-      cookies: { vg_session: cookieFor(adminUserId, "ADMIN", tenantAId) },
+      cookies: { vg_session: await cookieFor(adminUserId, "ADMIN", tenantAId) },
       payload: { name: "X", origin: "INTERNAL", riskTier: "SUPER_HIGH" },
     });
     expect(res.statusCode).toBe(400);
@@ -140,7 +141,7 @@ describe("POST /ai-systems", () => {
   it("rejects an ownerUserId that has no membership in this tenant", async () => {
     const res = await server.inject({
       method: "POST", url: "/ai-systems",
-      cookies: { vg_session: cookieFor(adminUserId, "ADMIN", tenantAId) },
+      cookies: { vg_session: await cookieFor(adminUserId, "ADMIN", tenantAId) },
       payload: { name: "X", origin: "INTERNAL", ownerUserId: tenantBUserId },
     });
     expect(res.statusCode).toBe(400);
@@ -149,7 +150,7 @@ describe("POST /ai-systems", () => {
   it("creates an AI system as ADMIN and generates an ai_system.created audit event", async () => {
     const res = await server.inject({
       method: "POST", url: "/ai-systems",
-      cookies: { vg_session: cookieFor(adminUserId, "ADMIN", tenantAId) },
+      cookies: { vg_session: await cookieFor(adminUserId, "ADMIN", tenantAId) },
       payload: { name: "Loan Underwriting AI", origin: "INTERNAL", category: "DECISION_SUPPORT", ownerUserId: analystUserId, dataCategories: ["PII", "FINANCIAL"], riskTier: "HIGH" },
     });
     expect(res.statusCode).toBe(201);
@@ -164,7 +165,7 @@ describe("POST /ai-systems", () => {
   it("creates an AI system as ANALYST", async () => {
     const res = await server.inject({
       method: "POST", url: "/ai-systems",
-      cookies: { vg_session: cookieFor(analystUserId, "ANALYST", tenantAId) },
+      cookies: { vg_session: await cookieFor(analystUserId, "ANALYST", tenantAId) },
       payload: { name: "Chatbot", origin: "THIRD_PARTY" },
     });
     expect(res.statusCode).toBe(201);
@@ -175,12 +176,12 @@ describe("GET /ai-systems (tenant isolation)", () => {
   it("lists only the caller's own tenant AI systems, never another tenant's", async () => {
     const inTenantA = await server.inject({
       method: "POST", url: "/ai-systems",
-      cookies: { vg_session: cookieFor(adminUserId, "ADMIN", tenantAId) },
+      cookies: { vg_session: await cookieFor(adminUserId, "ADMIN", tenantAId) },
       payload: { name: "Tenant A System", origin: "INTERNAL" },
     });
     const inTenantB = await server.inject({
       method: "POST", url: "/ai-systems",
-      cookies: { vg_session: cookieFor(tenantBUserId, "ADMIN", tenantBId) },
+      cookies: { vg_session: await cookieFor(tenantBUserId, "ADMIN", tenantBId) },
       payload: { name: "Tenant B System", origin: "INTERNAL" },
     });
     const tenantAId_created = JSON.parse(inTenantA.body).id;
@@ -188,7 +189,7 @@ describe("GET /ai-systems (tenant isolation)", () => {
 
     const list = await server.inject({
       method: "GET", url: "/ai-systems",
-      cookies: { vg_session: cookieFor(adminUserId, "ADMIN", tenantAId) },
+      cookies: { vg_session: await cookieFor(adminUserId, "ADMIN", tenantAId) },
     });
     expect(list.statusCode).toBe(200);
     const ids = JSON.parse(list.body).aiSystems.map((s: { id: string }) => s.id);
@@ -206,14 +207,14 @@ describe("GET /ai-systems/:id and PATCH /ai-systems/:id (tenant isolation, valid
   it("rejects a cross-tenant read as not found, not leaking existence", async () => {
     const created = await server.inject({
       method: "POST", url: "/ai-systems",
-      cookies: { vg_session: cookieFor(adminUserId, "ADMIN", tenantAId) },
+      cookies: { vg_session: await cookieFor(adminUserId, "ADMIN", tenantAId) },
       payload: { name: "Isolation Test System", origin: "INTERNAL" },
     });
     const id = JSON.parse(created.body).id;
 
     const res = await server.inject({
       method: "GET", url: `/ai-systems/${id}`,
-      cookies: { vg_session: cookieFor(tenantBUserId, "ADMIN", tenantBId) },
+      cookies: { vg_session: await cookieFor(tenantBUserId, "ADMIN", tenantBId) },
     });
     expect(res.statusCode).toBe(404);
   });
@@ -221,14 +222,14 @@ describe("GET /ai-systems/:id and PATCH /ai-systems/:id (tenant isolation, valid
   it("reads an AI system belonging to the caller's own tenant", async () => {
     const created = await server.inject({
       method: "POST", url: "/ai-systems",
-      cookies: { vg_session: cookieFor(adminUserId, "ADMIN", tenantAId) },
+      cookies: { vg_session: await cookieFor(adminUserId, "ADMIN", tenantAId) },
       payload: { name: "Readable System", origin: "INTERNAL" },
     });
     const id = JSON.parse(created.body).id;
 
     const res = await server.inject({
       method: "GET", url: `/ai-systems/${id}`,
-      cookies: { vg_session: cookieFor(adminUserId, "ADMIN", tenantAId) },
+      cookies: { vg_session: await cookieFor(adminUserId, "ADMIN", tenantAId) },
     });
     expect(res.statusCode).toBe(200);
     expect(JSON.parse(res.body).name).toBe("Readable System");
@@ -237,14 +238,14 @@ describe("GET /ai-systems/:id and PATCH /ai-systems/:id (tenant isolation, valid
   it("updates fields and generates ai_system.updated when lifecycle does not change", async () => {
     const created = await server.inject({
       method: "POST", url: "/ai-systems",
-      cookies: { vg_session: cookieFor(adminUserId, "ADMIN", tenantAId) },
+      cookies: { vg_session: await cookieFor(adminUserId, "ADMIN", tenantAId) },
       payload: { name: "Update Target", origin: "INTERNAL" },
     });
     const id = JSON.parse(created.body).id;
 
     const res = await server.inject({
       method: "PATCH", url: `/ai-systems/${id}`,
-      cookies: { vg_session: cookieFor(adminUserId, "ADMIN", tenantAId) },
+      cookies: { vg_session: await cookieFor(adminUserId, "ADMIN", tenantAId) },
       payload: { description: "Now with a description" },
     });
     expect(res.statusCode).toBe(200);
@@ -257,14 +258,14 @@ describe("GET /ai-systems/:id and PATCH /ai-systems/:id (tenant isolation, valid
   it("rejects a cross-tenant update as not found", async () => {
     const created = await server.inject({
       method: "POST", url: "/ai-systems",
-      cookies: { vg_session: cookieFor(adminUserId, "ADMIN", tenantAId) },
+      cookies: { vg_session: await cookieFor(adminUserId, "ADMIN", tenantAId) },
       payload: { name: "Protected System", origin: "INTERNAL" },
     });
     const id = JSON.parse(created.body).id;
 
     const res = await server.inject({
       method: "PATCH", url: `/ai-systems/${id}`,
-      cookies: { vg_session: cookieFor(tenantBUserId, "ADMIN", tenantBId) },
+      cookies: { vg_session: await cookieFor(tenantBUserId, "ADMIN", tenantBId) },
       payload: { name: "Hijacked" },
     });
     expect(res.statusCode).toBe(404);
@@ -273,14 +274,14 @@ describe("GET /ai-systems/:id and PATCH /ai-systems/:id (tenant isolation, valid
   it("rejects an invalid lifecycleStatus", async () => {
     const created = await server.inject({
       method: "POST", url: "/ai-systems",
-      cookies: { vg_session: cookieFor(adminUserId, "ADMIN", tenantAId) },
+      cookies: { vg_session: await cookieFor(adminUserId, "ADMIN", tenantAId) },
       payload: { name: "Bad Lifecycle Test", origin: "INTERNAL" },
     });
     const id = JSON.parse(created.body).id;
 
     const res = await server.inject({
       method: "PATCH", url: `/ai-systems/${id}`,
-      cookies: { vg_session: cookieFor(adminUserId, "ADMIN", tenantAId) },
+      cookies: { vg_session: await cookieFor(adminUserId, "ADMIN", tenantAId) },
       payload: { lifecycleStatus: "NOT_A_REAL_STATUS" },
     });
     expect(res.statusCode).toBe(400);
@@ -289,14 +290,14 @@ describe("GET /ai-systems/:id and PATCH /ai-systems/:id (tenant isolation, valid
   it("enforces the THIRD_PARTY rule: blocks leaving PROPOSED with no vendor link", async () => {
     const created = await server.inject({
       method: "POST", url: "/ai-systems",
-      cookies: { vg_session: cookieFor(adminUserId, "ADMIN", tenantAId) },
+      cookies: { vg_session: await cookieFor(adminUserId, "ADMIN", tenantAId) },
       payload: { name: "Third Party No Vendor", origin: "THIRD_PARTY" },
     });
     const id = JSON.parse(created.body).id;
 
     const res = await server.inject({
       method: "PATCH", url: `/ai-systems/${id}`,
-      cookies: { vg_session: cookieFor(adminUserId, "ADMIN", tenantAId) },
+      cookies: { vg_session: await cookieFor(adminUserId, "ADMIN", tenantAId) },
       payload: { lifecycleStatus: "DEVELOPMENT" },
     });
     expect(res.statusCode).toBe(400);
@@ -305,20 +306,20 @@ describe("GET /ai-systems/:id and PATCH /ai-systems/:id (tenant isolation, valid
   it("enforces the THIRD_PARTY rule: allows leaving PROPOSED once a vendor is linked, and generates ai_system.lifecycle_changed", async () => {
     const created = await server.inject({
       method: "POST", url: "/ai-systems",
-      cookies: { vg_session: cookieFor(adminUserId, "ADMIN", tenantAId) },
+      cookies: { vg_session: await cookieFor(adminUserId, "ADMIN", tenantAId) },
       payload: { name: "Third Party With Vendor", origin: "THIRD_PARTY" },
     });
     const id = JSON.parse(created.body).id;
 
     await server.inject({
       method: "POST", url: `/ai-systems/${id}/vendors`,
-      cookies: { vg_session: cookieFor(adminUserId, "ADMIN", tenantAId) },
+      cookies: { vg_session: await cookieFor(adminUserId, "ADMIN", tenantAId) },
       payload: { vendorId: vendorAId, role: "PRIMARY_PROVIDER" },
     });
 
     const res = await server.inject({
       method: "PATCH", url: `/ai-systems/${id}`,
-      cookies: { vg_session: cookieFor(adminUserId, "ADMIN", tenantAId) },
+      cookies: { vg_session: await cookieFor(adminUserId, "ADMIN", tenantAId) },
       payload: { lifecycleStatus: "DEVELOPMENT" },
     });
     expect(res.statusCode).toBe(200);
@@ -330,14 +331,14 @@ describe("GET /ai-systems/:id and PATCH /ai-systems/:id (tenant isolation, valid
   it("rejects direct retirement without independent approval", async () => {
     const created = await server.inject({
       method: "POST", url: "/ai-systems",
-      cookies: { vg_session: cookieFor(adminUserId, "ADMIN", tenantAId) },
+      cookies: { vg_session: await cookieFor(adminUserId, "ADMIN", tenantAId) },
       payload: { name: "Retirement Test", origin: "INTERNAL" },
     });
     const id = JSON.parse(created.body).id;
 
     const res = await server.inject({
       method: "PATCH", url: `/ai-systems/${id}`,
-      cookies: { vg_session: cookieFor(adminUserId, "ADMIN", tenantAId) },
+      cookies: { vg_session: await cookieFor(adminUserId, "ADMIN", tenantAId) },
       payload: { lifecycleStatus: "RETIRED" },
     });
     expect(res.statusCode).toBe(409);
@@ -351,14 +352,14 @@ describe("AI System <-> Vendor linking", () => {
   it("links a vendor and generates ai_system.vendor_linked", async () => {
     const created = await server.inject({
       method: "POST", url: "/ai-systems",
-      cookies: { vg_session: cookieFor(adminUserId, "ADMIN", tenantAId) },
+      cookies: { vg_session: await cookieFor(adminUserId, "ADMIN", tenantAId) },
       payload: { name: "Link Test System", origin: "INTERNAL" },
     });
     const id = JSON.parse(created.body).id;
 
     const res = await server.inject({
       method: "POST", url: `/ai-systems/${id}/vendors`,
-      cookies: { vg_session: cookieFor(adminUserId, "ADMIN", tenantAId) },
+      cookies: { vg_session: await cookieFor(adminUserId, "ADMIN", tenantAId) },
       payload: { vendorId: vendorAId, role: "MODEL_PROVIDER" },
     });
     expect(res.statusCode).toBe(201);
@@ -370,14 +371,14 @@ describe("AI System <-> Vendor linking", () => {
   it("rejects linking a vendor that belongs to a different tenant", async () => {
     const created = await server.inject({
       method: "POST", url: "/ai-systems",
-      cookies: { vg_session: cookieFor(adminUserId, "ADMIN", tenantAId) },
+      cookies: { vg_session: await cookieFor(adminUserId, "ADMIN", tenantAId) },
       payload: { name: "Cross Tenant Link Test", origin: "INTERNAL" },
     });
     const id = JSON.parse(created.body).id;
 
     const res = await server.inject({
       method: "POST", url: `/ai-systems/${id}/vendors`,
-      cookies: { vg_session: cookieFor(adminUserId, "ADMIN", tenantAId) },
+      cookies: { vg_session: await cookieFor(adminUserId, "ADMIN", tenantAId) },
       payload: { vendorId: vendorBId, role: "MODEL_PROVIDER" },
     });
     expect(res.statusCode).toBe(404);
@@ -386,19 +387,19 @@ describe("AI System <-> Vendor linking", () => {
   it("rejects a duplicate identical relationship (same aiSystemId, vendorId, role)", async () => {
     const created = await server.inject({
       method: "POST", url: "/ai-systems",
-      cookies: { vg_session: cookieFor(adminUserId, "ADMIN", tenantAId) },
+      cookies: { vg_session: await cookieFor(adminUserId, "ADMIN", tenantAId) },
       payload: { name: "Duplicate Link Test", origin: "INTERNAL" },
     });
     const id = JSON.parse(created.body).id;
 
     await server.inject({
       method: "POST", url: `/ai-systems/${id}/vendors`,
-      cookies: { vg_session: cookieFor(adminUserId, "ADMIN", tenantAId) },
+      cookies: { vg_session: await cookieFor(adminUserId, "ADMIN", tenantAId) },
       payload: { vendorId: vendorAId, role: "DATA_PROVIDER" },
     });
     const res = await server.inject({
       method: "POST", url: `/ai-systems/${id}/vendors`,
-      cookies: { vg_session: cookieFor(adminUserId, "ADMIN", tenantAId) },
+      cookies: { vg_session: await cookieFor(adminUserId, "ADMIN", tenantAId) },
       payload: { vendorId: vendorAId, role: "DATA_PROVIDER" },
     });
     expect(res.statusCode).toBe(409);
@@ -407,25 +408,25 @@ describe("AI System <-> Vendor linking", () => {
   it("allows one AI system to have multiple different vendors linked", async () => {
     const created = await server.inject({
       method: "POST", url: "/ai-systems",
-      cookies: { vg_session: cookieFor(adminUserId, "ADMIN", tenantAId) },
+      cookies: { vg_session: await cookieFor(adminUserId, "ADMIN", tenantAId) },
       payload: { name: "Multi Vendor System", origin: "INTERNAL" },
     });
     const id = JSON.parse(created.body).id;
 
     await server.inject({
       method: "POST", url: `/ai-systems/${id}/vendors`,
-      cookies: { vg_session: cookieFor(adminUserId, "ADMIN", tenantAId) },
+      cookies: { vg_session: await cookieFor(adminUserId, "ADMIN", tenantAId) },
       payload: { vendorId: vendorAId, role: "MODEL_PROVIDER" },
     });
     await server.inject({
       method: "POST", url: `/ai-systems/${id}/vendors`,
-      cookies: { vg_session: cookieFor(adminUserId, "ADMIN", tenantAId) },
+      cookies: { vg_session: await cookieFor(adminUserId, "ADMIN", tenantAId) },
       payload: { vendorId: vendorA2Id, role: "PLATFORM_PROVIDER" },
     });
 
     const list = await server.inject({
       method: "GET", url: `/ai-systems/${id}/vendors`,
-      cookies: { vg_session: cookieFor(adminUserId, "ADMIN", tenantAId) },
+      cookies: { vg_session: await cookieFor(adminUserId, "ADMIN", tenantAId) },
     });
     expect(list.statusCode).toBe(200);
     expect(JSON.parse(list.body).vendorLinks.length).toBe(2);
@@ -434,12 +435,12 @@ describe("AI System <-> Vendor linking", () => {
   it("allows one vendor to be linked to multiple different AI systems", async () => {
     const sys1 = await server.inject({
       method: "POST", url: "/ai-systems",
-      cookies: { vg_session: cookieFor(adminUserId, "ADMIN", tenantAId) },
+      cookies: { vg_session: await cookieFor(adminUserId, "ADMIN", tenantAId) },
       payload: { name: "Shared Vendor System 1", origin: "INTERNAL" },
     });
     const sys2 = await server.inject({
       method: "POST", url: "/ai-systems",
-      cookies: { vg_session: cookieFor(adminUserId, "ADMIN", tenantAId) },
+      cookies: { vg_session: await cookieFor(adminUserId, "ADMIN", tenantAId) },
       payload: { name: "Shared Vendor System 2", origin: "INTERNAL" },
     });
     const id1 = JSON.parse(sys1.body).id;
@@ -447,12 +448,12 @@ describe("AI System <-> Vendor linking", () => {
 
     const link1 = await server.inject({
       method: "POST", url: `/ai-systems/${id1}/vendors`,
-      cookies: { vg_session: cookieFor(adminUserId, "ADMIN", tenantAId) },
+      cookies: { vg_session: await cookieFor(adminUserId, "ADMIN", tenantAId) },
       payload: { vendorId: vendorAId, role: "AI_SERVICE_PROVIDER" },
     });
     const link2 = await server.inject({
       method: "POST", url: `/ai-systems/${id2}/vendors`,
-      cookies: { vg_session: cookieFor(adminUserId, "ADMIN", tenantAId) },
+      cookies: { vg_session: await cookieFor(adminUserId, "ADMIN", tenantAId) },
       payload: { vendorId: vendorAId, role: "AI_SERVICE_PROVIDER" },
     });
     expect(link1.statusCode).toBe(201);
@@ -462,21 +463,21 @@ describe("AI System <-> Vendor linking", () => {
   it("unlinks a vendor and generates ai_system.vendor_unlinked", async () => {
     const created = await server.inject({
       method: "POST", url: "/ai-systems",
-      cookies: { vg_session: cookieFor(adminUserId, "ADMIN", tenantAId) },
+      cookies: { vg_session: await cookieFor(adminUserId, "ADMIN", tenantAId) },
       payload: { name: "Unlink Test System", origin: "INTERNAL" },
     });
     const id = JSON.parse(created.body).id;
 
     const link = await server.inject({
       method: "POST", url: `/ai-systems/${id}/vendors`,
-      cookies: { vg_session: cookieFor(adminUserId, "ADMIN", tenantAId) },
+      cookies: { vg_session: await cookieFor(adminUserId, "ADMIN", tenantAId) },
       payload: { vendorId: vendorAId, role: "DEVELOPMENT_PROVIDER" },
     });
     const linkId = JSON.parse(link.body).id;
 
     const res = await server.inject({
       method: "DELETE", url: `/ai-systems/${id}/vendors/${linkId}`,
-      cookies: { vg_session: cookieFor(adminUserId, "ADMIN", tenantAId) },
+      cookies: { vg_session: await cookieFor(adminUserId, "ADMIN", tenantAId) },
     });
     expect(res.statusCode).toBe(204);
 

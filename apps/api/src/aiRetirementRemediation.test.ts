@@ -1,3 +1,4 @@
+import { issueTestSessionCookie } from "./testSession.js";
 import {
   beforeAll,
   afterAll,
@@ -36,7 +37,7 @@ import {
   databaseClient,
   governanceTransaction,
 } from "@vendorguard/database";
-import { createSessionCookie } from "@vendorguard/auth";
+
 import { server } from "./index.js";
 let tenant: string;
 const users: Record<string, string> = {};
@@ -69,8 +70,8 @@ async function drainPending() {
     draining = false;
   }
 }
-const cookie = (role = "ADMIN") =>
-  createSessionCookie({
+const cookie = async (role = "ADMIN") =>
+  await issueTestSessionCookie({
     tenantId: tenant,
     userId: users[role]!,
     role,
@@ -87,7 +88,7 @@ async function call(
     method,
     url,
     payload,
-    cookies: { vg_session: cookie(role) },
+    cookies: { vg_session: await cookie(role) },
     remoteAddress: `10.92.0.${++sequence}`,
   });
   return { status: r.statusCode, body: r.json() };
@@ -175,7 +176,7 @@ async function upload(id: string, query = "", role = "ADMIN") {
       url: `/ai-systems/${id}/evidence/upload${query}`,
       payload,
       headers: { "content-type": `multipart/form-data; boundary=${boundary}` },
-      cookies: { vg_session: cookie(role) },
+      cookies: { vg_session: await cookie(role) },
       remoteAddress: `10.92.0.${++sequence}`,
     }),
   );

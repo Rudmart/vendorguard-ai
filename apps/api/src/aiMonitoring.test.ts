@@ -1,8 +1,9 @@
+import { issueTestSessionCookie } from "./testSession.js";
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { prisma } from "@vendorguard/database";
 import { server } from "./index.js";
 import { nextDueDate, dueState } from "./aiMonitoring.js";
-import { createSessionCookie } from "@vendorguard/auth";
+
 
 let tenantAId: string;
 let tenantBId: string;
@@ -21,11 +22,11 @@ function nextIp() {
   ipCounter += 1;
   return "10.15." + Math.floor(ipCounter / 250) + "." + (ipCounter % 250);
 }
-function cookieFor(userId: string, role: string, tenantId: string) {
-  return createSessionCookie({ userId, tenantId, email: `${userId}@example.com`, displayName: "Test User", role });
+async function cookieFor(userId: string, role: string, tenantId: string) {
+  return await issueTestSessionCookie({ userId, tenantId, email: `${userId}@example.com`, displayName: "Test User", role });
 }
 async function call(method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE", url: string, userId: string, role: string, payload?: Record<string, unknown>, tenantId?: string) {
-  const res = await server.inject({ method, url, cookies: { vg_session: cookieFor(userId, role, tenantId ?? tenantAId) }, payload, remoteAddress: nextIp() });
+  const res = await server.inject({ method, url, cookies: { vg_session: await cookieFor(userId, role, tenantId ?? tenantAId) }, payload, remoteAddress: nextIp() });
   return { status: res.statusCode, body: res.body ? JSON.parse(res.body) : null };
 }
 async function newSystem(tenantId?: string, userId?: string) {
@@ -315,7 +316,7 @@ describe("Tenant isolation", () => {
     const sysId = await newSystem();
     const check = await newCheck(sysId);
     const r = await review(check.body.id, { result: "REASSESSMENT_REQUIRED" });
-    const b = (method: "GET" | "POST" | "PATCH", url: string, payload?: Record<string, unknown>) => call(method, url, tenantBUserId, "ADMIN", payload, tenantBId);
+    const b = async (method: "GET" | "POST" | "PATCH", url: string, payload?: Record<string, unknown>) => call(method, url, tenantBUserId, "ADMIN", payload, tenantBId);
     expect((await b("GET", `/ai-systems/${sysId}/monitoring`)).status).toBe(404);
     expect((await b("GET", `/ai-systems/${sysId}/monitoring-checks`)).status).toBe(404);
     expect((await b("POST", `/ai-systems/${sysId}/monitoring-checks`, CHECK)).status).toBe(404);

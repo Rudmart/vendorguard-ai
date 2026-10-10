@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { prisma } from "@vendorguard/database";
+import { prisma, resourceScope, validateStoredSession } from "@vendorguard/database";
 import { getSessionFromCookie, requestContextSchema, type RequestContext } from "@vendorguard/auth";
 
 export async function resolveMcpContext(cookieValue: string | undefined): Promise<RequestContext> {
@@ -15,10 +15,14 @@ export async function resolveMcpContext(cookieValue: string | undefined): Promis
     throw new Error("NO_MEMBERSHIP");
   }
 
+  const activeMembership = await validateStoredSession(session);
+  if (!activeMembership) throw new Error("UNAUTHENTICATED");
+  const scope = resourceScope.getStore();
+  if (scope) scope.tenantId = membership.tenantId;
   return requestContextSchema.parse({
     userId: session.userId,
     tenantId: session.tenantId,
-    role: membership.role,
+    role: activeMembership.role,
     correlationId: randomUUID(),
   });
 }

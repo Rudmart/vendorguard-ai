@@ -1,8 +1,9 @@
+import { issueTestSessionCookie } from "./testSession.js";
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { prisma } from "@vendorguard/database";
 import { server } from "./index.js";
 import { deriveAcceptanceState } from "./aiRiskAcceptance.js";
-import { createSessionCookie } from "@vendorguard/auth";
+
 
 let tenantAId: string;
 let tenantBId: string;
@@ -31,12 +32,12 @@ const REQ = {
   expiresAt: FUTURE,
 };
 
-function cookieFor(userId: string, role: string, tenantId: string) {
-  return createSessionCookie({ userId, tenantId, email: `${userId}@example.com`, displayName: "Test User", role });
+async function cookieFor(userId: string, role: string, tenantId: string) {
+  return await issueTestSessionCookie({ userId, tenantId, email: `${userId}@example.com`, displayName: "Test User", role });
 }
 
 async function call(method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE", url: string, userId: string, role: string, payload?: Record<string, unknown>, tenantId?: string) {
-  const res = await server.inject({ method, url, cookies: { vg_session: cookieFor(userId, role, tenantId ?? tenantAId) }, payload, remoteAddress: nextIp() });
+  const res = await server.inject({ method, url, cookies: { vg_session: await cookieFor(userId, role, tenantId ?? tenantAId) }, payload, remoteAddress: nextIp() });
   return { status: res.statusCode, body: res.body ? JSON.parse(res.body) : null };
 }
 
@@ -324,7 +325,7 @@ describe("Tenant isolation", () => {
   it("returns 404 to another tenant on every Risk Acceptance route", async () => {
     const riskId = await riskOn(await newSystem());
     const req = await requestOn(riskId);
-    const b = (method: "GET" | "POST" | "PATCH", url: string, payload?: Record<string, unknown>) => call(method, url, tenantBUserId, "ADMIN", payload, tenantBId);
+    const b = async (method: "GET" | "POST" | "PATCH", url: string, payload?: Record<string, unknown>) => call(method, url, tenantBUserId, "ADMIN", payload, tenantBId);
     expect((await b("GET", `/ai-risks/${riskId}/risk-acceptance`)).status).toBe(404);
     expect((await b("POST", `/ai-risks/${riskId}/risk-acceptance`, REQ)).status).toBe(404);
     expect((await b("PATCH", `/risk-acceptances/${req.body.id}`, { conditions: "x" })).status).toBe(404);

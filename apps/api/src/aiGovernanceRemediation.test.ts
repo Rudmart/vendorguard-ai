@@ -1,7 +1,32 @@
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { issueTestSessionCookie } from "./testSession.js";
+import { describe, it as test, expect, beforeAll, afterAll, beforeEach, afterEach } from "vitest";
 import { prisma } from "@vendorguard/database";
 import { server } from "./index.js";
-import { createSessionCookie } from "@vendorguard/auth";
+
+
+const pendingOperations = new Set<Promise<unknown>>();
+function tracked<T>(operation: Promise<T>): Promise<T> {
+  pendingOperations.add(operation);
+  void operation.then(
+    () => pendingOperations.delete(operation),
+    () => pendingOperations.delete(operation),
+  );
+  return operation;
+}
+// A Vitest deadline does not cancel the body or its concurrent requests.
+function it(name: string, body: () => void | Promise<void>) {
+  test(name, () => tracked(Promise.resolve().then(body)));
+}
+async function drainPending() {
+  do {
+    await Promise.allSettled([...pendingOperations]);
+  } while (pendingOperations.size);
+}
+beforeEach(drainPending);
+afterEach(drainPending);
+function call(...args: Parameters<typeof performCall>) {
+  return tracked(performCall(...args));
+}
 
 let tenantAId: string;
 let tenantBId: string;
@@ -24,12 +49,12 @@ function nextIp() {
 }
 const REM = { title: "Require approval record", description: "Block final decisions without a recorded human approval", dueDate: "2027-01-31" };
 
-function cookieFor(userId: string, role: string, tenantId: string) {
-  return createSessionCookie({ userId, tenantId, email: `${userId}@example.com`, displayName: "Test User", role });
+async function cookieFor(userId: string, role: string, tenantId: string) {
+  return await issueTestSessionCookie({ userId, tenantId, email: `${userId}@example.com`, displayName: "Test User", role });
 }
 
-async function call(method: "GET" | "POST" | "PUT" | "PATCH", url: string, userId: string, role: string, payload?: Record<string, unknown>, tenantId?: string) {
-  const res = await server.inject({ method, url, cookies: { vg_session: cookieFor(userId, role, tenantId ?? tenantAId) }, payload, remoteAddress: nextIp() });
+async function performCall(method: "GET" | "POST" | "PUT" | "PATCH", url: string, userId: string, role: string, payload?: Record<string, unknown>, tenantId?: string) {
+  const res = await server.inject({ method, url, cookies: { vg_session: await cookieFor(userId, role, tenantId ?? tenantAId) }, payload, remoteAddress: nextIp() });
   return { status: res.statusCode, body: res.body ? JSON.parse(res.body) : null };
 }
 
@@ -95,6 +120,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  await drainPending();
   const tenants = { in: [tenantAId, tenantBId] };
   await prisma.remediationVerification.deleteMany({ where: { tenantId: tenants } });
   await prisma.remediationAction.deleteMany({ where: { tenantId: tenants } });
@@ -336,7 +362,7 @@ describe("Tenant isolation", () => {
     const { findingId } = await findingIn("OPEN");
     const rem = await createRem(findingId);
     const id = rem.body.id as string;
-    const b = (method: "GET" | "POST" | "PATCH", url: string, payload?: Record<string, unknown>) => call(method, url, tenantBUserId, "ADMIN", payload, tenantBId);
+    const b = async (method: "GET" | "POST" | "PATCH", url: string, payload?: Record<string, unknown>) => call(method, url, tenantBUserId, "ADMIN", payload, tenantBId);
     expect((await b("POST", `/governance-findings/${findingId}/remediation`, { ...REM, ownerUserId: tenantBUserId })).status).toBe(404);
     expect((await b("GET", `/governance-findings/${findingId}/remediation`)).status).toBe(404);
     expect((await b("GET", `/governance-remediations/${id}`)).status).toBe(404);

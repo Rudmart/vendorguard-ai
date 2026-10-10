@@ -1,3 +1,5 @@
+import { evidenceAllowed } from "@vendorguard/auth";
+import type { Role } from "@vendorguard/shared";
 /** Permanent AI retirement. Historical governance records are never deleted or completed here. */
 import { createHash } from "node:crypto";
 import type { FastifyInstance, FastifyRequest } from "fastify";
@@ -655,8 +657,7 @@ async function required(
 }
 async function detail(i: AiSystemRetirement, s: Session) {
   const mayReadEvidence =
-    hasPermission(s, "evidence:read") ||
-    hasPermission(s, "evidence:read-metadata");
+    evidenceAllowed(s.role as Role, "metadata");
   const record = await prisma.aiSystemRetirement.findFirst({
     where: { id: i.id, tenantId: s.tenantId },
     include: {
@@ -897,7 +898,7 @@ export async function registerRetirementRoutes(app: FastifyInstance) {
     "/ai-retirements/:id/evidence",
     "ai-system:update",
     async (r, s) => {
-      if (!hasPermission(s, "evidence:read"))
+      if (!evidenceAllowed(s.role as Role, "content"))
         fail(
           403,
           "Existing evidence read permission is required to link evidence",

@@ -1,7 +1,8 @@
+import { issueTestSessionCookie } from "./testSession.js";
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { prisma } from "@vendorguard/database";
 import { server } from "./index.js";
-import { createSessionCookie } from "@vendorguard/auth";
+
 
 let tenantAId: string;
 let tenantBId: string;
@@ -25,8 +26,8 @@ let librarySnapshotBefore: string;
 
 const TEST_PREFIXES = ["m12-test-", "ra-test-fw-", "s8-test-"];
 
-function cookieFor(userId: string, role: string, tenantId: string) {
-  return createSessionCookie({ userId, tenantId, email: `${userId}@example.com`, displayName: "Test User", role });
+async function cookieFor(userId: string, role: string, tenantId: string) {
+  return await issueTestSessionCookie({ userId, tenantId, email: `${userId}@example.com`, displayName: "Test User", role });
 }
 
 // Snapshot of every framework/version/control that is NOT a temporary test record.
@@ -57,7 +58,7 @@ async function makeControl(frameworkVersionId: string, code: string) {
 async function createAiSystem(name = "S8 Test AI System") {
   const res = await server.inject({
     method: "POST", url: "/ai-systems",
-    cookies: { vg_session: cookieFor(adminUserId, "ADMIN", tenantAId) },
+    cookies: { vg_session: await cookieFor(adminUserId, "ADMIN", tenantAId) },
     payload: { name, origin: "INTERNAL" },
   });
   return JSON.parse(res.body).id as string;
@@ -66,7 +67,7 @@ async function createAiSystem(name = "S8 Test AI System") {
 async function setApplicability(sysId: string, frameworkId: string, status: unknown, rationale: unknown = "Test rationale", role = "ANALYST", userId?: string, tenantId?: string) {
   return server.inject({
     method: "PUT", url: `/ai-systems/${sysId}/framework-applicability/${frameworkId}`,
-    cookies: { vg_session: cookieFor(userId ?? analystUserId, role, tenantId ?? tenantAId) },
+    cookies: { vg_session: await cookieFor(userId ?? analystUserId, role, tenantId ?? tenantAId) },
     payload: { status, rationale },
   });
 }
@@ -74,7 +75,7 @@ async function setApplicability(sysId: string, frameworkId: string, status: unkn
 async function mapControls(sysId: string, payload: unknown, role = "ANALYST", userId?: string, tenantId?: string) {
   return server.inject({
     method: "POST", url: `/ai-systems/${sysId}/controls`,
-    cookies: { vg_session: cookieFor(userId ?? analystUserId, role, tenantId ?? tenantAId) },
+    cookies: { vg_session: await cookieFor(userId ?? analystUserId, role, tenantId ?? tenantAId) },
     payload: payload as Record<string, unknown>,
   });
 }
@@ -82,7 +83,7 @@ async function mapControls(sysId: string, payload: unknown, role = "ANALYST", us
 async function patchControl(recordId: string, payload: Record<string, unknown>, role = "ANALYST", userId?: string, tenantId?: string) {
   return server.inject({
     method: "PATCH", url: `/ai-system-controls/${recordId}`,
-    cookies: { vg_session: cookieFor(userId ?? analystUserId, role, tenantId ?? tenantAId) },
+    cookies: { vg_session: await cookieFor(userId ?? analystUserId, role, tenantId ?? tenantAId) },
     payload,
   });
 }
@@ -90,7 +91,7 @@ async function patchControl(recordId: string, payload: Record<string, unknown>, 
 async function getControlSet(sysId: string) {
   const res = await server.inject({
     method: "GET", url: `/ai-systems/${sysId}/controls`,
-    cookies: { vg_session: cookieFor(readOnlyUserId, "READ_ONLY", tenantAId) },
+    cookies: { vg_session: await cookieFor(readOnlyUserId, "READ_ONLY", tenantAId) },
   });
   return { status: res.statusCode, body: JSON.parse(res.body) };
 }
@@ -222,7 +223,7 @@ describe("Framework applicability (human governance determination)", () => {
     expect((await setApplicability(sysId, fwId, "APPLICABLE", "x", "REVIEWER", reviewerUserId)).statusCode).toBe(403);
     const res = await server.inject({
       method: "GET", url: `/ai-systems/${sysId}/framework-applicability`,
-      cookies: { vg_session: cookieFor(readOnlyUserId, "READ_ONLY", tenantAId) },
+      cookies: { vg_session: await cookieFor(readOnlyUserId, "READ_ONLY", tenantAId) },
     });
     expect(res.statusCode).toBe(200);
   });
@@ -231,7 +232,7 @@ describe("Framework applicability (human governance determination)", () => {
     const sysId = await createAiSystem();
     const getRes = await server.inject({
       method: "GET", url: `/ai-systems/${sysId}/framework-applicability`,
-      cookies: { vg_session: cookieFor(tenantBUserId, "ADMIN", tenantBId) },
+      cookies: { vg_session: await cookieFor(tenantBUserId, "ADMIN", tenantBId) },
     });
     expect(getRes.statusCode).toBe(404);
     expect((await setApplicability(sysId, fwId, "APPLICABLE", "x", "ADMIN", tenantBUserId, tenantBId)).statusCode).toBe(404);
@@ -242,7 +243,7 @@ describe("Framework applicability (human governance determination)", () => {
     expect((await setApplicability(sysId, fwBId, "APPLICABLE")).statusCode).toBe(404);
     const res = await server.inject({
       method: "GET", url: `/ai-systems/${sysId}/framework-applicability`,
-      cookies: { vg_session: cookieFor(analystUserId, "ANALYST", tenantAId) },
+      cookies: { vg_session: await cookieFor(analystUserId, "ANALYST", tenantAId) },
     });
     const ids = JSON.parse(res.body).frameworks.map((row: { framework: { id: string } }) => row.framework.id);
     expect(ids).not.toContain(fwBId);
@@ -254,7 +255,7 @@ describe("Framework applicability (human governance determination)", () => {
     await prisma.aiSystem.update({ where: { id: sysId }, data: { regulatoryRelevance: ["EU_AI_ACT", "PRIVACY"] } });
     const res = await server.inject({
       method: "GET", url: `/ai-systems/${sysId}/framework-applicability`,
-      cookies: { vg_session: cookieFor(analystUserId, "ANALYST", tenantAId) },
+      cookies: { vg_session: await cookieFor(analystUserId, "ANALYST", tenantAId) },
     });
     const rows = JSON.parse(res.body).frameworks as Array<{ framework: { catalogId: string }; applicability: unknown; regulatoryContext: string | null }>;
     expect(rows.every((row) => row.applicability === null)).toBe(true);
@@ -270,7 +271,7 @@ describe("Framework applicability (human governance determination)", () => {
     const before = await prisma.framework.findUniqueOrThrow({ where: { id: fwId } });
     await server.inject({
       method: "PUT", url: `/ai-systems/${sysId}/framework-applicability/${fwId}`,
-      cookies: { vg_session: cookieFor(analystUserId, "ANALYST", tenantAId) },
+      cookies: { vg_session: await cookieFor(analystUserId, "ANALYST", tenantAId) },
       payload: { status: "APPLICABLE", rationale: "ok", name: "Hacked", scope: "HACKED", tenantId: tenantBId },
     });
     const after = await prisma.framework.findUniqueOrThrow({ where: { id: fwId } });
@@ -365,7 +366,7 @@ describe("Control mapping", () => {
     expect((await mapControls(sysId, { controlIds: [ctrlA] }, "ADMIN", tenantBUserId, tenantBId)).statusCode).toBe(404);
     const res = await server.inject({
       method: "GET", url: `/ai-systems/${sysId}/controls`,
-      cookies: { vg_session: cookieFor(tenantBUserId, "ADMIN", tenantBId) },
+      cookies: { vg_session: await cookieFor(tenantBUserId, "ADMIN", tenantBId) },
     });
     expect(res.statusCode).toBe(404);
   });
@@ -472,7 +473,7 @@ describe("Control applicability, ownership, and implementation claim", () => {
     const record = await mappedRecord(sysId, ctrlA);
     const res = await server.inject({
       method: "DELETE", url: `/ai-system-controls/${record.id}`,
-      cookies: { vg_session: cookieFor(adminUserId, "ADMIN", tenantAId) },
+      cookies: { vg_session: await cookieFor(adminUserId, "ADMIN", tenantAId) },
     });
     expect(res.statusCode).toBe(404);
     expect(await prisma.aiSystemControl.findUnique({ where: { id: record.id } })).not.toBeNull();
@@ -531,7 +532,7 @@ describe("AI Control Set summary and relationships", () => {
     const sysId = await systemWithApplicableFramework();
     const raRes = await server.inject({
       method: "POST", url: `/ai-systems/${sysId}/risk-assessments`,
-      cookies: { vg_session: cookieFor(analystUserId, "ANALYST", tenantAId) },
+      cookies: { vg_session: await cookieFor(analystUserId, "ANALYST", tenantAId) },
       payload: { name: "S8 Linked Risk Assessment" },
     });
     expect(raRes.statusCode).toBe(201);
@@ -566,7 +567,7 @@ describe("Regression - existing workflows still work", () => {
     const sysId = await createAiSystem();
     const res = await server.inject({
       method: "POST", url: `/ai-systems/${sysId}/impact-assessments`,
-      cookies: { vg_session: cookieFor(analystUserId, "ANALYST", tenantAId) },
+      cookies: { vg_session: await cookieFor(analystUserId, "ANALYST", tenantAId) },
       payload: {},
     });
     expect(res.statusCode).toBe(201);
@@ -575,12 +576,12 @@ describe("Regression - existing workflows still work", () => {
   it("Framework Explorer and Vendor/TPRM list endpoints still respond", async () => {
     const frameworks = await server.inject({
       method: "GET", url: "/frameworks",
-      cookies: { vg_session: cookieFor(adminUserId, "ADMIN", tenantAId) },
+      cookies: { vg_session: await cookieFor(adminUserId, "ADMIN", tenantAId) },
     });
     expect(frameworks.statusCode).toBe(200);
     const assessments = await server.inject({
       method: "GET", url: "/assessments",
-      cookies: { vg_session: cookieFor(adminUserId, "ADMIN", tenantAId) },
+      cookies: { vg_session: await cookieFor(adminUserId, "ADMIN", tenantAId) },
     });
     expect(assessments.statusCode).toBe(200);
   });

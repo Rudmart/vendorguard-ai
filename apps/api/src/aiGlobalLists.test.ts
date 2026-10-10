@@ -1,9 +1,10 @@
+import { issueTestSessionCookie } from "./testSession.js";
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { readFileSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { prisma } from "@vendorguard/database";
-import { createSessionCookie } from "@vendorguard/auth";
+
 import { server } from "./index.js";
 import { nextDueDate } from "./aiMonitoring.js";
 
@@ -22,20 +23,20 @@ function nextIp() {
   ipCounter += 1;
   return "10.41." + Math.floor(ipCounter / 250) + "." + (ipCounter % 250);
 }
-function cookie(userId: string, role: string, tenantId: string) {
-  return createSessionCookie({ userId, tenantId, email: `${userId}@example.com`, displayName: "Test", role });
+async function cookie(userId: string, role: string, tenantId: string) {
+  return await issueTestSessionCookie({ userId, tenantId, email: `${userId}@example.com`, displayName: "Test", role });
 }
 async function call(method: "GET" | "PUT" | "POST", url: string, userId?: string, role?: string, tenantId?: string, payload?: Record<string, unknown>) {
   const res = await server.inject({
     method,
     url,
-    cookies: userId && role ? { vg_session: cookie(userId, role, tenantId ?? tenantAId) } : {},
+    cookies: userId && role ? { vg_session: await cookie(userId, role, tenantId ?? tenantAId) } : {},
     payload,
     remoteAddress: nextIp(),
   });
   return { status: res.statusCode, body: res.body ? JSON.parse(res.body) : null };
 }
-const get = (url: string, userId?: string, role?: string, tenantId?: string) => call("GET", url, userId, role, tenantId);
+const get = async (url: string, userId?: string, role?: string, tenantId?: string) => call("GET", url, userId, role, tenantId);
 
 async function system(tenantId: string, name: string) {
   const s = await prisma.aiSystem.create({ data: { tenantId, name, origin: "INTERNAL" as never, dataCategories: [], affectedPopulation: [], regulatoryRelevance: [] } });

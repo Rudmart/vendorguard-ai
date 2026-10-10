@@ -10,6 +10,7 @@ describe("runEvidenceAnalysis (integration, fake mode)", () => {
   it("throws if the assessment does not exist for the tenant", async () => {
     await expect(
       runEvidenceAnalysis({
+        actor: { userId: "test-analysis-actor", role: "ADMIN" },
         tenantId: TENANT_ID,
         assessmentId: "00000000-0000-0000-0000-000000000000",
         evidenceDocumentId: EVIDENCE_DOCUMENT_ID,
@@ -24,6 +25,7 @@ describe("runEvidenceAnalysis (integration, fake mode)", () => {
     if (!assessment) return;
     await expect(
       runEvidenceAnalysis({
+        actor: { userId: "test-analysis-actor", role: "ADMIN" },
         tenantId: assessment.tenantId,
         assessmentId: ASSESSMENT_ID,
         evidenceDocumentId: "00000000-0000-0000-0000-000000000000",
@@ -42,7 +44,11 @@ describe("runEvidenceAnalysis (integration, fake mode)", () => {
       return;
     }
 
+    const actor = await prisma.tenantMembership.findFirstOrThrow({
+      where: { tenantId: assessment.tenantId, role: { in: ["ADMIN", "ANALYST"] } },
+    });
     const result = await runEvidenceAnalysis({
+      actor: { userId: actor.userId, role: actor.role },
       tenantId: assessment.tenantId,
       assessmentId: ASSESSMENT_ID,
       evidenceDocumentId: EVIDENCE_DOCUMENT_ID,

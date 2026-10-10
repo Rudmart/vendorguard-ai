@@ -1,7 +1,8 @@
+import { issueTestSessionCookie } from "./testSession.js";
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { prisma } from "@vendorguard/database";
 import { server } from "./index.js";
-import { createSessionCookie } from "@vendorguard/auth";
+
 import { missingForSubmission } from "./aiUseCases.js";
 
 // AI Use Cases V1 - CRUD, validation, tenant isolation, RBAC, lifecycle, human review + SoD, audit, relationships.
@@ -20,11 +21,11 @@ function nextIp() {
   ipCounter += 1;
   return "10.77." + Math.floor(ipCounter / 250) + "." + (ipCounter % 250);
 }
-function cookieFor(userId: string, role: string, tenantId: string) {
-  return createSessionCookie({ userId, tenantId, email: `${userId}@example.com`, displayName: "Test User", role });
+async function cookieFor(userId: string, role: string, tenantId: string) {
+  return await issueTestSessionCookie({ userId, tenantId, email: `${userId}@example.com`, displayName: "Test User", role });
 }
 async function call(method: "GET" | "POST" | "PATCH", url: string, userId: string, role: string, payload?: Record<string, unknown>, tenantId?: string) {
-  const res = await server.inject({ method, url, cookies: { vg_session: cookieFor(userId, role, tenantId ?? tenantAId) }, payload, remoteAddress: nextIp() });
+  const res = await server.inject({ method, url, cookies: { vg_session: await cookieFor(userId, role, tenantId ?? tenantAId) }, payload, remoteAddress: nextIp() });
   return { status: res.statusCode, body: res.body ? JSON.parse(res.body) : null };
 }
 async function newSystem(tenantId?: string, userId?: string) {

@@ -1,3 +1,4 @@
+import { issueTestSessionCookie } from "./testSession.js";
 import {
   beforeAll,
   afterAll,
@@ -9,7 +10,7 @@ import {
 } from "vitest";
 import { randomUUID } from "node:crypto";
 import { prisma, databaseClient, Prisma } from "@vendorguard/database";
-import { createSessionCookie } from "@vendorguard/auth";
+
 import { server } from "./index.js";
 import { loadReportData } from "./aiGovernanceReportData.js";
 import { buildReport } from "./aiGovernanceReportMetrics.js";
@@ -55,7 +56,7 @@ async function get(
     method: "GET",
     url: path,
     remoteAddress: "10.98." + Math.floor(++ip / 250) + "." + (ip % 250),
-    cookies: s ? { vg_session: createSessionCookie(s) } : {},
+    cookies: s ? { vg_session: await issueTestSessionCookie(s) } : {},
   });
   return response;
 }
