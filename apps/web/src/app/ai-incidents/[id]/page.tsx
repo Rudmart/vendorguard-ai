@@ -289,7 +289,7 @@ export default function IncidentDetail() {
           )}
           <h2>Findings and remediation</h2>
           {i.findings.map(({ finding: f }) => (
-            <p key={f.id}>
+            <p key={f.id} id={"finding-" + f.id}>
               <a style={link} href={`/ai-systems/${i.aiSystemId}/findings`}>
                 {f.title}
               </a>{" "}

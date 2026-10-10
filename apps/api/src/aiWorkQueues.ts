@@ -1,3 +1,4 @@
+import { authorizedReport, reportAudit } from "./aiGovernanceReporting.js";
 /**
  * Alignment Phase C - read-only aggregation for Dashboard, My Work and Pending Reviews.
  * No task/review table: everything is derived from existing authoritative records.
@@ -224,6 +225,41 @@ export async function registerWorkQueueRoutes(app: FastifyInstance): Promise<voi
       return reply.status(403).send({ error: "Not authorized to view the dashboard" });
     }
     const t = session.tenantId;
+    if (hasPermission(session, "report:read")) {
+      const { report } = await authorizedReport(session, { lifecycleScope: "operational" });
+      const value = (key: string) => {
+        const metric = report.metrics.find(m => m.key === key);
+        return metric?.access === "AVAILABLE" ? metric.value : 0;
+      };
+      let thirdParty = null;
+      if (hasPermission(session, "vendor:read")) {
+        const vendors = await prisma.vendor.findMany({ where: { tenantId:t, deletedAt:null }, select:{ aiFunctionality:true } });
+        thirdParty = { vendors:vendors.length, aiVendors:vendors.filter(v => v.aiFunctionality).length,
+          openVendorRemediation:await prisma.remediationAction.count({ where:{ tenantId:t,vendorId:{ not:null },status:{ not:"CLOSED" } } }) };
+      }
+      const residual = Object.fromEntries(["LOW","MODERATE","HIGH","CRITICAL","NOT_ASSESSED"].map(b => [b,value("risks." + b)]));
+      await reportAudit(session,request,"governance_report.generated","SUCCESS",{ operation:"dashboard",lifecycleScope:"operational",metrics:report.metrics.length });
+      reply.header("Cache-Control","private, no-store");
+      return {
+        governanceReport:report,
+        attention:{
+          pendingReviewsForMe:(await pendingReviewsFor(session)).length,myWork:(await myWorkFor(session)).length,
+          findingsOpen:value("findings.OPEN"),findingsPendingReview:value("findings.PENDING_REVIEW"),
+          criticalOrHighOpenFindings:value("findings.highCriticalOpen"),
+          aiRemediationOverdue:value("remediation.overdue"),remediationAwaitingVerification:value("remediation.PENDING_VERIFICATION"),
+          monitoringOverdue:value("monitoring.OVERDUE"),monitoringDueSoon:value("monitoring.DUE_SOON"),
+          reassessmentsPastTarget:value("reassessments.overdue"),riskAcceptanceExpiringSoon:value("acceptances.expiring"),
+          riskAcceptanceExpired:value("acceptances.EXPIRED"),riskAcceptancePending:value("acceptances.PENDING_REVIEW")
+        },
+        posture:{ aiSystems:value("systems.operational"),inProduction:value("systems.production"),
+          withoutCompletedRiskAssessment:value("risk.missing"),withoutCompletedImpactAssessment:value("impact.missing"),
+          latestAssessedResidualRisk:residual,
+          aiRemediationOpen:["OPEN","IN_PROGRESS","OVERDUE","PENDING_VERIFICATION"].reduce((n,s) => n+value("remediation."+s),0),
+          riskAcceptanceActive:value("acceptances.ACTIVE"),reassessmentsInProgress:value("reassessments.IN_PROGRESS"),
+          monitoringChecksActive:["OVERDUE","DUE_SOON","NOT_DUE"].reduce((n,s) => n+value("monitoring."+s),0) },
+        thirdParty,acceptanceExpiringDays:ACCEPTANCE_EXPIRING_DAYS
+      };
+    }
     const now = Date.now();
 
     const systems = await prisma.aiSystem.findMany({ where: { tenantId: t }, select: { id: true, lifecycleStatus: true } });

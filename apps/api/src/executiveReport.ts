@@ -26,7 +26,7 @@ function isFindingOpen(status: string): boolean {
   return OPEN_FINDING_STATUSES.has(status);
 }
 
-export async function buildExecutiveReport(tenantId: string, vendorId: string) {
+export async function buildExecutiveReport(tenantId: string, vendorId: string, evidenceAllowed = false) {
   const vendor = await prisma.vendor.findFirst({
     where: { id: vendorId, tenantId },
   });
@@ -147,21 +147,25 @@ export async function buildExecutiveReport(tenantId: string, vendorId: string) {
     }));
   }
 
-  const evidenceDocuments = await prisma.evidenceDocument.findMany({
+  const evidenceDocuments = evidenceAllowed ? await prisma.evidenceDocument.findMany({
     where: { vendorId, tenantId, deletedAt: null },
-  });
+    select: { expirationDate: true, state: true },
+  }) : [];
   const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
   const soonCutoff = new Date(now.getTime() + THIRTY_DAYS_MS);
-  const evidenceStatus = {
+  const evidenceStatus = evidenceAllowed ? {
+    access: "AVAILABLE" as const,
+    definition: "Expiration only; not evidence acceptance, usability or compliance",
     total: evidenceDocuments.length,
     current: evidenceDocuments.filter((d) => !d.expirationDate || d.expirationDate > soonCutoff).length,
     expiringSoon: evidenceDocuments.filter(
       (d) => d.expirationDate && d.expirationDate > now && d.expirationDate <= soonCutoff
     ).length,
     expired: evidenceDocuments.filter((d) => d.expirationDate && d.expirationDate <= now).length,
-  };
+  } : { access: "RESTRICTED" as const };
 
   return {
+    generatedAt: now.toISOString(),
     vendor: {
       id: vendor.id,
       legalName: vendor.legalName,
@@ -172,6 +176,9 @@ export async function buildExecutiveReport(tenantId: string, vendorId: string) {
       : null,
     riskRating: currentRiskRating
       ? {
+          id: currentRiskRating.id,
+          assessmentId: currentRiskRating.assessmentId,
+          createdAt: currentRiskRating.createdAt,
           inherentScore: currentRiskRating.inherentScore,
           controlEffectiveness: currentRiskRating.controlEffectiveness,
           residualScore: currentRiskRating.residualScore,
@@ -180,6 +187,9 @@ export async function buildExecutiveReport(tenantId: string, vendorId: string) {
       : null,
     previousRiskRating: previousRiskRating
       ? {
+          id: previousRiskRating.id,
+          assessmentId: previousRiskRating.assessmentId,
+          createdAt: previousRiskRating.createdAt,
           inherentScore: previousRiskRating.inherentScore,
           controlEffectiveness: previousRiskRating.controlEffectiveness,
           residualScore: previousRiskRating.residualScore,

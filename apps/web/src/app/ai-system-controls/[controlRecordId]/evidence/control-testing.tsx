@@ -452,7 +452,7 @@ export default function ControlTestingSection({
       <div style={{ ...muted, fontWeight: 600, marginTop: 8 }}>Test history (completed tests are locked)</div>
       {completed.length === 0 && <p style={muted}>No completed tests yet.</p>}
       {completed.map((test, index) => (
-        <div key={test.id} style={{ borderTop: "1px solid #1f2937", padding: "10px 0" }}>
+        <div key={test.id} id={"test-" + test.id} style={{ borderTop: "1px solid #1f2937", padding: "10px 0" }}>
           <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
             <strong style={{ fontSize: 13 }}>
               Test #{completed.length - index} - {formatDate(test.testDate)} - {methodLabel(test.method)}

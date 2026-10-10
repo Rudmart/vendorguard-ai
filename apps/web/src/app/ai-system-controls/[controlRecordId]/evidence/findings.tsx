@@ -213,7 +213,7 @@ export default function FindingsSection({ controlRecordId, aiSystemId, refreshKe
 
       {findings.length === 0 && <p style={muted}>No findings for this control.</p>}
       {findings.map((f) => (
-        <div key={f.id} style={{ borderTop: "1px solid #1f2937", padding: "12px 0" }}>
+        <div key={f.id} id={"finding-" + f.id} style={{ borderTop: "1px solid #1f2937", padding: "12px 0" }}>
           <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
             <strong style={{ fontSize: 14 }}>{f.title}</strong>
             <span style={{ display: "flex", gap: 8 }}>
