@@ -42,7 +42,7 @@ Append-only use-case, risk and impact decision history now preserves actor, time
 
 **Lesson:** accountability requires durable decision evidence alongside current operational state. Do not reconstruct missing rationale or retroactive approval. Validate history preservation and mutation denial, and distinguish append-only controls from a broader retention policy.
 
-Sources: [Human Governance Review Bypass](02-human-governance-review-bypass.md) and [hardening validation report](../core-v1-hardening-remediation-validation.md).
+Sources: [Human Governance Review Bypass](02-human-governance-review-bypass.md) and [hardening validation report](core-v1-hardening-remediation-validation.md).
 
 ## 5. Session Security
 
@@ -52,7 +52,7 @@ API and MCP now share database-backed signed sessions with a seven-day absolute 
 
 **Lesson:** the server must remain authoritative for session lifetime and revocation. Evaluate retained credentials, membership changes and database failures—not only the normal browser logout flow.
 
-Sources: [Evidence Authorization Bypass Across AI/MCP Routes](03-evidence-authorization-bypass-ai-mcp.md) and [hardening validation report](../core-v1-hardening-remediation-validation.md).
+Sources: [Evidence Authorization Bypass Across AI/MCP Routes](03-evidence-authorization-bypass-ai-mcp.md) and [hardening validation report](core-v1-hardening-remediation-validation.md).
 
 ## 6. Security Middleware Performance Regression
 
@@ -64,7 +64,7 @@ The documented local measurements showed nested predicates growing from 1 to 9 b
 
 **Lesson:** a security control must preserve authorization correctness without creating unsafe or unstable operational behavior. Keep request state local, investigate cumulative query growth, and validate security and performance together. Separately, unfinished test operations must be drained so they cannot contaminate the next test or fixture teardown.
 
-Sources: [Cross-Tenant Private Framework Control Exposure](01-cross-tenant-private-framework-control-exposure.md) and [hardening validation report](../core-v1-hardening-remediation-validation.md).
+Sources: [Cross-Tenant Private Framework Control Exposure](01-cross-tenant-private-framework-control-exposure.md) and [hardening validation report](core-v1-hardening-remediation-validation.md).
 
 ## 7. CI / Database Migration Lesson
 
@@ -76,7 +76,7 @@ CI was changed to `prisma migrate deploy`, executing the committed migration SQL
 
 **Lesson:** validate the controls that actually execute in the database, not merely matching models and columns. Migration-defined protections belong in CI initialization. Preserve assertions when environment differences expose missing controls; do not replace rejection tests with weaker expectations.
 
-Sources: [hardening report's migration scope](../core-v1-hardening-remediation-validation.md), the [committed CI workflow](../../.github/workflows/pr-validation.yml), [CI correction commit](https://github.com/Rudmart/vendorguard-ai/commit/48551c47ab7942856729b258593f1e81ad1dff70), and [successful CI validation run](https://github.com/Rudmart/vendorguard-ai/actions/runs/38098481434). The linked workflow/commit/run supply subsequent CI evidence not yet incorporated into the original closure report.
+Sources: [hardening report's migration scope](core-v1-hardening-remediation-validation.md), the [committed CI workflow](../../../.github/workflows/pr-validation.yml), [CI correction commit](https://github.com/Rudmart/vendorguard-ai/commit/48551c47ab7942856729b258593f1e81ad1dff70), and [successful CI validation run](https://github.com/Rudmart/vendorguard-ai/actions/runs/38098481434). The linked workflow/commit/run supply subsequent CI evidence not yet incorporated into the original closure report.
 
 ## Validation and Human Closure
 
@@ -84,7 +84,7 @@ The accepted local validation passed **913/913 repository tests with zero timeou
 
 Original security probes revealed gaps despite an earlier passing suite. Findings were investigated, remediation designs and implementation were separately approved, original denied/authorized paths were retested, and the human owner reviewed the evidence before closure. Passing tests were evidence for that decision, not an automatic certification.
 
-Source: [Core V1 Lifecycle Validation](../core-v1-lifecycle-validation.md).
+Source: [Core V1 Lifecycle Validation](../../projects/vendorguard-ai/core-v1-lifecycle-validation.md).
 
 ## How I Would Explain This in an Interview
 

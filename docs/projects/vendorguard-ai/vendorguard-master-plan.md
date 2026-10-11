@@ -1,3 +1,5 @@
+> **Architecture contract.** Baseline/status references describe the plan's original stage; later completed Core V1 work is documented in the [lifecycle validation summary](core-v1-lifecycle-validation.md). Future sections remain planned unless supported by subsequent validation evidence.
+
 # VendorGuard AI
 # Master Build Plan & Architecture Contract
 

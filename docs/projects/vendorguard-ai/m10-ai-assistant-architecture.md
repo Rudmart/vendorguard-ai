@@ -1,3 +1,5 @@
+> **Milestone architecture record.** Describes the implementation and evidence at that milestone; test counts and security/dependency statements are historical. Later hardening and current validation are linked from the [project overview](README.md).
+
 # Milestone 10 - Governed AI Risk Assistant
 
 ## 1. AI Architecture

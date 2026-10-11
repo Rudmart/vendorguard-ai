@@ -18,4 +18,4 @@ B1, H1, H2, M1 and M2 are **REMEDIATED — VALIDATED — HUMAN APPROVED — CLOS
 
 This is **Core V1 technical validation, not final production deployment certification**. Final UI/UX polish, production hardening, Azure deployment and advanced Agent/MCP/RAG phases remain separate future work. Deferred use-case transitions, status-document cleanup and existing console warnings remain future cleanup; no sidebar/dashboard redesign is included.
 
-See the [detailed hardening report and exact file inventory](core-v1-hardening-remediation-validation.md) and [security/governance case studies](security-governance-case-studies/README.md) for implementation, migration, performance evidence and limitations.
+See the [detailed hardening report and exact file inventory](../../issues-findings/core-v1/core-v1-hardening-remediation-validation.md) and [security/governance case studies](../../issues-findings/core-v1/README.md) for implementation, migration, performance evidence and limitations.

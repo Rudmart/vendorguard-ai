@@ -14,7 +14,7 @@ Discovery combined source inspection, existing tests and authenticated local API
 
 The discovery baseline was commit `67ee07f2ca6f1d94e34b3d41c873c9e9c70b4e48`, whose tree matched merged Reporting V1. Affected discovery paths were unchanged by that implementation; no Reporting V1 regression was established. Baseline validation passed 645/645 lifecycle-focused and 875/875 repository tests, yet additional probes uncovered policy gaps. Those figures describe discovery, not final remediation validation.
 
-Final remediation validation passed **913/913 repository tests**, zero awake-run timeouts, API hardening **28/28**, MCP security/context/authentication **20/20**, typecheck, lint and production build (27 web pages). Lint retained four pre-existing console warnings. See [the detailed hardening report](../core-v1-hardening-remediation-validation.md) for integrated checks, query-performance measurements, migration scope and limitations.
+Final remediation validation passed **913/913 repository tests**, zero awake-run timeouts, API hardening **28/28**, MCP security/context/authentication **20/20**, typecheck, lint and production build (27 web pages). Lint retained four pre-existing console warnings. See [the detailed hardening report](core-v1-hardening-remediation-validation.md) for integrated checks, query-performance measurements, migration scope and limitations.
 
 Results describe local automated validation. They do not establish production exploitation, unauthorized raw download during original discovery, comprehensive browser certification or final production deployment certification.
 
@@ -24,4 +24,16 @@ Results describe local automated validation. They do not establish production ex
 
 Separate approvals governed design and implementation. The human owner explicitly accepted the validated remediation on 10 October 2026 and closed B1, H1, H2, M1 and M2. The targeted visibility performance correction is also accepted. Core V1 technical readiness is approved; passing tests alone did not close the findings.
 
-These documents are prepared locally for the approved commit. GitHub publication awaits separately approved push/PR. Deferred UI/UX polish, production hardening, Azure deployment and advanced Agent/MCP/RAG phases remain future work. See [the concise lifecycle summary](../core-v1-lifecycle-validation.md).
+The original closure report records its pre-publication Git preparation stage. Subsequent CI correction evidence is linked from the lessons learned; those historical statements are not the current publication status. Deferred UI/UX polish, production hardening, Azure deployment and advanced Agent/MCP/RAG phases remain future work. See [the concise lifecycle summary](../../projects/vendorguard-ai/core-v1-lifecycle-validation.md).
+
+## Navigation and lessons
+
+- [Hardening implementation, validation and historical commit inventory](core-v1-hardening-remediation-validation.md)
+- [Core V1 Governance & Security Lessons Learned](core-v1-governance-security-lessons-learned.md): decision history, sessions, visibility performance and CI migration enforcement, alongside the three findings above.
+- [Completed lifecycle validation](../../projects/vendorguard-ai/core-v1-lifecycle-validation.md)
+
+**AI ASSISTS. HUMANS GOVERN.**
+
+Finding → Risk → Investigation → Root Cause → Remediation → Testing → Evidence → Human Decision → Closure
+
+[Issues & Findings](../README.md) · [VendorGuard AI project](../../projects/vendorguard-ai/README.md)

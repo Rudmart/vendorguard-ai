@@ -1,4 +1,4 @@
-> **HISTORICAL - NOT AUTHORITATIVE.** Superseded by docs/vendorguard-master-plan.md (VendorGuard AI Master Build Plan & Architecture Contract).
+> **HISTORICAL - NOT AUTHORITATIVE.** Superseded by [the current architecture contract](../projects/vendorguard-ai/vendorguard-master-plan.md).
 > Kept only as a record of the earlier TPRM-era roadmap (M11/M12, polish and security backlog ideas). Do not follow instructions in this file.
 
 # VendorGuard AI - Complete Master Plan
