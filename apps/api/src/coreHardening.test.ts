@@ -1,5 +1,13 @@
 import { randomUUID } from "node:crypto";
-import { beforeAll, afterAll, describe, expect, it, vi } from "vitest";
+import {
+  beforeAll,
+  afterAll,
+  describe,
+  expect,
+  it,
+  vi,
+  type MockInstance,
+} from "vitest";
 import {
   prisma,
   resourceScope,
@@ -492,10 +500,18 @@ describe("H2 evidence operations and narrowly scoped independent review", () => 
     ).toBe(403);
   });
   it("allows content for ADMIN and ANALYST through the same operation policy", async () => {
-    const download = vi
-      .spyOn(getStorageClient(), "downloadFile")
-      .mockResolvedValue(Buffer.from("test"));
+    const previousProvider = process.env.STORAGE_PROVIDER;
+    const previousConnection = process.env.AZURITE_CONNECTION_STRING;
+    // Constructor-only emulator configuration; download is mocked below.
+    process.env.STORAGE_PROVIDER = "azurite";
+    process.env.AZURITE_CONNECTION_STRING = "UseDevelopmentStorage=true";
+    let download:
+      | MockInstance<ReturnType<typeof getStorageClient>["downloadFile"]>
+      | undefined;
     try {
+      download = vi
+        .spyOn(getStorageClient(), "downloadFile")
+        .mockResolvedValue(Buffer.from("test"));
       for (const role of ["ADMIN", "ANALYST"])
         expect(
           (await request("GET", `/evidence/${document}/download`, role))
@@ -503,7 +519,12 @@ describe("H2 evidence operations and narrowly scoped independent review", () => 
         ).toBe(200);
       expect(download).toHaveBeenCalledTimes(2);
     } finally {
-      download.mockRestore();
+      download?.mockRestore();
+      if (previousProvider === undefined) delete process.env.STORAGE_PROVIDER;
+      else process.env.STORAGE_PROVIDER = previousProvider;
+      if (previousConnection === undefined)
+        delete process.env.AZURITE_CONNECTION_STRING;
+      else process.env.AZURITE_CONNECTION_STRING = previousConnection;
     }
   });
   it("allows only pending metadata for an eligible independent reviewer; general access remains denied", async () => {
