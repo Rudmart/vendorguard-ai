@@ -1,7 +1,8 @@
+import { issueTestSessionCookie } from "./testSession.js";
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { prisma } from "@vendorguard/database";
 import { server } from "./index.js";
-import { createSessionCookie } from "@vendorguard/auth";
+
 
 // Phase D2: at most one non-COMPLETED Risk Assessment and one non-COMPLETED Impact Assessment per AI system.
 const RISK_ERROR = "An unfinished risk assessment already exists for this AI system. Complete it before starting a new version.";
@@ -20,14 +21,14 @@ function nextIp() {
   return "10.42." + Math.floor(ipCounter / 250) + "." + (ipCounter % 250);
 }
 
-function cookieFor(userId: string, role: string, tenantId: string) {
-  return createSessionCookie({ userId, tenantId, email: `${userId}@example.com`, displayName: "D2 Test User", role });
+async function cookieFor(userId: string, role: string, tenantId: string) {
+  return await issueTestSessionCookie({ userId, tenantId, email: `${userId}@example.com`, displayName: "D2 Test User", role });
 }
 
 async function newSystem(tenantId = tenantAId, userId = adminAId) {
   const res = await server.inject({
     method: "POST", url: "/ai-systems",
-    cookies: { vg_session: cookieFor(userId, "ADMIN", tenantId) },
+    cookies: { vg_session: await cookieFor(userId, "ADMIN", tenantId) },
     payload: { name: "D2 Guard System", origin: "INTERNAL" },
     remoteAddress: nextIp(),
   });
@@ -37,7 +38,7 @@ async function newSystem(tenantId = tenantAId, userId = adminAId) {
 async function create(kind: Kind, sysId: string, tenantId = tenantAId, userId = adminAId) {
   const res = await server.inject({
     method: "POST", url: `/ai-systems/${sysId}/${kind}-assessments`,
-    cookies: { vg_session: cookieFor(userId, "ADMIN", tenantId) },
+    cookies: { vg_session: await cookieFor(userId, "ADMIN", tenantId) },
     payload: { name: `D2 ${kind} assessment` },
     remoteAddress: nextIp(),
   });

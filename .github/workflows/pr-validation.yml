@@ -53,8 +53,8 @@ jobs:
       - name: Generate Prisma Client
         run: pnpm --filter @vendorguard/database exec prisma generate
 
-      - name: Push database schema
-        run: pnpm --filter @vendorguard/database exec prisma db push --skip-generate
+      - name: Deploy committed database migrations
+        run: pnpm --filter @vendorguard/database exec prisma migrate deploy
 
       - name: Lint
         run: pnpm lint

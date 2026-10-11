@@ -1,3 +1,5 @@
+import { evidenceAllowed } from "@vendorguard/auth";
+import type { Role } from "@vendorguard/shared";
 /** Manual AI incident governance. No autonomous response or evidence-file access. */
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { prisma, type Prisma, type AiIncident } from "@vendorguard/database";
@@ -161,8 +163,7 @@ async function mutate(
 }
 async function detail(i: AiIncident, s: Session) {
   const canEvidence =
-    hasPermission(s, "evidence:read") ||
-    hasPermission(s, "evidence:read-metadata");
+    evidenceAllowed(s.role as Role, "metadata");
   return prisma.aiIncident.findFirst({
     where: { id: i.id, tenantId: s.tenantId },
     include: {
@@ -542,7 +543,7 @@ export async function registerAiIncidentRoutes(
       const b = bodyOf(r);
       editable(i);
       revision(i, b);
-      if (!hasPermission(s, "evidence:read"))
+      if (!evidenceAllowed(s.role as Role, "content"))
         fail(403, "Existing evidence read permission required");
       if (typeof b.evidenceDocumentId !== "string")
         fail(400, "evidenceDocumentId required");

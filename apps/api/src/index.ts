@@ -1,3 +1,7 @@
+import { appendGovernanceDecision } from "./governanceDecisionHistory.js";
+import { roleHasPermission } from "@vendorguard/shared";
+import { proposeLegacyFinding, reviewLegacyFinding } from "./legacyFindingGovernance.js";
+import { evidenceAllowed } from "@vendorguard/auth";
 import { registerGovernanceReportRoutes } from "./aiGovernanceReporting.js";
 import { registerAuditEventRoutes } from "./auditEvents.js";
 import { registerGovernanceWriteGuard } from "./aiGovernanceWriteGuard.js";
@@ -6,7 +10,7 @@ import "dotenv/config";
 import { randomUUID } from "node:crypto";
 import Fastify from "fastify";
 import cors from "@fastify/cors";
-import { prisma } from "@vendorguard/database";
+import { prisma, resourceScope } from "@vendorguard/database";
 import { calculateInherentRisk, calculateAIInherentRisk, calculateAIImpactScore, calculateResidualRisk, QUESTIONNAIRE_QUESTIONS, mapQuestionnaireToRiskFactors, calculateFullRiskRating, calculateRequirementRisk, type QuestionnaireAnswers } from "@vendorguard/risk-engine";
 import { resolveApplicableRequirements } from "@vendorguard/framework-engine";
 import { runEvidenceAnalysis } from "./evidenceAnalysis.js";
@@ -48,6 +52,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const FRAMEWORKS_DIR = join(__dirname, "..", "..", "..", "frameworks");
 
 export const server = Fastify({ logger: true });
+server.addHook("onRequest", (_request, _reply, done) => resourceScope.run({}, done));
 
 server.register(cors, {
   origin: process.env.WEB_ORIGIN || "http://localhost:3000",
@@ -238,27 +243,13 @@ server.post("/assessments/:id/findings", async (request, reply) => {
     return reply.status(404).send({ error: "Control not found" });
   }
 
-  const existing = await prisma.controlFinding.findFirst({
-    where: { assessmentId, controlId: body.controlId },
-  });
-
-  const finding = existing
-    ? await prisma.controlFinding.update({
-        where: { id: existing.id },
-        data: { status: body.status as (typeof validStatuses)[number], requiresHumanReview: false },
-      })
-    : await prisma.controlFinding.create({
-        data: {
-          tenantId: session.tenantId,
-          vendorId: assessment.vendorId,
-          assessmentId,
-          controlId: body.controlId,
-          status: body.status as (typeof validStatuses)[number],
-          requiresHumanReview: false,
-        },
-      });
-
-  return reply.status(200).send(finding);
+  try {
+    const finding = await proposeLegacyFinding(session, assessmentId, body.controlId, body.status as never);
+    return reply.status(200).send(finding);
+  } catch (error) {
+    const e = error as Error & { statusCode?: number };
+    return reply.code(e.statusCode ?? 500).send({ error: e.statusCode ? e.message : "Proposal could not be recorded" });
+  }
 });
 server.post("/assessments/:id/evidence/:evidenceDocumentId/analyze", async (request, reply) => {
   const session = await resolveSession(request);
@@ -277,8 +268,10 @@ server.post("/assessments/:id/evidence/:evidenceDocumentId/analyze", async (requ
   } catch {
     return reply.status(403).send({ error: "Not authorized to run evidence analysis" });
   }
+  if (!evidenceAllowed(session.role as Role, "analysis")) return reply.status(403).send({ error: "Not authorized to analyze evidence" });
   try {
     const result = await runEvidenceAnalysis({
+      actor: { userId: session.userId, role: session.role as Role },
       tenantId: session.tenantId,
       assessmentId,
       evidenceDocumentId,
@@ -360,41 +353,33 @@ server.post("/assessments/:id/findings/:findingId/review", async (request, reply
   if (!body.decision || !validDecisions.includes(body.decision as (typeof validDecisions)[number])) {
     return reply.status(400).send({ error: "decision must be one of: " + validDecisions.join(", ") });
   }
-  if (!body.rationale) {
+  if (typeof body.rationale !== "string" || !body.rationale.trim()) {
     return reply.status(400).send({ error: "rationale is required" });
   }
   const validStatuses = ["PASS", "PARTIAL", "FAIL", "INSUFFICIENT_EVIDENCE", "CONFLICTING_EVIDENCE", "NOT_APPLICABLE"] as const;
   if (body.finalStatus && !validStatuses.includes(body.finalStatus as (typeof validStatuses)[number])) {
     return reply.status(400).send({ error: "Invalid finalStatus" });
   }
-  const finding = await prisma.controlFinding.findFirst({
-    where: { id: findingId, assessmentId, tenantId: session.tenantId },
-  });
-  if (!finding) {
-    return reply.status(404).send({ error: "Finding not found" });
+  try {
+    const result = await reviewLegacyFinding(session, assessmentId, findingId, body.decision as never, body.rationale.trim(), body.finalStatus as never);
+    if ("denied" in result) return reply.code(403).send({ error: "Independent review is required" });
+    return reply.send(result);
+  } catch (error) {
+    const e = error as Error & { statusCode?: number };
+    return reply.code(e.statusCode ?? 500).send({ error: e.statusCode ? e.message : "Review could not be recorded" });
   }
-  const changedValuesJson =
-    body.finalStatus && body.finalStatus !== finding.status
-      ? { status: { from: finding.status, to: body.finalStatus } }
-      : undefined;
-  const reviewDecision = await prisma.reviewDecision.create({
-    data: {
-      tenantId: session.tenantId,
-      findingId: finding.id,
-      reviewerUserId: session.userId,
-      decision: body.decision as (typeof validDecisions)[number],
-      rationale: body.rationale,
-      changedValuesJson,
-    },
-  });
-  const updatedFinding = await prisma.controlFinding.update({
-    where: { id: finding.id },
-    data: {
-      requiresHumanReview: false,
-      status: (body.finalStatus as (typeof validStatuses)[number] | undefined) ?? finding.status,
-    },
-  });
-  return reply.status(200).send({ reviewDecision, finding: updatedFinding });
+});
+server.post("/assessments/:id/findings/:findingId/reconcile", async (request, reply) => {
+  const session = await resolveSession(request);
+  if (!session) return reply.code(401).send({ error: "Not logged in" });
+  if (!roleHasPermission(session.role as Role, "finding:propose")) return reply.code(403).send({ error: "Not authorized to reconcile proposals" });
+  const { id, findingId } = request.params as { id: string; findingId: string };
+  const body = request.body as { rationale?: string; proposedStatus?: string };
+  if (typeof body.rationale !== "string" || !body.rationale.trim() || body.rationale.length > 4000 || !["PASS", "PARTIAL", "FAIL", "INSUFFICIENT_EVIDENCE", "CONFLICTING_EVIDENCE", "NOT_APPLICABLE"].includes(body.proposedStatus ?? "")) return reply.code(400).send({ error: "Reconciliation rationale and proposedStatus are required" });
+  const finding = await prisma.controlFinding.findFirst({ where: { id: findingId, assessmentId: id, tenantId: session.tenantId } });
+  if (!finding) return reply.code(404).send({ error: "Finding not found" });
+  try { return await proposeLegacyFinding(session, id, finding.controlId, body.proposedStatus as never, body.rationale.trim()); }
+  catch (error) { const e = error as Error & { statusCode?: number }; return reply.code(e.statusCode ?? 500).send({ error: e.statusCode ? e.message : "Reconciliation failed" }); }
 });
 server.post("/vendors/:id/risk-acceptance", async (request, reply) => {
   const session = await resolveSession(request);
@@ -494,7 +479,7 @@ server.get("/evidence/:evidenceDocumentId", async (request, reply) => {
   if (!document) {
     return reply.status(404).send({ error: "Evidence document not found" });
   }
-  if (!hasAnyPermission(session, ["evidence:read", "evidence:read-metadata"])) {
+  if (!evidenceAllowed(session.role as Role, "metadata")) {
     return reply.status(403).send({ error: "Not authorized to view evidence" });
   }
   return reply.status(200).send(withoutStorageKey(document));
@@ -513,7 +498,7 @@ server.get("/vendors/:id/executive-report", async (request, reply) => {
   }
   const { id: vendorId } = request.params as { id: string };
 
-  const report = await buildExecutiveReport(session.tenantId, vendorId, hasAnyPermission(session, ["evidence:read", "evidence:read-metadata"]));
+  const report = await buildExecutiveReport(session.tenantId, vendorId, evidenceAllowed(session.role as Role, "metadata"));
   if (!report) {
     return reply.status(404).send({ error: "Vendor not found" });
   }
@@ -543,7 +528,7 @@ server.get("/evidence/:evidenceDocumentId/download", async (request, reply) => {
   if (!document) {
     return reply.status(404).send({ error: "Evidence document not found" });
   }
-  if (!hasAnyPermission(session, ["evidence:read"])) {
+  if (!evidenceAllowed(session.role as Role, "content")) {
     return reply.status(403).send({ error: "Not authorized to download evidence" });
   }
 
@@ -590,7 +575,7 @@ server.get("/vendors/:id/executive-report/export", async (request, reply) => {
   }
   const { id: vendorId } = request.params as { id: string };
 
-  const report = await buildExecutiveReport(session.tenantId, vendorId, hasAnyPermission(session, ["evidence:read", "evidence:read-metadata"]));
+  const report = await buildExecutiveReport(session.tenantId, vendorId, evidenceAllowed(session.role as Role, "metadata"));
   if (!report) {
     return reply.status(404).send({ error: "Vendor not found" });
   }
@@ -707,7 +692,7 @@ server.post("/vendors/:id/assistant/messages", async (request, reply) => {
     orderBy: { createdAt: "asc" },
   });
 
-  const context = await buildAssistantContext(session.tenantId, vendorId);
+  const context = await buildAssistantContext(session.tenantId, vendorId, session.role as Role);
 
   const result = await askAssistant({
     question,
@@ -1511,7 +1496,7 @@ server.get("/vendors/:id/evidence", async (request, reply) => {
     return reply.status(401).send({ error: "Not logged in" });
   }
   const { id: vendorId } = request.params as { id: string };
-  if (!hasAnyPermission(session, ["evidence:read", "evidence:read-metadata"])) {
+  if (!evidenceAllowed(session.role as Role, "metadata")) {
     return reply.status(403).send({ error: "Not authorized to view evidence" });
   }
 
@@ -3035,7 +3020,7 @@ server.post("/ai-risk-assessments/:id/review", async (request, reply) => {
     return reply.status(404).send({ error: "AI risk assessment not found" });
   }
 
-  const body = request.body as { decision?: string; rationale?: string };
+  const body = request.body as { decision?: string; rationale?: string; reconciliationRationale?: unknown };
   if (!body.decision || !AI_ASSESSMENT_REVIEW_DECISIONS.includes(body.decision)) {
     return reply.status(400).send({ error: "Invalid or missing decision" });
   }
@@ -3078,19 +3063,10 @@ server.post("/ai-risk-assessments/:id/review", async (request, reply) => {
     await auditDenied("already_completed");
     return reply.status(409).send({ error: alreadyReviewedMessage });
   }
-  const updated = await prisma.aiRiskAssessment.findUnique({ where: { id: assessment.id } });
 
-  await prisma.auditEvent.create({
-    data: {
-      tenantId: session.tenantId,
-      actorUserId: session.userId,
-      action: "ai_risk_assessment.review_recorded",
-      targetType: "AiRiskAssessment",
-      targetId: assessment.id,
-      outcome: "SUCCESS",
-      metadataJson: { decision: body.decision } as never,
-    },
-  });
+
+  await appendGovernanceDecision(session, "AiRiskAssessment", assessment, body.decision as never, body.rationale.trim(), newStatus, body.reconciliationRationale);
+  const updated = await prisma.aiRiskAssessment.findUnique({ where: { id: assessment.id } });
 
   return reply.send(updated);
 });
@@ -3722,7 +3698,7 @@ server.post("/ai-impact-assessments/:id/review", async (request, reply) => {
     return reply.status(404).send({ error: "AI impact assessment not found" });
   }
 
-  const body = (request.body ?? {}) as { decision?: string; rationale?: string };
+  const body = (request.body ?? {}) as { decision?: string; rationale?: string; reconciliationRationale?: unknown };
   if (!body.decision || !AI_ASSESSMENT_REVIEW_DECISIONS.includes(body.decision)) {
     return reply.status(400).send({ error: "Invalid or missing decision" });
   }
@@ -3768,19 +3744,10 @@ server.post("/ai-impact-assessments/:id/review", async (request, reply) => {
     await auditDenied("already_completed");
     return reply.status(409).send({ error: AI_IMPACT_ALREADY_REVIEWED_MESSAGE });
   }
-  const updated = await prisma.aiImpactAssessment.findUnique({ where: { id: assessment.id } });
 
-  await prisma.auditEvent.create({
-    data: {
-      tenantId: session.tenantId,
-      actorUserId: session.userId,
-      action: "ai_impact_assessment.review_recorded",
-      targetType: "AiImpactAssessment",
-      targetId: assessment.id,
-      outcome: "SUCCESS",
-      metadataJson: { decision: body.decision } as never,
-    },
-  });
+
+  await appendGovernanceDecision(session, "AiImpactAssessment", assessment, body.decision as never, body.rationale.trim(), newStatus, body.reconciliationRationale);
+  const updated = await prisma.aiImpactAssessment.findUnique({ where: { id: assessment.id } });
 
   return reply.send(updated);
 });

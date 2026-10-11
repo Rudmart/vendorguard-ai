@@ -1,9 +1,19 @@
+import { resourceScope, scopeResourceRead, normalizeLegacyFindings } from "./resource-visibility.js";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { PrismaClient, type Prisma } from "@prisma/client";
 
 // Existing callers retain the singleton API. Only explicitly guarded governance
 // handlers use the transaction-scoped client; unrelated callers are unchanged.
 export const databaseClient = new PrismaClient();
+databaseClient.$use(async (params, next) => {
+  const tenantId = resourceScope.getStore()?.tenantId;
+  if (tenantId && params.model && ["findUnique", "findUniqueOrThrow", "findFirst", "findFirstOrThrow", "findMany", "count", "aggregate", "groupBy"].includes(params.action)) {
+    params.args ??= {};
+    params.args = scopeResourceRead(params.model, params.args, tenantId, true, params.action.startsWith("find"));
+  }
+  const result = await next(params);
+  return tenantId ? normalizeLegacyFindings(result, params.model ?? "") : result;
+});
 export interface GovernanceTransaction {
   client: Prisma.TransactionClient;
   tenantId: string;

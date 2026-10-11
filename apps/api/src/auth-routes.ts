@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
-import { prisma } from "@vendorguard/database";
-import { COOKIE_NAME, createSessionCookie } from "@vendorguard/auth";
+import { prisma, issueStoredSession, revokeStoredSession } from "@vendorguard/database";
+import { COOKIE_NAME, createSessionCookie, getSessionFromCookie } from "@vendorguard/auth";
 import { resolveSession } from "./session.js";
 
 export async function registerAuthRoutes(server: FastifyInstance) {
@@ -55,7 +55,8 @@ export async function registerAuthRoutes(server: FastifyInstance) {
       role: membership.role,
     };
 
-    reply.setCookie(COOKIE_NAME, createSessionCookie(session), {
+    const lifetime = await issueStoredSession(session.userId, session.tenantId);
+    reply.setCookie(COOKIE_NAME, createSessionCookie({ ...session, ...lifetime }), {
       path: "/",
       httpOnly: true,
       sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
@@ -68,6 +69,11 @@ export async function registerAuthRoutes(server: FastifyInstance) {
   });
 
   server.post("/auth/logout", async (request, reply) => {
+    const claims = getSessionFromCookie(request.cookies[COOKIE_NAME]);
+    if (claims) {
+      try { await revokeStoredSession(claims); }
+      catch { return reply.status(503).send({ error: "Session revocation unavailable" }); }
+    }
     reply.clearCookie(COOKIE_NAME, { path: "/" });
     return reply.send({ ok: true });
   });

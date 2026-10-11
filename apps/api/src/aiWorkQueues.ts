@@ -1,3 +1,5 @@
+import { independentEvidenceContext } from "@vendorguard/auth";
+import type { Role } from "@vendorguard/shared";
 import { authorizedReport, reportAudit } from "./aiGovernanceReporting.js";
 /**
  * Alignment Phase C - read-only aggregation for Dashboard, My Work and Pending Reviews.
@@ -50,7 +52,7 @@ export async function pendingReviewsFor(session: Session): Promise<PendingItem[]
       where: { tenantId: t, status: "PENDING_REVIEW", aiSystemControl: {aiSystem:{lifecycleStatus:{not:"RETIRED"}}} },
       include: { evidenceDocument: { select: { uploadedByUserId: true, displayFilename: true } } },
     });
-    const eligible = links.filter((l) => l.submittedByUserId !== me && l.evidenceDocument.uploadedByUserId !== me);
+    const eligible = links.filter((l) => independentEvidenceContext({ userId: me, role: session.role as Role }, l));
     const recIds = eligible.map((l) => field(l, "aiSystemControlId"));
     const recs = await prisma.aiSystemControl.findMany({ where: { tenantId: t, id: { in: recIds } }, select: { id: true, aiSystem: { select: { name: true } }, control: { select: { controlId: true } } } });
     const recMap = new Map(recs.map((r) => [r.id, r]));

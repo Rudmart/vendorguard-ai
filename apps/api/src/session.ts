@@ -1,5 +1,5 @@
 import type { FastifyRequest } from "fastify";
-import { prisma } from "@vendorguard/database";
+import { validateStoredSession, resourceScope } from "@vendorguard/database";
 import { COOKIE_NAME, getSessionFromCookie } from "@vendorguard/auth";
 
 /** Same shape the routes already use (userId, tenantId, email, displayName, role). */
@@ -21,13 +21,12 @@ export async function resolveSession(request: FastifyRequest): Promise<ApiSessio
   if (!signed) {
     return null;
   }
-  const membership = await prisma.tenantMembership.findUnique({
-    where: { tenantId_userId: { tenantId: signed.tenantId, userId: signed.userId } },
-    include: { user: { select: { id: true, email: true, displayName: true } } },
-  });
+  const membership = await validateStoredSession(signed);
   if (!membership || !membership.user) {
     return null;
   }
+  const scope = resourceScope.getStore();
+  if (scope) scope.tenantId = membership.tenantId;
   return {
     userId: membership.user.id,
     tenantId: membership.tenantId,

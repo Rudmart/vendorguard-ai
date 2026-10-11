@@ -1,7 +1,8 @@
+import { issueTestSessionCookie } from "./testSession.js";
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { prisma } from "@vendorguard/database";
 import { server } from "./index.js";
-import { createSessionCookie } from "@vendorguard/auth";
+
 
 let tenantAId: string;
 let tenantBId: string;
@@ -14,14 +15,14 @@ let controlId: string;
 let vendorAId: string;
 let raFrameworkId: string;
 
-function cookieFor(userId: string, role: string, tenantId: string) {
-  return createSessionCookie({ userId, tenantId, email: `${userId}@example.com`, displayName: "Test User", role });
+async function cookieFor(userId: string, role: string, tenantId: string) {
+  return await issueTestSessionCookie({ userId, tenantId, email: `${userId}@example.com`, displayName: "Test User", role });
 }
 
 async function createAiSystem(tenantId: string, role: string, userId: string) {
   const res = await server.inject({
     method: "POST", url: "/ai-systems",
-    cookies: { vg_session: cookieFor(userId, role, tenantId) },
+    cookies: { vg_session: await cookieFor(userId, role, tenantId) },
     payload: { name: "Risk Assessment Test System", origin: "INTERNAL" },
   });
   return JSON.parse(res.body).id as string;
@@ -30,7 +31,7 @@ async function createAiSystem(tenantId: string, role: string, userId: string) {
 async function createAssessment(aiSystemId: string, tenantId: string, role: string, userId: string, name = "Test Assessment") {
   const res = await server.inject({
     method: "POST", url: `/ai-systems/${aiSystemId}/risk-assessments`,
-    cookies: { vg_session: cookieFor(userId, role, tenantId) },
+    cookies: { vg_session: await cookieFor(userId, role, tenantId) },
     payload: { name },
   });
   return JSON.parse(res.body).id as string;
@@ -113,7 +114,7 @@ describe("AI Risk Assessment - create/retrieve/update", () => {
     const sysId = await createAiSystem(tenantAId, "ADMIN", adminUserId);
     const res = await server.inject({
       method: "POST", url: `/ai-systems/${sysId}/risk-assessments`,
-      cookies: { vg_session: cookieFor(adminUserId, "ADMIN", tenantAId) },
+      cookies: { vg_session: await cookieFor(adminUserId, "ADMIN", tenantAId) },
       payload: { name: "Q3 Assessment", assessorUserId: analystUserId },
     });
     expect(res.statusCode).toBe(201);
@@ -130,7 +131,7 @@ describe("AI Risk Assessment - create/retrieve/update", () => {
     const assessmentId = await createAssessment(sysId, tenantAId, "ADMIN", adminUserId);
     const res = await server.inject({
       method: "GET", url: `/ai-risk-assessments/${assessmentId}`,
-      cookies: { vg_session: cookieFor(adminUserId, "ADMIN", tenantAId) },
+      cookies: { vg_session: await cookieFor(adminUserId, "ADMIN", tenantAId) },
     });
     expect(res.statusCode).toBe(200);
     expect(JSON.parse(res.body).risks).toEqual([]);
@@ -141,7 +142,7 @@ describe("AI Risk Assessment - create/retrieve/update", () => {
     const assessmentId = await createAssessment(sysId, tenantAId, "ADMIN", adminUserId);
     const res = await server.inject({
       method: "GET", url: `/ai-risk-assessments/${assessmentId}`,
-      cookies: { vg_session: cookieFor(tenantBUserId, "ADMIN", tenantBId) },
+      cookies: { vg_session: await cookieFor(tenantBUserId, "ADMIN", tenantBId) },
     });
     expect(res.statusCode).toBe(404);
   });
@@ -150,7 +151,7 @@ describe("AI Risk Assessment - create/retrieve/update", () => {
     const sysId = await createAiSystem(tenantAId, "ADMIN", adminUserId);
     const res = await server.inject({
       method: "POST", url: `/ai-systems/${sysId}/risk-assessments`,
-      cookies: { vg_session: cookieFor(readOnlyUserId, "READ_ONLY", tenantAId) },
+      cookies: { vg_session: await cookieFor(readOnlyUserId, "READ_ONLY", tenantAId) },
       payload: { name: "Unauthorized" },
     });
     expect(res.statusCode).toBe(403);
@@ -161,7 +162,7 @@ describe("AI Risk Assessment - create/retrieve/update", () => {
     const assessmentId = await createAssessment(sysId, tenantAId, "ADMIN", adminUserId);
     const res = await server.inject({
       method: "PATCH", url: `/ai-risk-assessments/${assessmentId}`,
-      cookies: { vg_session: cookieFor(adminUserId, "ADMIN", tenantAId) },
+      cookies: { vg_session: await cookieFor(adminUserId, "ADMIN", tenantAId) },
       payload: { status: "IN_PROGRESS" },
     });
     expect(res.statusCode).toBe(200);
@@ -177,7 +178,7 @@ describe("AI Risk - create/update/delete and inherent-risk calculation", () => {
     const assessmentId = await createAssessment(sysId, tenantAId, "ADMIN", adminUserId);
     const res = await server.inject({
       method: "POST", url: `/ai-risk-assessments/${assessmentId}/risks`,
-      cookies: { vg_session: cookieFor(adminUserId, "ADMIN", tenantAId) },
+      cookies: { vg_session: await cookieFor(adminUserId, "ADMIN", tenantAId) },
       payload: { title: "Bad Category", category: "NOT_REAL", statement: "x", likelihood: 3, impact: 3 },
     });
     expect(res.statusCode).toBe(400);
@@ -188,7 +189,7 @@ describe("AI Risk - create/update/delete and inherent-risk calculation", () => {
     const assessmentId = await createAssessment(sysId, tenantAId, "ADMIN", adminUserId);
     const res = await server.inject({
       method: "POST", url: `/ai-risk-assessments/${assessmentId}/risks`,
-      cookies: { vg_session: cookieFor(adminUserId, "ADMIN", tenantAId) },
+      cookies: { vg_session: await cookieFor(adminUserId, "ADMIN", tenantAId) },
       payload: { title: "Bad Likelihood", category: "FAIRNESS", statement: "x", likelihood: 9, impact: 3 },
     });
     expect(res.statusCode).toBe(400);
@@ -199,7 +200,7 @@ describe("AI Risk - create/update/delete and inherent-risk calculation", () => {
     const assessmentId = await createAssessment(sysId, tenantAId, "ADMIN", adminUserId);
     const res = await server.inject({
       method: "POST", url: `/ai-risk-assessments/${assessmentId}/risks`,
-      cookies: { vg_session: cookieFor(adminUserId, "ADMIN", tenantAId) },
+      cookies: { vg_session: await cookieFor(adminUserId, "ADMIN", tenantAId) },
       payload: { title: "Bad Impact", category: "FAIRNESS", statement: "x", likelihood: 3, impact: 0 },
     });
     expect(res.statusCode).toBe(400);
@@ -218,7 +219,7 @@ describe("AI Risk - create/update/delete and inherent-risk calculation", () => {
     for (const [likelihood, impact, expectedScore, expectedRating] of cases) {
       const res = await server.inject({
         method: "POST", url: `/ai-risk-assessments/${assessmentId}/risks`,
-        cookies: { vg_session: cookieFor(adminUserId, "ADMIN", tenantAId) },
+        cookies: { vg_session: await cookieFor(adminUserId, "ADMIN", tenantAId) },
         payload: { title: `Case ${likelihood}x${impact}`, category: "FAIRNESS", statement: "x", likelihood, impact },
       });
       const body = JSON.parse(res.body);
@@ -232,7 +233,7 @@ describe("AI Risk - create/update/delete and inherent-risk calculation", () => {
     const assessmentId = await createAssessment(sysId, tenantAId, "ADMIN", adminUserId);
     const res = await server.inject({
       method: "POST", url: `/ai-risk-assessments/${assessmentId}/risks`,
-      cookies: { vg_session: cookieFor(adminUserId, "ADMIN", tenantAId) },
+      cookies: { vg_session: await cookieFor(adminUserId, "ADMIN", tenantAId) },
       payload: { title: "Spoof Attempt", category: "SAFETY", statement: "x", likelihood: 1, impact: 1, inherentScore: 25, inherentRating: "CRITICAL" },
     });
     const body = JSON.parse(res.body);
@@ -245,7 +246,7 @@ describe("AI Risk - create/update/delete and inherent-risk calculation", () => {
     const assessmentId = await createAssessment(sysId, tenantAId, "ADMIN", adminUserId);
     const res = await server.inject({
       method: "POST", url: `/ai-risk-assessments/${assessmentId}/risks`,
-      cookies: { vg_session: cookieFor(adminUserId, "ADMIN", tenantAId) },
+      cookies: { vg_session: await cookieFor(adminUserId, "ADMIN", tenantAId) },
       payload: { title: "Discriminatory Outcomes", category: "FAIRNESS", statement: "x", likelihood: 3, impact: 4, controlId },
     });
     expect(res.statusCode).toBe(201);
@@ -257,7 +258,7 @@ describe("AI Risk - create/update/delete and inherent-risk calculation", () => {
     const assessmentId = await createAssessment(sysId, tenantAId, "ADMIN", adminUserId);
     const res = await server.inject({
       method: "POST", url: `/ai-risk-assessments/${assessmentId}/risks`,
-      cookies: { vg_session: cookieFor(adminUserId, "ADMIN", tenantAId) },
+      cookies: { vg_session: await cookieFor(adminUserId, "ADMIN", tenantAId) },
       payload: { title: "Bad Control", category: "FAIRNESS", statement: "x", likelihood: 3, impact: 3, controlId: "00000000-0000-0000-0000-000000000000" },
     });
     expect(res.statusCode).toBe(400);
@@ -268,14 +269,14 @@ describe("AI Risk - create/update/delete and inherent-risk calculation", () => {
     const assessmentId = await createAssessment(sysId, tenantAId, "ADMIN", adminUserId);
     const createRes = await server.inject({
       method: "POST", url: `/ai-risk-assessments/${assessmentId}/risks`,
-      cookies: { vg_session: cookieFor(adminUserId, "ADMIN", tenantAId) },
+      cookies: { vg_session: await cookieFor(adminUserId, "ADMIN", tenantAId) },
       payload: { title: "Effectiveness Test", category: "FAIRNESS", statement: "x", likelihood: 3, impact: 3 },
     });
     const riskId = JSON.parse(createRes.body).id;
 
     const res = await server.inject({
       method: "PATCH", url: `/ai-risks/${riskId}`,
-      cookies: { vg_session: cookieFor(adminUserId, "ADMIN", tenantAId) },
+      cookies: { vg_session: await cookieFor(adminUserId, "ADMIN", tenantAId) },
       payload: { controlEffectiveness: "EFFECTIVE" },
     });
     expect(res.statusCode).toBe(200);
@@ -289,13 +290,13 @@ describe("AI Risk - create/update/delete and inherent-risk calculation", () => {
     const assessmentId = await createAssessment(sysId, tenantAId, "ADMIN", adminUserId);
     const createRes = await server.inject({
       method: "POST", url: `/ai-risk-assessments/${assessmentId}/risks`,
-      cookies: { vg_session: cookieFor(adminUserId, "ADMIN", tenantAId) },
+      cookies: { vg_session: await cookieFor(adminUserId, "ADMIN", tenantAId) },
       payload: { title: "Bad Effectiveness", category: "FAIRNESS", statement: "x", likelihood: 3, impact: 3 },
     });
     const riskId = JSON.parse(createRes.body).id;
     const res = await server.inject({
       method: "PATCH", url: `/ai-risks/${riskId}`,
-      cookies: { vg_session: cookieFor(adminUserId, "ADMIN", tenantAId) },
+      cookies: { vg_session: await cookieFor(adminUserId, "ADMIN", tenantAId) },
       payload: { controlEffectiveness: "SOMEWHAT" },
     });
     expect(res.statusCode).toBe(400);
@@ -306,21 +307,21 @@ describe("AI Risk - create/update/delete and inherent-risk calculation", () => {
     const assessmentId = await createAssessment(sysId, tenantAId, "ADMIN", adminUserId);
     const createRes = await server.inject({
       method: "POST", url: `/ai-risk-assessments/${assessmentId}/risks`,
-      cookies: { vg_session: cookieFor(adminUserId, "ADMIN", tenantAId) },
+      cookies: { vg_session: await cookieFor(adminUserId, "ADMIN", tenantAId) },
       payload: { title: "Residual Test", category: "PRIVACY", statement: "x", likelihood: 4, impact: 4 },
     });
     const riskId = JSON.parse(createRes.body).id;
 
     const badRes = await server.inject({
       method: "PATCH", url: `/ai-risks/${riskId}`,
-      cookies: { vg_session: cookieFor(adminUserId, "ADMIN", tenantAId) },
+      cookies: { vg_session: await cookieFor(adminUserId, "ADMIN", tenantAId) },
       payload: { residualLikelihood: 6, residualImpact: 2 },
     });
     expect(badRes.statusCode).toBe(400);
 
     const res = await server.inject({
       method: "PATCH", url: `/ai-risks/${riskId}`,
-      cookies: { vg_session: cookieFor(adminUserId, "ADMIN", tenantAId) },
+      cookies: { vg_session: await cookieFor(adminUserId, "ADMIN", tenantAId) },
       payload: { residualLikelihood: 2, residualImpact: 2, residualScore: 999, residualRating: "CRITICAL" },
     });
     const body = JSON.parse(res.body);
@@ -335,21 +336,21 @@ describe("AI Risk - create/update/delete and inherent-risk calculation", () => {
     const assessmentId = await createAssessment(sysId, tenantAId, "ADMIN", adminUserId);
     const createRes = await server.inject({
       method: "POST", url: `/ai-risk-assessments/${assessmentId}/risks`,
-      cookies: { vg_session: cookieFor(adminUserId, "ADMIN", tenantAId) },
+      cookies: { vg_session: await cookieFor(adminUserId, "ADMIN", tenantAId) },
       payload: { title: "Treatment Test", category: "OPERATIONAL", statement: "x", likelihood: 2, impact: 2 },
     });
     const riskId = JSON.parse(createRes.body).id;
 
     const invalidRes = await server.inject({
       method: "PATCH", url: `/ai-risks/${riskId}`,
-      cookies: { vg_session: cookieFor(adminUserId, "ADMIN", tenantAId) },
+      cookies: { vg_session: await cookieFor(adminUserId, "ADMIN", tenantAId) },
       payload: { treatment: "IGNORE" },
     });
     expect(invalidRes.statusCode).toBe(400);
 
     const res = await server.inject({
       method: "PATCH", url: `/ai-risks/${riskId}`,
-      cookies: { vg_session: cookieFor(adminUserId, "ADMIN", tenantAId) },
+      cookies: { vg_session: await cookieFor(adminUserId, "ADMIN", tenantAId) },
       payload: { treatment: "MITIGATE", treatmentRationale: "Add bias testing gate" },
     });
     expect(res.statusCode).toBe(200);
@@ -363,13 +364,13 @@ describe("AI Risk - create/update/delete and inherent-risk calculation", () => {
     const assessmentId = await createAssessment(sysId, tenantAId, "ADMIN", adminUserId);
     const createRes = await server.inject({
       method: "POST", url: `/ai-risk-assessments/${assessmentId}/risks`,
-      cookies: { vg_session: cookieFor(adminUserId, "ADMIN", tenantAId) },
+      cookies: { vg_session: await cookieFor(adminUserId, "ADMIN", tenantAId) },
       payload: { title: "Cross Tenant Test", category: "SECURITY", statement: "x", likelihood: 2, impact: 2 },
     });
     const riskId = JSON.parse(createRes.body).id;
     const res = await server.inject({
       method: "PATCH", url: `/ai-risks/${riskId}`,
-      cookies: { vg_session: cookieFor(tenantBUserId, "ADMIN", tenantBId) },
+      cookies: { vg_session: await cookieFor(tenantBUserId, "ADMIN", tenantBId) },
       payload: { likelihood: 5 },
     });
     expect(res.statusCode).toBe(404);
@@ -380,13 +381,13 @@ describe("AI Risk - create/update/delete and inherent-risk calculation", () => {
     const assessmentId = await createAssessment(sysId, tenantAId, "ADMIN", adminUserId);
     const createRes = await server.inject({
       method: "POST", url: `/ai-risk-assessments/${assessmentId}/risks`,
-      cookies: { vg_session: cookieFor(adminUserId, "ADMIN", tenantAId) },
+      cookies: { vg_session: await cookieFor(adminUserId, "ADMIN", tenantAId) },
       payload: { title: "Delete Test", category: "OPERATIONAL", statement: "x", likelihood: 1, impact: 1 },
     });
     const riskId = JSON.parse(createRes.body).id;
     const res = await server.inject({
       method: "DELETE", url: `/ai-risks/${riskId}`,
-      cookies: { vg_session: cookieFor(adminUserId, "ADMIN", tenantAId) },
+      cookies: { vg_session: await cookieFor(adminUserId, "ADMIN", tenantAId) },
     });
     expect(res.statusCode).toBe(204);
     const event = await prisma.auditEvent.findFirst({ where: { tenantId: tenantAId, action: "ai_risk.deleted", targetId: riskId } });
@@ -400,7 +401,7 @@ describe("AI Risk Assessment - human review (separation of duties)", () => {
     const assessmentId = await createAssessment(sysId, tenantAId, "ANALYST", analystUserId);
     const res = await server.inject({
       method: "POST", url: `/ai-risk-assessments/${assessmentId}/review`,
-      cookies: { vg_session: cookieFor(analystUserId, "ANALYST", tenantAId) },
+      cookies: { vg_session: await cookieFor(analystUserId, "ANALYST", tenantAId) },
       payload: { decision: "APPROVED", rationale: "Looks good" },
     });
     expect(res.statusCode).toBe(403);
@@ -411,12 +412,12 @@ describe("AI Risk Assessment - human review (separation of duties)", () => {
     const assessmentId = await createAssessment(sysId, tenantAId, "ADMIN", adminUserId, "Self Review Test");
     await server.inject({
       method: "PATCH", url: `/ai-risk-assessments/${assessmentId}`,
-      cookies: { vg_session: cookieFor(adminUserId, "ADMIN", tenantAId) },
+      cookies: { vg_session: await cookieFor(adminUserId, "ADMIN", tenantAId) },
       payload: { assessorUserId: reviewerUserId },
     });
     const res = await server.inject({
       method: "POST", url: `/ai-risk-assessments/${assessmentId}/review`,
-      cookies: { vg_session: cookieFor(reviewerUserId, "REVIEWER", tenantAId) },
+      cookies: { vg_session: await cookieFor(reviewerUserId, "REVIEWER", tenantAId) },
       payload: { decision: "APPROVED", rationale: "Approving my own work" },
     });
     expect(res.statusCode).toBe(403);
@@ -427,7 +428,7 @@ describe("AI Risk Assessment - human review (separation of duties)", () => {
     const assessmentId = await createAssessment(sysId, tenantAId, "ANALYST", analystUserId, "Distinct Reviewer Test");
     const res = await server.inject({
       method: "POST", url: `/ai-risk-assessments/${assessmentId}/review`,
-      cookies: { vg_session: cookieFor(reviewerUserId, "REVIEWER", tenantAId) },
+      cookies: { vg_session: await cookieFor(reviewerUserId, "REVIEWER", tenantAId) },
       payload: { decision: "APPROVED", rationale: "Reviewed and approved" },
     });
     expect(res.statusCode).toBe(200);
@@ -443,7 +444,7 @@ describe("AI Risk Assessment - human review (separation of duties)", () => {
     const assessmentId = await createAssessment(sysId, tenantAId, "ANALYST", analystUserId, "Rejected Review Test");
     const res = await server.inject({
       method: "POST", url: `/ai-risk-assessments/${assessmentId}/review`,
-      cookies: { vg_session: cookieFor(reviewerUserId, "REVIEWER", tenantAId) },
+      cookies: { vg_session: await cookieFor(reviewerUserId, "REVIEWER", tenantAId) },
       payload: { decision: "REJECTED", rationale: "Needs more work" },
     });
     expect(JSON.parse(res.body).status).toBe("IN_PROGRESS");
@@ -461,7 +462,7 @@ describe("AI Risk Assessment - human review (separation of duties)", () => {
     const assessmentId = await createAssessment(sysId, tenantAId, "ADMIN", adminUserId, "Implicit Self Review Test");
     const res = await server.inject({
       method: "POST", url: `/ai-risk-assessments/${assessmentId}/review`,
-      cookies: { vg_session: cookieFor(adminUserId, "ADMIN", tenantAId) },
+      cookies: { vg_session: await cookieFor(adminUserId, "ADMIN", tenantAId) },
       payload: { decision: "APPROVED", rationale: "Approving my own work" },
     });
     expect(res.statusCode).toBe(403);
@@ -473,7 +474,7 @@ describe("AI Risk Assessment - human review (separation of duties)", () => {
     await prisma.aiRiskAssessment.update({ where: { id: assessmentId }, data: { assessorUserId: null } });
     const res = await server.inject({
       method: "POST", url: `/ai-risk-assessments/${assessmentId}/review`,
-      cookies: { vg_session: cookieFor(reviewerUserId, "REVIEWER", tenantAId) },
+      cookies: { vg_session: await cookieFor(reviewerUserId, "REVIEWER", tenantAId) },
       payload: { decision: "APPROVED", rationale: "No assessor on record" },
     });
     expect(res.statusCode).toBe(403);
@@ -486,14 +487,14 @@ describe("AI Risk Assessment - human review (separation of duties)", () => {
     const assessmentId = await createAssessment(sysId, tenantAId, "ANALYST", analystUserId, "Second Review Test");
     const first = await server.inject({
       method: "POST", url: `/ai-risk-assessments/${assessmentId}/review`,
-      cookies: { vg_session: cookieFor(reviewerUserId, "REVIEWER", tenantAId) },
+      cookies: { vg_session: await cookieFor(reviewerUserId, "REVIEWER", tenantAId) },
       payload: { decision: "APPROVED", rationale: "Original approval" },
     });
     expect(first.statusCode).toBe(200);
     const before = await prisma.aiRiskAssessment.findUnique({ where: { id: assessmentId } });
     const second = await server.inject({
       method: "POST", url: `/ai-risk-assessments/${assessmentId}/review`,
-      cookies: { vg_session: cookieFor(adminUserId, "ADMIN", tenantAId) },
+      cookies: { vg_session: await cookieFor(adminUserId, "ADMIN", tenantAId) },
       payload: { decision: "REJECTED", rationale: "Attempted overwrite" },
     });
     expect(second.statusCode).toBe(409);
@@ -513,7 +514,7 @@ describe("AI Risk Assessment - human review (separation of duties)", () => {
     const assessmentId = await createAssessment(sysId, tenantAId, "ADMIN", adminUserId, "Denied Self Review Audit Test");
     const res = await server.inject({
       method: "POST", url: `/ai-risk-assessments/${assessmentId}/review`,
-      cookies: { vg_session: cookieFor(adminUserId, "ADMIN", tenantAId) },
+      cookies: { vg_session: await cookieFor(adminUserId, "ADMIN", tenantAId) },
       payload: { decision: "APPROVED", rationale: "Self approval attempt" },
     });
     expect(res.statusCode).toBe(403);
@@ -529,7 +530,7 @@ describe("AI Risk Assessment - human review (separation of duties)", () => {
     const assessmentId = await createAssessment(sysId, tenantAId, "ANALYST", analystUserId, "Denied Permission Audit Test");
     const res = await server.inject({
       method: "POST", url: `/ai-risk-assessments/${assessmentId}/review`,
-      cookies: { vg_session: cookieFor(analystUserId, "ANALYST", tenantAId) },
+      cookies: { vg_session: await cookieFor(analystUserId, "ANALYST", tenantAId) },
       payload: { decision: "APPROVED", rationale: "No permission" },
     });
     expect(res.statusCode).toBe(403);
@@ -544,7 +545,7 @@ describe("AI Risk Assessment - human review (separation of duties)", () => {
     await prisma.aiRiskAssessment.update({ where: { id: assessmentId }, data: { assessorUserId: null } });
     const res = await server.inject({
       method: "POST", url: `/ai-risk-assessments/${assessmentId}/review`,
-      cookies: { vg_session: cookieFor(reviewerUserId, "REVIEWER", tenantAId) },
+      cookies: { vg_session: await cookieFor(reviewerUserId, "REVIEWER", tenantAId) },
       payload: { decision: "APPROVED", rationale: "No assessor" },
     });
     expect(res.statusCode).toBe(403);
@@ -561,14 +562,14 @@ describe("AiRisk -> RemediationAction (mitigation work)", () => {
     const assessmentId = await createAssessment(sysId, tenantAId, "ADMIN", adminUserId);
     const createRiskRes = await server.inject({
       method: "POST", url: `/ai-risk-assessments/${assessmentId}/risks`,
-      cookies: { vg_session: cookieFor(adminUserId, "ADMIN", tenantAId) },
+      cookies: { vg_session: await cookieFor(adminUserId, "ADMIN", tenantAId) },
       payload: { title: "Remediation Test", category: "PRIVACY", statement: "x", likelihood: 4, impact: 4 },
     });
     const riskId = JSON.parse(createRiskRes.body).id;
 
     const res = await server.inject({
       method: "POST", url: `/ai-risks/${riskId}/remediation`,
-      cookies: { vg_session: cookieFor(adminUserId, "ADMIN", tenantAId) },
+      cookies: { vg_session: await cookieFor(adminUserId, "ADMIN", tenantAId) },
       payload: { title: "Add data minimization control", description: "Implement field-level redaction" },
     });
     expect(res.statusCode).toBe(201);

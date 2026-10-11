@@ -7,12 +7,15 @@
  * executiveReport.ts (M9), reshaped for the Assistant's grounding context.
  */
 
+import { evidenceAllowed } from "@vendorguard/auth";
+import type { Role } from "@vendorguard/shared";
 import { prisma } from "@vendorguard/database";
 import type { VendorGuardContext } from "@vendorguard/ai-client";
 
 export async function buildAssistantContext(
   tenantId: string,
-  vendorId: string
+  vendorId: string,
+  role: Role = "READ_ONLY"
 ): Promise<VendorGuardContext> {
   const vendor = await prisma.vendor.findFirst({
     where: { id: vendorId, tenantId },
@@ -35,10 +38,10 @@ export async function buildAssistantContext(
       })
     : [];
 
-  const evidenceDocuments = await prisma.evidenceDocument.findMany({
+  const evidenceDocuments = evidenceAllowed(role, "analysis") ? await prisma.evidenceDocument.findMany({
     where: { vendorId, tenantId, deletedAt: null },
     select: { id: true, documentType: true },
-  });
+  }) : [];
   const documentIds = evidenceDocuments.map((d) => d.id);
   const documentTypeById = new Map(evidenceDocuments.map((d) => [d.id, d.documentType]));
 

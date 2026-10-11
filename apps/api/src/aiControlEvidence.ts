@@ -7,6 +7,7 @@
  * Deliberately NOT here: control testing, design/operating effectiveness, formal test results.
  * Those belong to the later Control Testing capability.
  */
+import { evidenceAllowed, independentEvidenceContext, independentControlTestEvidenceContext } from "@vendorguard/auth";
 import { randomUUID } from "node:crypto";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { prisma, databaseClient, type Prisma } from "@vendorguard/database";
@@ -496,7 +497,7 @@ export async function registerAiControlEvidenceRoutes(app: FastifyInstance): Pro
     if (!session) {
       return reply.status(401).send({ error: "Not logged in" });
     }
-    if (!hasPermission(session, "ai-system:read")) {
+    if (!hasPermission(session, "ai-system:read") || !evidenceAllowed(session.role as Role, "metadata")) {
       return reply.status(403).send({ error: "Not authorized to view AI system evidence" });
     }
     const { id } = request.params as { id: string };
@@ -605,21 +606,27 @@ export async function registerAiControlEvidenceRoutes(app: FastifyInstance): Pro
     const { controlRecordId } = request.params as { controlRecordId: string };
     const record = await prisma.aiSystemControl.findFirst({
       where: { id: controlRecordId, tenantId: session.tenantId },
-      include: { control: { select: { id: true, controlId: true, title: true, summary: true, expectedEvidenceTypes: true } } },
+      include: { aiSystem: { select: { lifecycleStatus: true } }, control: { select: { id: true, controlId: true, title: true, summary: true, expectedEvidenceTypes: true } } },
     });
     if (!record) {
       return reply.status(404).send({ error: "AI system control not found" });
     }
-    const links = await prisma.aiSystemControlEvidence.findMany({
-      where: { tenantId: session.tenantId, aiSystemControlId: record.id },
+    const canMetadata = evidenceAllowed(session.role as Role, "metadata");
+    const canReview = record.aiSystem.lifecycleStatus !== "RETIRED" && hasPermission(session, "ai-control-evidence:review");
+    const assignedTest = !canMetadata && record.aiSystem.lifecycleStatus !== "RETIRED" && record.ownerUserId !== session.userId && hasPermission(session, "ai-control-test:perform") ? await prisma.aiControlTest.findFirst({ where: { tenantId: session.tenantId, aiSystemControlId: record.id, testerUserId: session.userId, status: "IN_PROGRESS" }, select: { testerUserId: true } }) : null;
+    const links = canMetadata || canReview || assignedTest ? await prisma.aiSystemControlEvidence.findMany({
+      where: { tenantId: session.tenantId, aiSystemControlId: record.id, ...(!canMetadata ? { status: { in: [...(canReview ? ["PENDING_REVIEW" as const] : []), ...(assignedTest ? ["ACCEPTED" as const] : [])] }, submittedByUserId: { not: session.userId }, evidenceDocument: { uploadedByUserId: { not: session.userId } } } : {}) },
       orderBy: { submittedAt: "desc" },
       include: {
         evidenceDocument: { select: EVIDENCE_SELECT },
         submittedBy: { select: USER_SELECT },
         reviews: { orderBy: { createdAt: "desc" }, include: { reviewer: { select: USER_SELECT } } },
       },
-    });
+    }) : [];
+    const actor = { userId: session.userId, role: session.role as Role };
+    const visibleLinks = canMetadata ? links : links.filter((link) => independentEvidenceContext(actor, link) || (assignedTest && link.status === "ACCEPTED" && independentControlTestEvidenceContext(actor, { ...assignedTest, aiSystemControl: { ownerUserId: record.ownerUserId } }, link)));
     return reply.send({
+      evidenceAccess: canMetadata ? "ALLOWED" : visibleLinks.length ? "REVIEW_CONTEXT" : "RESTRICTED",
       controlRecord: {
         id: record.id,
         aiSystemId: record.aiSystemId,
@@ -627,8 +634,8 @@ export async function registerAiControlEvidenceRoutes(app: FastifyInstance): Pro
         implementationStatus: record.implementationStatus,
         control: record.control,
       },
-      assuranceStatus: deriveAssuranceStatus(links.map((link) => link.status)),
-      links,
+      assuranceStatus: canMetadata ? deriveAssuranceStatus(links.map((link) => link.status)) : null,
+      links: !canMetadata && !visibleLinks.length ? null : visibleLinks,
     });
   });
 
@@ -764,6 +771,7 @@ export async function registerAiControlEvidenceRoutes(app: FastifyInstance): Pro
     if (!aiSystem) {
       return reply.status(404).send({ error: "AI system not found" });
     }
+    if (!evidenceAllowed(session.role as Role, "metadata")) return reply.send({ aiSystemId: aiSystem.id, access: "RESTRICTED", byControl: null, summary: null });
     const controls = await prisma.aiSystemControl.findMany({
       where: { tenantId: session.tenantId, aiSystemId: aiSystem.id },
       select: { id: true, applicability: true, evidenceLinks: { select: { status: true } } },

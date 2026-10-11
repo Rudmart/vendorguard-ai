@@ -2,15 +2,15 @@ import "dotenv/config";
 import Fastify from "fastify";
 import cors from "@fastify/cors";
 import cookie from "@fastify/cookie";
-import { randomUUID } from "node:crypto";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
-import { prisma } from "@vendorguard/database";
-import { getSessionFromCookie, COOKIE_NAME, requestContextSchema, type RequestContext } from "@vendorguard/auth";
+import { prisma, resourceScope } from "@vendorguard/database";
+import { COOKIE_NAME, type RequestContext } from "@vendorguard/auth";
+import { evidenceAllowed } from "@vendorguard/auth";
 import { analyzeEvidence, detectPromptInjection } from "@vendorguard/ai-client";
 
 // Explicit tool allowlist (spec Â§16). Even though the handler below only
@@ -25,6 +25,7 @@ const ALLOWED_TOOLS = new Set([
 ]);
 
 const server = Fastify({ logger: true });
+server.addHook("onRequest", (_request, _reply, done) => resourceScope.run({}, done));
 
 server.register(cors, {
   origin: process.env.WEB_ORIGIN || "http://localhost:3000",
@@ -306,6 +307,12 @@ function buildServerForContext(context: RequestContext) {
         return { content: [{ type: "text", text: JSON.stringify(mappings, null, 2) }] };
       }
 
+      if (name === "get_evidence" || name === "evaluate_evidence") {
+        if (!evidenceAllowed(context.role, name === "get_evidence" ? "metadata" : "analysis")) {
+          await logToolCall(context, name, "DENIED", { reason: "missing_evidence_permission" });
+          return { content: [{ type: "text", text: "Not authorized for this evidence operation." }], isError: true };
+        }
+      }
       if (name === "get_evidence") {
         const vendorId = String(args?.vendorId ?? "");
         const documents = await prisma.evidenceDocument.findMany({
@@ -399,9 +406,9 @@ function buildServerForContext(context: RequestContext) {
           return acc;
         }, {});
 
-        const evidenceCount = await prisma.evidenceDocument.count({
+        const evidenceCount = evidenceAllowed(context.role, "metadata") ? await prisma.evidenceDocument.count({
           where: { vendorId, tenantId: context.tenantId, deletedAt: null },
-        });
+        }) : null;
 
         const report = {
           vendor: { id: vendor.id, legalName: vendor.legalName, criticality: vendor.criticality },

@@ -16,6 +16,9 @@ import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 export const COOKIE_NAME = "vg_session";
 
 export interface SessionCookie {
+  sessionId?: string;
+  issuedAt?: number;
+  expiresAt?: number;
   userId: string;
   tenantId: string;
   email: string;
@@ -62,6 +65,7 @@ export function getSessionFromCookie(cookieValue: string | undefined): SessionCo
     const parsed = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as Partial<SessionCookie>;
     const fields = [parsed.userId, parsed.tenantId, parsed.email, parsed.displayName, parsed.role];
     if (fields.some((v) => typeof v !== "string" || v.length === 0)) return null;
+    if (typeof parsed.sessionId !== "string" || !parsed.sessionId || !Number.isSafeInteger(parsed.issuedAt) || !Number.isSafeInteger(parsed.expiresAt) || parsed.issuedAt! > Date.now() || parsed.expiresAt! <= Date.now() || parsed.expiresAt! <= parsed.issuedAt! || parsed.expiresAt! - parsed.issuedAt! > 7 * 24 * 60 * 60 * 1000) return null;
     return parsed as SessionCookie;
   } catch {
     return null;

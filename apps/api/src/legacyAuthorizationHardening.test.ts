@@ -1,7 +1,8 @@
+import { issueTestSessionCookie } from "./testSession.js";
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { prisma } from "@vendorguard/database";
 import { server } from "./index.js";
-import { createSessionCookie } from "@vendorguard/auth";
+
 
 // Third-Party AI authorization hardening: tenant isolation + RBAC on legacy scoring/rating/analyze routes and vendor creation.
 const ROLES = ["ADMIN", "ANALYST", "REVIEWER", "AUDITOR", "READ_ONLY"] as const;
@@ -24,11 +25,11 @@ function nextIp() {
   ipCounter += 1;
   return "10.99." + Math.floor(ipCounter / 250) + "." + (ipCounter % 250);
 }
-function cookie(userId: string, role: string, tenantId: string) {
-  return createSessionCookie({ userId, tenantId, email: `${userId}@example.com`, displayName: "Hardening Test", role });
+async function cookie(userId: string, role: string, tenantId: string) {
+  return await issueTestSessionCookie({ userId, tenantId, email: `${userId}@example.com`, displayName: "Hardening Test", role });
 }
 async function post(url: string, userId: string, role: string, tenantId: string, payload: Record<string, unknown> = {}) {
-  const res = await server.inject({ method: "POST", url, cookies: { vg_session: cookie(userId, role, tenantId) }, payload, remoteAddress: nextIp() });
+  const res = await server.inject({ method: "POST", url, cookies: { vg_session: await cookie(userId, role, tenantId) }, payload, remoteAddress: nextIp() });
   return { status: res.statusCode, body: res.body ? JSON.parse(res.body) : null };
 }
 async function newUser(label: string, role: string, tenantId: string) {

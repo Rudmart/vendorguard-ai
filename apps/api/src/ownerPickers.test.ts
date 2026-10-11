@@ -1,7 +1,8 @@
+import { issueTestSessionCookie } from "./testSession.js";
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { prisma } from "@vendorguard/database";
 import { server } from "./index.js";
-import { createSessionCookie } from "@vendorguard/auth";
+
 
 // Owner Pickers: treatment owner + target date on AI risks, owner on monitoring checks, tenant-user list.
 let tenantAId: string;
@@ -19,11 +20,11 @@ function nextIp() {
   ipCounter += 1;
   return "10.88." + Math.floor(ipCounter / 250) + "." + (ipCounter % 250);
 }
-function cookie(userId: string, role: string, tenantId = tenantAId) {
-  return createSessionCookie({ userId, tenantId, email: `${userId}@example.com`, displayName: "Owner Picker Test", role });
+async function cookie(userId: string, role: string, tenantId = tenantAId) {
+  return await issueTestSessionCookie({ userId, tenantId, email: `${userId}@example.com`, displayName: "Owner Picker Test", role });
 }
 async function call(method: "GET" | "POST" | "PATCH", url: string, userId: string, role: string, payload?: Record<string, unknown>, tenantId = tenantAId) {
-  const res = await server.inject({ method, url, cookies: { vg_session: cookie(userId, role, tenantId) }, payload, remoteAddress: nextIp() });
+  const res = await server.inject({ method, url, cookies: { vg_session: await cookie(userId, role, tenantId) }, payload, remoteAddress: nextIp() });
   return { status: res.statusCode, body: res.body ? JSON.parse(res.body) : null };
 }
 async function newUser(label: string, role: string, tenantId: string) {

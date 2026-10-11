@@ -1,8 +1,9 @@
+import { issueTestSessionCookie } from "./testSession.js";
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { prisma } from "@vendorguard/database";
 import { server } from "./index.js";
 import { overallWithinLimit } from "./aiControlTests.js";
-import { createSessionCookie } from "@vendorguard/auth";
+
 
 let tenantAId: string;
 let tenantBId: string;
@@ -36,12 +37,12 @@ const PARTIAL_DRAFT = {
   nextTestDate: "2027-03-20",
 };
 
-function cookieFor(userId: string, role: string, tenantId: string) {
-  return createSessionCookie({ userId, tenantId, email: `${userId}@example.com`, displayName: "Test User", role });
+async function cookieFor(userId: string, role: string, tenantId: string) {
+  return await issueTestSessionCookie({ userId, tenantId, email: `${userId}@example.com`, displayName: "Test User", role });
 }
 
 async function call(method: "GET" | "POST" | "PUT" | "PATCH", url: string, userId: string, role: string, payload?: Record<string, unknown>, tenantId?: string) {
-  const res = await server.inject({ method, url, cookies: { vg_session: cookieFor(userId, role, tenantId ?? tenantAId) }, payload, remoteAddress: nextIp() });
+  const res = await server.inject({ method, url, cookies: { vg_session: await cookieFor(userId, role, tenantId ?? tenantAId) }, payload, remoteAddress: nextIp() });
   return { status: res.statusCode, body: res.body ? JSON.parse(res.body) : null };
 }
 
@@ -247,7 +248,7 @@ describe("Completing control tests", () => {
     expect(await prisma.auditEvent.findFirst({ where: { tenantId: tenantAId, action: "ai_control_test.completed", targetId: testId } })).not.toBeNull();
     expect(await prisma.auditEvent.findFirst({ where: { tenantId: tenantAId, action: "ai_control_test.effectiveness_determined", targetId: testId } })).not.toBeNull();
     // Step 9 regression: evidence assurance stays ACCEPTED - a separate decision.
-    const assurance = await call("GET", `/ai-systems/${sysId}/assurance`, readOnlyUserId, "READ_ONLY");
+    const assurance = await call("GET", `/ai-systems/${sysId}/assurance`, adminUserId, "ADMIN");
     expect(Object.values(assurance.body.byControl)).toContain("ACCEPTED");
   });
 
@@ -354,7 +355,7 @@ describe("Retesting and history", () => {
 describe("Tenant isolation", () => {
   it("returns 404 to another tenant on every control-test route", async () => {
     const { recA, linkId, testId } = await readyTest();
-    const b = (method: "GET" | "POST" | "PATCH", url: string, payload?: Record<string, unknown>) => call(method, url, tenantBUserId, "ADMIN", payload, tenantBId);
+    const b = async (method: "GET" | "POST" | "PATCH", url: string, payload?: Record<string, unknown>) => call(method, url, tenantBUserId, "ADMIN", payload, tenantBId);
     expect((await b("GET", `/ai-system-controls/${recA}/tests`)).status).toBe(404);
     expect((await b("POST", `/ai-system-controls/${recA}/tests`, PROCEDURE)).status).toBe(404);
     expect((await b("GET", `/ai-control-tests/${testId}`)).status).toBe(404);

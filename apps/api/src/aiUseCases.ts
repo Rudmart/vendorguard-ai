@@ -15,6 +15,7 @@
  * owner, and an owner must exist. Fail closed; denied review attempts are audited as DENIED.
  * AI ASSISTS. HUMANS GOVERN. - there is no AI / MCP path that approves a use case.
  */
+import { appendGovernanceDecision } from "./governanceDecisionHistory.js";
 import type { FastifyInstance } from "fastify";
 import { prisma } from "@vendorguard/database";
 import { AFFECTED_POPULATIONS } from "@vendorguard/shared";
@@ -50,6 +51,7 @@ const INCLUDE = {
   owner: { select: USER_SELECT },
   createdBy: { select: USER_SELECT },
   reviewer: { select: USER_SELECT },
+  decisionHistory: { orderBy: { createdAt: "asc" } },
 } as const;
 
 type DecisionRole = (typeof USE_CASE_DECISION_ROLES)[number];
@@ -448,7 +450,7 @@ export async function registerAiUseCaseRoutes(app: FastifyInstance): Promise<voi
       await deniedReview(session, existing.id, "state_changed");
       return reply.status(409).send({ error: "This use case changed while you were reviewing it. Reload and try again." });
     }
-    await audit(session, "ai_use_case.review_recorded", "AiUseCase", existing.id, { decision, status: newStatus });
+    await appendGovernanceDecision(session, "AiUseCase", existing, decision, rationale, newStatus, body.reconciliationRationale);
     return reply.send(await loadUseCase(existing.id, session.tenantId));
   });
 }

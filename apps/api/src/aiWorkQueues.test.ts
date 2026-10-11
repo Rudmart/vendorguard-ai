@@ -1,6 +1,7 @@
+import { issueTestSessionCookie } from "./testSession.js";
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { prisma } from "@vendorguard/database";
-import { createSessionCookie } from "@vendorguard/auth";
+
 import { server } from "./index.js";
 
 const stamp = Date.now();
@@ -17,7 +18,7 @@ function nextIp() {
   return "10.51." + Math.floor(ip / 250) + "." + (ip % 250);
 }
 async function call(method: "GET" | "PUT" | "POST", url: string, user?: string, role?: string, tenantId?: string, payload?: Record<string, unknown>) {
-  const res = await server.inject({ method, url, payload, remoteAddress: nextIp(), cookies: user && role ? { vg_session: createSessionCookie({ userId: user, tenantId: tenantId ?? tA, email: `${user}@example.com`, displayName: "T", role }) } : {} });
+  const res = await server.inject({ method, url, payload, remoteAddress: nextIp(), cookies: user && role ? { vg_session: await issueTestSessionCookie({ userId: user, tenantId: tenantId ?? tA, email: `${user}@example.com`, displayName: "T", role }) } : {} });
   return { status: res.statusCode, body: res.body ? JSON.parse(res.body) : null };
 }
 const ids = (body: { items: { id: string }[] }) => body.items.map((i) => i.id);

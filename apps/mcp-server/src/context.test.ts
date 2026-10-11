@@ -1,6 +1,7 @@
+import { issueTestSessionCookie } from "./testSession.js";
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { resolveMcpContext } from "./context.js";
-import { requestContextSchema, createSessionCookie } from "@vendorguard/auth";
+import { requestContextSchema } from "@vendorguard/auth";
 import { prisma } from "@vendorguard/database";
 
 let tenantId: string;
@@ -37,7 +38,7 @@ describe("resolveMcpContext (MCP authentication boundary)", () => {
   });
 
   it("rejects a session whose user/tenant has no real TenantMembership row", async () => {
-    const fakeSession = createSessionCookie({
+    const fakeSession = await issueTestSessionCookie({
       userId: "00000000-0000-0000-0000-000000000000",
       tenantId: "00000000-0000-0000-0000-000000000000",
       email: "nobody@example.com",
@@ -48,7 +49,7 @@ describe("resolveMcpContext (MCP authentication boundary)", () => {
   });
 
   it("always uses the role from the real TenantMembership row, never a role claimed in the cookie itself", async () => {
-    const tamperedSession = createSessionCookie({
+    const tamperedSession = await issueTestSessionCookie({
       userId,
       tenantId,
       email: "attacker-controlled@example.com",
@@ -60,7 +61,7 @@ describe("resolveMcpContext (MCP authentication boundary)", () => {
   });
 
   it("assigns a fresh, unique correlation ID to every single request, even for the same user", async () => {
-    const validSession = createSessionCookie({
+    const validSession = await issueTestSessionCookie({
       userId,
       tenantId,
       email: "test@vendorguard.dev",

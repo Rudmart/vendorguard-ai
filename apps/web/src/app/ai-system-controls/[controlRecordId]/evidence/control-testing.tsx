@@ -27,7 +27,7 @@ type ControlTest = {
   completedAt: string | null;
   createdAt: string;
   tester: UserRef;
-  evidence: TestEvidence[];
+  evidence: TestEvidence[] | null;
 };
 export type EvidenceLinkOption = { id: string; status: string; evidenceDocument: { displayFilename: string; documentType: string } };
 type Draft = {
@@ -59,6 +59,7 @@ const EFFECTIVENESS: { value: Effectiveness; label: string; color: string }[] = 
   { value: "EFFECTIVE", label: "Effective", color: "#4ade80" },
 ];
 const EVIDENCE_LABEL: Record<string, string> = {
+  RESTRICTED: "Restricted by evidence permissions",
   NO_EVIDENCE: "No Evidence",
   PENDING_REVIEW: "Pending Review",
   ACCEPTED: "Accepted",
@@ -330,8 +331,8 @@ export default function ControlTestingSection({
 
           <div style={{ color: "#93c5fd", fontSize: 13, fontWeight: 600, margin: "14px 0 6px 0" }}>2. Evidence considered</div>
           <p style={muted}>At least one item must be Accepted in evidence review before the test can be completed.</p>
-          {inProgress.evidence.length === 0 && <p style={muted}>No evidence added yet.</p>}
-          {inProgress.evidence.map((item) => (
+          {inProgress.evidence === null ? <p style={muted}>Restricted by evidence permissions.</p> : inProgress.evidence.length === 0 && <p style={muted}>No evidence added yet.</p>}
+          {inProgress.evidence?.map((item) => (
             <p key={item.id} style={{ ...muted, margin: "2px 0" }}>
               {item.evidenceLink.evidenceDocument.displayFilename} ({item.evidenceLink.evidenceDocument.documentType}) - evidence review:{" "}
               {EVIDENCE_LABEL[item.evidenceLink.status] ?? item.evidenceLink.status}
@@ -466,7 +467,7 @@ export default function ControlTestingSection({
           </p>
           <p style={muted}>Procedure: {test.procedure}</p>
           <p style={muted}>Conclusion: {test.conclusionRationale}</p>
-          <p style={muted}>Evidence considered: {test.evidence.map((item) => item.evidenceLink.evidenceDocument.displayFilename).join(", ")}</p>
+          <p style={muted}>Evidence considered: {test.evidence === null ? "Restricted by evidence permissions" : test.evidence.map((item) => item.evidenceLink.evidenceDocument.displayFilename).join(", ")}</p>
         </div>
       ))}
     </section>

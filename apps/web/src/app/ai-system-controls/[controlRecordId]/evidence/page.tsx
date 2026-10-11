@@ -48,8 +48,8 @@ type ControlEvidenceResponse = {
     implementationStatus: string;
     control: { id: string; controlId: string; title: string; summary: string; expectedEvidenceTypes: string[] };
   };
-  assuranceStatus: AssuranceStatus;
-  links: EvidenceLink[];
+  assuranceStatus: AssuranceStatus | null;
+  links: EvidenceLink[] | null;
 };
 type AvailableDoc = EvidenceDoc & {
   source: "AI_SYSTEM" | "VENDOR";
@@ -58,6 +58,7 @@ type AvailableDoc = EvidenceDoc & {
 };
 
 const STATUS_LABEL: Record<string, string> = {
+  RESTRICTED: "Restricted by evidence permissions",
   NO_EVIDENCE: "No Evidence",
   PENDING_REVIEW: "Evidence Submitted / Pending Review",
   ACCEPTED: "Evidence Accepted",
@@ -185,7 +186,8 @@ export default function ControlEvidencePage() {
     return <main style={{ padding: 24, color: "#e5e7eb" }}>{error ?? "Loading..."}</main>;
   }
 
-  const { controlRecord, assuranceStatus, links } = data;
+  const { controlRecord, assuranceStatus } = data;
+  const links = data.links ?? [];
   const aiSystemId = controlRecord.aiSystemId;
   const linkedIds = new Set(links.map((link) => link.evidenceDocument.id));
   const options = available.filter((doc) => doc.usable && !linkedIds.has(doc.id));
@@ -202,7 +204,7 @@ export default function ControlEvidencePage() {
       <p style={{ ...muted, fontSize: 13 }}>{controlRecord.control.summary}</p>
       <div style={{ margin: "12px 0 16px 0", display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
         <span style={muted}>Assurance status:</span>
-        <Badge status={assuranceStatus} />
+        <Badge status={assuranceStatus ?? "RESTRICTED"} />
         <span style={muted}>
           Applicability: {controlRecord.applicability} | Reported implementation: {controlRecord.implementationStatus}
         </span>
@@ -303,7 +305,7 @@ export default function ControlEvidencePage() {
 
       <section style={card}>
         <h2 style={heading}>Submissions and review history</h2>
-        {links.length === 0 && <p style={muted}>No evidence submitted yet.</p>}
+        {data.links === null ? <p style={muted}>Restricted by evidence permissions.</p> : links.length === 0 && <p style={muted}>No evidence submitted yet.</p>}
         {links.map((link) => (
           <div key={link.id} id={"evidence-" + link.evidenceDocument.id} style={{ borderTop: "1px solid #1f2937", padding: "12px 0" }}>
             <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
@@ -316,12 +318,12 @@ export default function ControlEvidencePage() {
               Submitted by {link.submittedBy.displayName} ({link.submittedBy.email}) on {new Date(link.submittedAt).toLocaleString()}
               {link.submissionNote ? " - Note: " + link.submissionNote : ""}
             </p>
-            {link.evidenceDocument.sizeBytes > 0 ? (
+            {link.evidenceDocument.sizeBytes > 0 && can("evidence:read") ? (
             <a href={`${API}/evidence/${link.evidenceDocument.id}/download`} style={{ color: "#93c5fd", fontSize: 12 }} target="_blank" rel="noreferrer">
               Open file
             </a>
             ) : (
-              <span style={muted}>Record only (no file attached)</span>
+              <span style={muted}>{link.evidenceDocument.sizeBytes > 0 ? "File access restricted" : "Record only (no file attached)"}</span>
             )}
 
             {link.status === "PENDING_REVIEW" && !can("ai-control-evidence:review") && <GovernanceInfo>Evidence review required - reviewer permission required.</GovernanceInfo>}
@@ -382,9 +384,9 @@ export default function ControlEvidencePage() {
       <ControlTestingSection
         controlRecordId={controlRecordId}
         evidenceLinks={links}
-        assuranceStatus={assuranceStatus}
+        assuranceStatus={assuranceStatus ?? "RESTRICTED"}
         disabled={notApplicable}
-        onChanged={() => setFindingsKey((k) => k + 1)}
+        onChanged={() => { setFindingsKey((k) => k + 1); setReloadKey((k) => k + 1); }}
       />
       <FindingsSection controlRecordId={controlRecordId} aiSystemId={aiSystemId} refreshKey={findingsKey} />
     </main>

@@ -1,8 +1,9 @@
+import { issueTestSessionCookie } from "./testSession.js";
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { prisma } from "@vendorguard/database";
 import { server } from "./index.js";
 import { deriveAssuranceStatus } from "./aiControlEvidence.js";
-import { createSessionCookie } from "@vendorguard/auth";
+
 
 let tenantAId: string;
 let tenantBId: string;
@@ -18,15 +19,15 @@ let ctrlB: string;
 // The "s8-test-" prefix keeps this framework out of aiControlSet.test.ts's library snapshot.
 const PREFIX = "s8-test-s9-";
 
-function cookieFor(userId: string, role: string, tenantId: string) {
-  return createSessionCookie({ userId, tenantId, email: `${userId}@example.com`, displayName: "Test User", role });
+async function cookieFor(userId: string, role: string, tenantId: string) {
+  return await issueTestSessionCookie({ userId, tenantId, email: `${userId}@example.com`, displayName: "Test User", role });
 }
 
 async function call(method: "GET" | "POST" | "PUT", url: string, userId: string, role: string, tenantId?: string, payload?: Record<string, unknown>) {
   const res = await server.inject({
     method,
     url,
-    cookies: { vg_session: cookieFor(userId, role, tenantId ?? tenantAId) },
+    cookies: { vg_session: await cookieFor(userId, role, tenantId ?? tenantAId) },
     payload,
   });
   return { status: res.statusCode, body: res.body ? JSON.parse(res.body) : null };
@@ -71,7 +72,7 @@ async function review(linkId: string, decision: string, rationale: unknown = "Re
 }
 
 async function assurance(sysId: string) {
-  return call("GET", `/ai-systems/${sysId}/assurance`, readOnlyUserId, "READ_ONLY");
+  return call("GET", `/ai-systems/${sysId}/assurance`, adminUserId, "ADMIN");
 }
 
 beforeAll(async () => {
@@ -152,7 +153,7 @@ describe("AI-system evidence records", () => {
     const { sysId } = await setupSystem();
     await addEvidence(sysId);
     await addEvidence(sysId, { displayFilename: "Old.pdf", expirationDate: "2020-01-01" });
-    const res = await call("GET", `/ai-systems/${sysId}/evidence`, readOnlyUserId, "READ_ONLY");
+    const res = await call("GET", `/ai-systems/${sysId}/evidence`, adminUserId, "ADMIN");
     expect(res.status).toBe(200);
     expect(res.body.evidence).toHaveLength(2);
     const expired = res.body.evidence.find((d: { displayFilename: string }) => d.displayFilename === "Old.pdf");
@@ -305,7 +306,7 @@ describe("Human review of control evidence", () => {
     expect((await call("POST", `/ai-control-evidence/${link.body.id}/resubmit`, analystUserId, "ANALYST", tenantAId, { note: "Signed copy" })).status).toBe(200);
     expect((await assurance(sysId)).body.byControl[recA]).toBe("PENDING_REVIEW");
     expect((await review(link.body.id, "ACCEPT")).status).toBe(200);
-    const history = await call("GET", `/ai-system-controls/${recA}/evidence`, readOnlyUserId, "READ_ONLY");
+    const history = await call("GET", `/ai-system-controls/${recA}/evidence`, adminUserId, "ADMIN");
     expect(history.body.assuranceStatus).toBe("ACCEPTED");
     expect(history.body.links[0].reviews).toHaveLength(2);
     const event = await prisma.auditEvent.findFirst({ where: { tenantId: tenantAId, action: "ai_control_evidence.resubmitted", targetId: link.body.id } });
@@ -337,7 +338,7 @@ describe("Tenant isolation", () => {
     const { sysId, recA } = await setupSystem();
     const doc = await addEvidence(sysId);
     const link = await submit(recA, doc.body.id);
-    const b = (method: "GET" | "POST", url: string, payload?: Record<string, unknown>) => call(method, url, tenantBUserId, "ADMIN", tenantBId, payload);
+    const b = async (method: "GET" | "POST", url: string, payload?: Record<string, unknown>) => call(method, url, tenantBUserId, "ADMIN", tenantBId, payload);
     expect((await b("GET", `/ai-systems/${sysId}/assurance`)).status).toBe(404);
     expect((await b("GET", `/ai-systems/${sysId}/evidence`)).status).toBe(404);
     expect((await b("POST", `/ai-systems/${sysId}/evidence`, { displayFilename: "x", documentType: "y" })).status).toBe(404);

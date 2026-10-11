@@ -1,7 +1,8 @@
+import { issueTestSessionCookie } from "./testSession.js";
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { prisma } from "@vendorguard/database";
 import { server } from "./index.js";
-import { createSessionCookie } from "@vendorguard/auth";
+
 
 let tenantId: string;
 let otherTenantId: string;
@@ -13,8 +14,8 @@ let vendorId: string;
 let assessmentId: string;
 let questionnaireId: string;
 
-function cookieFor(userId: string, role: string, tid: string = tenantId) {
-  return createSessionCookie({ userId, tenantId: tid, email: `${userId}@example.com`, displayName: "Test User", role });
+async function cookieFor(userId: string, role: string, tid: string = tenantId) {
+  return await issueTestSessionCookie({ userId, tenantId: tid, email: `${userId}@example.com`, displayName: "Test User", role });
 }
 
 beforeAll(async () => {
@@ -99,7 +100,7 @@ describe("POST /questionnaires/:id/review (approval-bypass scenarios)", () => {
     const res = await server.inject({
       method: "POST",
       url: `/questionnaires/${questionnaireId}/review`,
-      cookies: { vg_session: cookieFor(analystUserId, "ANALYST") },
+      cookies: { vg_session: await cookieFor(analystUserId, "ANALYST") },
     });
     expect(res.statusCode).toBe(403);
   });
@@ -108,7 +109,7 @@ describe("POST /questionnaires/:id/review (approval-bypass scenarios)", () => {
     const res = await server.inject({
       method: "POST",
       url: `/questionnaires/${questionnaireId}/review`,
-      cookies: { vg_session: cookieFor(submitterUserId, "REVIEWER") },
+      cookies: { vg_session: await cookieFor(submitterUserId, "REVIEWER") },
     });
     expect(res.statusCode).toBe(403);
     const body = JSON.parse(res.body);
@@ -119,7 +120,7 @@ describe("POST /questionnaires/:id/review (approval-bypass scenarios)", () => {
     const res = await server.inject({
       method: "POST",
       url: `/questionnaires/${questionnaireId}/review`,
-      cookies: { vg_session: cookieFor(otherTenantReviewerUserId, "REVIEWER", otherTenantId) },
+      cookies: { vg_session: await cookieFor(otherTenantReviewerUserId, "REVIEWER", otherTenantId) },
     });
     expect(res.statusCode).toBe(404);
   });
@@ -128,7 +129,7 @@ describe("POST /questionnaires/:id/review (approval-bypass scenarios)", () => {
     const res = await server.inject({
       method: "POST",
       url: `/questionnaires/${questionnaireId}/review`,
-      cookies: { vg_session: cookieFor(secondReviewerUserId, "REVIEWER") },
+      cookies: { vg_session: await cookieFor(secondReviewerUserId, "REVIEWER") },
     });
     expect(res.statusCode).toBe(200);
 
@@ -151,7 +152,7 @@ describe("POST /questionnaires/:id/approve (approval-bypass scenarios)", () => {
     const res = await server.inject({
       method: "POST",
       url: `/questionnaires/${questionnaireId}/approve`,
-      cookies: { vg_session: cookieFor(analystUserId, "ANALYST") },
+      cookies: { vg_session: await cookieFor(analystUserId, "ANALYST") },
     });
     expect(res.statusCode).toBe(403);
   });
@@ -160,7 +161,7 @@ describe("POST /questionnaires/:id/approve (approval-bypass scenarios)", () => {
     const res = await server.inject({
       method: "POST",
       url: `/questionnaires/${questionnaireId}/approve`,
-      cookies: { vg_session: cookieFor(submitterUserId, "REVIEWER") },
+      cookies: { vg_session: await cookieFor(submitterUserId, "REVIEWER") },
     });
     expect(res.statusCode).toBe(403);
     const body = JSON.parse(res.body);
@@ -171,7 +172,7 @@ describe("POST /questionnaires/:id/approve (approval-bypass scenarios)", () => {
     const res = await server.inject({
       method: "POST",
       url: `/questionnaires/${questionnaireId}/approve`,
-      cookies: { vg_session: cookieFor(otherTenantReviewerUserId, "REVIEWER", otherTenantId) },
+      cookies: { vg_session: await cookieFor(otherTenantReviewerUserId, "REVIEWER", otherTenantId) },
     });
     expect(res.statusCode).toBe(404);
   });
@@ -180,7 +181,7 @@ describe("POST /questionnaires/:id/approve (approval-bypass scenarios)", () => {
     const res = await server.inject({
       method: "POST",
       url: `/questionnaires/${questionnaireId}/approve`,
-      cookies: { vg_session: cookieFor(secondReviewerUserId, "REVIEWER") },
+      cookies: { vg_session: await cookieFor(secondReviewerUserId, "REVIEWER") },
     });
     expect(res.statusCode).toBe(200);
 
