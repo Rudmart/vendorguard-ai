@@ -32,8 +32,8 @@ const navSections: NavSectionDef[] = [
     title: "AI Risk",
     items: [
       { label: "Risk Register", href: "/risk-register", built: true, icon: "\uD83D\uDCCB" },
-      { label: "Risk Assessments", href: "/risk-assessments", built: true, icon: "\uD83D\uDCCA" },
-      { label: "Impact Assessments", href: "/impact-assessments", built: true, icon: "\uD83C\uDFAF" },
+      { label: "AI Risk Assessments", href: "/risk-assessments", built: true, icon: "\uD83D\uDCCA" },
+      { label: "AI Impact Assessments", href: "/impact-assessments", built: true, icon: "\uD83C\uDFAF" },
       { label: "Findings", href: "/findings", built: true, icon: "\u26A0" },
       { label: "Risk Acceptance", href: "/risk-acceptance", built: true, icon: "\u2696" },
       { label: "Remediation", href: "/remediation", built: true, icon: "\u2705" },

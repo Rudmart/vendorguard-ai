@@ -30,7 +30,7 @@ function versionText(v: PostureVersion | null, href: string, empty: string) {
   }
   return (
     <a href={href + v.id} style={{ color: "#93c5fd" }}>
-      v{v.version}
+      Version {v.version}
       {v.completedAt ? ` (completed ${new Date(v.completedAt).toLocaleDateString()})` : ""}
     </a>
   );
@@ -82,12 +82,12 @@ export default function GovernancePosture({
         <div style={{ marginTop: 14, fontSize: 12.5, color: "#fbbf24", display: "flex", flexDirection: "column", gap: 4 }}>
           {posture.riskInProgress && (
             <a href={`/ai-risk-assessments/${posture.riskInProgress.id}`} style={{ color: "#fbbf24" }}>
-              Risk Assessment v{posture.riskInProgress.version} in progress (not yet assessed posture)
+              AI Risk Assessment · Version {posture.riskInProgress.version} in progress (not yet assessed posture)
             </a>
           )}
           {posture.impactInProgress && (
             <a href={`/ai-impact-assessments/${posture.impactInProgress.id}`} style={{ color: "#fbbf24" }}>
-              Impact Assessment v{posture.impactInProgress.version} in progress (not yet assessed posture)
+              AI Impact Assessment · Version {posture.impactInProgress.version} in progress (not yet assessed posture)
             </a>
           )}
           {posture.reassessmentInProgress && (
@@ -98,7 +98,7 @@ export default function GovernancePosture({
         </div>
       )}
       <p style={{ color: "#5d6786", fontSize: 11.5, marginTop: 14, marginBottom: 12 }}>
-        Posture is derived from completed Risk and Impact Assessments and open reassessments. Lifecycle status is separate.
+        Posture is derived from completed AI Risk and AI Impact Assessments and open reassessments. Lifecycle status is separate.
       </p>
       <nav style={{ display: "flex", gap: 8, flexWrap: "wrap", borderTop: "1px solid #2e3d63", paddingTop: 12 }}>
         {SECTIONS.map((s) => (

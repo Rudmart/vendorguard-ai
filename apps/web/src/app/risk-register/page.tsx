@@ -37,7 +37,7 @@ export default function RiskRegisterPage() {
       purpose="Latest assessed posture: risks from each AI system's latest COMPLETED risk assessment. It is an assessment snapshot, not real-time monitoring. Planned treatment is a plan; only an approved Risk Acceptance is authoritative."
       error={error}
       loading={!data}
-      empty={data && rows.length === 0 ? "No assessed risks yet. Start a Risk Assessment from an AI System." : null}
+      empty={data && rows.length === 0 ? "No assessed risks yet. Start an AI Risk Assessment from an AI System." : null}
       controls={
         <>
           <select style={control} value={scope} onChange={(e) => setScope(e.target.value)}>
@@ -93,7 +93,7 @@ export default function RiskRegisterPage() {
                 </a>
               </td>
               <td style={td}>
-                {"v" + r.assessment.version + " " + words(r.assessment.status) + " "}
+                {"Version " + r.assessment.version + " " + words(r.assessment.status) + " "}
                 <Badge text={POSTURE[r.assessment.posture]?.text ?? r.assessment.posture} color={POSTURE[r.assessment.posture]?.color ?? "#94a3b8"} />
               </td>
             </tr>

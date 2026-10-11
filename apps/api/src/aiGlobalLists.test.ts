@@ -242,7 +242,7 @@ describe("Phase B navigation", () => {
   it("adds the new AI Risk and Monitoring pages, each backed by a real page", () => {
     const webApp = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "web", "src", "app");
     const sidebar = readFileSync(join(webApp, "sidebar.tsx"), "utf8");
-    for (const [label, href] of [["Risk Register", "/risk-register"], ["Risk Assessments", "/risk-assessments"], ["Impact Assessments", "/impact-assessments"], ["Findings", "/findings"], ["Governance Monitoring", "/governance-monitoring"], ["Reassessments", "/reassessments"], ["AI Incidents", "/ai-incidents"]]) {
+    for (const [label, href] of [["Risk Register", "/risk-register"], ["AI Risk Assessments", "/risk-assessments"], ["AI Impact Assessments", "/impact-assessments"], ["Findings", "/findings"], ["Governance Monitoring", "/governance-monitoring"], ["Reassessments", "/reassessments"], ["AI Incidents", "/ai-incidents"]]) {
       expect(sidebar).toContain(`label: "${label}", href: "${href}"`);
       expect(existsSync(join(webApp, (href ?? "").slice(1), "page.tsx")), href).toBe(true);
     }

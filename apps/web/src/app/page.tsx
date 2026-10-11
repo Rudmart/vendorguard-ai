@@ -71,8 +71,8 @@ export default function DashboardPage() {
             cards={[
               { label: "AI systems", value: data.posture.aiSystems, href: "/ai-inventory" },
               { label: "In production", value: data.posture.inProduction, href: "/ai-inventory" },
-              { label: "No completed risk assessment", value: data.posture.withoutCompletedRiskAssessment, href: "/risk-assessments", warn: true },
-              { label: "No completed impact assessment", value: data.posture.withoutCompletedImpactAssessment, href: "/impact-assessments", warn: true },
+              { label: "No completed AI risk assessment", value: data.posture.withoutCompletedRiskAssessment, href: "/risk-assessments", warn: true },
+              { label: "No completed AI impact assessment", value: data.posture.withoutCompletedImpactAssessment, href: "/impact-assessments", warn: true },
               { label: "Critical residual risks (latest assessed)", value: data.posture.latestAssessedResidualRisk.CRITICAL ?? 0, href: "/risk-register", warn: true },
               { label: "High residual risks (latest assessed)", value: data.posture.latestAssessedResidualRisk.HIGH ?? 0, href: "/risk-register", warn: true },
               { label: "Moderate residual risks", value: data.posture.latestAssessedResidualRisk.MODERATE ?? 0, href: "/risk-register" },

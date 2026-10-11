@@ -1820,9 +1820,9 @@ Use these user-facing names:
 
 **Risk**
 
-**Risk Assessment**
+**AI Risk Assessment**
 
-**Impact Assessment**
+**AI Impact Assessment**
 
 **Framework**
 
@@ -1847,6 +1847,18 @@ Use these user-facing names:
 **AI Incident**
 
 **Audit Log**
+
+Assessment presentation contract (human-approved 11 October 2026):
+
+| Context | User-facing terminology |
+| --- | --- |
+| AI-system risk workflow | AI Risk Assessment / AI Risk Assessments |
+| AI-system impact workflow | AI Impact Assessment / AI Impact Assessments |
+| My Work assessment types | AI risk assessment / AI impact assessment |
+| Mixed work-list subject column | Subject |
+| AI-system-only subject column | AI System |
+| Assessment version | Version N, separate from the displayed name; stored names and versions remain unchanged |
+| Vendor-side workflows | Preserve existing Third-Party / Vendor AI risk terminology |
 
 Do not casually invent synonyms for navigation or primary objects.
 
@@ -1883,8 +1895,8 @@ The target sidebar is exactly:
 
 ## AI Risk
 - Risk Register
-- Risk Assessments
-- Impact Assessments
+- AI Risk Assessments
+- AI Impact Assessments
 - Findings
 - Risk Acceptance
 - Remediation
@@ -1932,6 +1944,22 @@ Do not change this navigation contract without explicit architectural approval.
 ---
 
 # 60. Important Sidebar Implementation Rule
+
+## Deferred polish backlog — AI assessment clarity
+
+Recorded from human visual review on 10 October 2026. Planning only; do not implement during unrelated work. Review these explicit AI-context labels during the later terminology/sidebar polish phase alongside section 58's current terminology contract.
+
+Human terminology decision: use industry-standard terms so learners recognize the workflows in real roles. AI-system workflows use **AI Risk Assessment** and **AI Impact Assessment**; vendor-side AI assessment workflows use **Third-Party AI Risk Assessment**. This is an explicit approved terminology refinement for the later polish implementation, not authorization to rename unrelated vendor assessments.
+
+- Use **AI Risk Assessments** and **AI Impact Assessments** for the corresponding sidebar entries.
+- In My Work, use **AI risk assessment** and **AI impact assessment** as the Type labels, and **Subject** for mixed lists; use **AI System** only for AI-system-only lists.
+- Use **AI Risk Assessment** and **AI Impact Assessment** as the corresponding assessment page titles.
+- Add brief explanatory text: "Identify and assess risks arising from an AI system's use" and "Assess how an AI system could affect people, groups and society."
+- Include the actual source framework name(s) in each assessment page's explanation line. Verify the framework against the implemented assessment methodology or authoritative assessment/framework records; do not infer a source from the page title or imply certification/full framework coverage. If no source is established, flag the gap for human clarification rather than inventing one.
+- Remove duplicated version presentation such as "Risk Assessment v2 (v2)"; display the assessment name once with a separate **Version 2** label while preserving the actual stored version.
+- Make AI context explicit for these workflows without adding "AI" indiscriminately to every sidebar item. Keep vendor assessment labels distinct.
+
+These are deferred presentation changes, not changes to assessment logic, authorization, stored history or governance authority. Implement only within a separately approved polish task. **AI ASSISTS. HUMANS GOVERN.**
 
 This is the TARGET sidebar.
 

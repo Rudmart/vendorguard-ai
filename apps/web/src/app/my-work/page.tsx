@@ -1,5 +1,7 @@
 "use client";
 
+import { assessmentTypeLabel, WorkItemLabel } from "../assessment-presentation";
+
 import { ListPage, formatDate, link, td, th, useList, words } from "../_lists/ui";
 
 type Item = { type: string; id: string; title: string; context: string; state: string; due: string | null; href: string };
@@ -18,7 +20,7 @@ export default function MyWorkPage() {
       <table style={{ width: "100%", borderCollapse: "collapse" }}>
         <thead>
           <tr>
-            {["Type", "Item", "Context", "State", "Due"].map((h) => (
+            {["Type", "Item", "Subject", "State", "Due"].map((h) => (
               <th key={h} style={th}>
                 {h}
               </th>
@@ -28,13 +30,13 @@ export default function MyWorkPage() {
         <tbody>
           {rows.map((r) => (
             <tr key={r.type + r.id}>
-              <td style={td}>{words(r.type)}</td>
+              <td style={td}>{assessmentTypeLabel(r.type) ?? words(r.type)}</td>
               <td style={td}>
                 <a style={link} href={r.href}>
-                  {r.title}
+                  <WorkItemLabel type={r.type} title={r.title} />
                 </a>
               </td>
-              <td style={td}>{r.context}</td>
+              <td style={td}>{r.type === "RISK_TREATMENT" ? r.context.replace(/ \(v(\d+)\)$/, " · Version $1") : r.context}</td>
               <td style={td}>{r.state}</td>
               <td style={td}>{formatDate(r.due)}</td>
             </tr>

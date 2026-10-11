@@ -1,5 +1,7 @@
 "use client";
 
+import { AssessmentLabel } from "../../assessment-presentation";
+
 import { useEffect, useState } from "react";
 import { useCurrentUser } from "../../current-user";
 import VersionList, { summarizeVersions } from "./assessment-versions";
@@ -127,7 +129,7 @@ export default function ImpactAssessmentCard({ aiSystemId }: { aiSystemId: strin
         <div style={{ background: "#0d1323", border: "1px solid #28324d", borderRadius: 10, padding: 16, marginBottom: 16 }}>
           <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
             <strong>
-              {latest.name} (v{latest.version})
+              <AssessmentLabel name={latest.name} version={latest.version} />
             </strong>
             <span style={{ color: latest.status === "COMPLETED" ? "#34d399" : "#8e9ab5", fontSize: 13 }}>
               {latest.status === "COMPLETED" ? "Approved" : readable(latest.status)}
@@ -155,12 +157,12 @@ export default function ImpactAssessmentCard({ aiSystemId }: { aiSystemId: strin
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
         {latest && (
           <a href={`/ai-impact-assessments/${latest.id}`} style={secondaryButtonStyle}>
-            View impact assessment
+            View AI impact assessment
           </a>
         )}
         {canStart && can("ai-system:update") && (
           <button type="button" onClick={startAssessment} disabled={starting} style={buttonStyle}>
-            {starting ? "Starting..." : latest ? "Start new version" : "Start impact assessment"}
+            {starting ? "Starting..." : latest ? "Start new version" : "Start AI impact assessment"}
           </button>
         )}
       </div>

@@ -58,7 +58,7 @@ export default function VersionList<T extends VersionRow>({
               color: "inherit",
             }}
           >
-            <strong style={{ fontSize: 13.5, minWidth: 28 }}>v{row.version}</strong>
+            <strong style={{ fontSize: 13.5, minWidth: 28 }}>Version {row.version}</strong>
             <span style={{ fontSize: 12.5, color: "#c7d0e3" }}>{completed ? "Completed" : readableStatus(row.status)}</span>
             {isLatestAssessed && <span style={badge("#4ade80")}>Latest assessed</span>}
             {completed && !isLatestAssessed && <span style={badge("#94a3b8")}>History</span>}

@@ -1,4 +1,6 @@
 "use client";
+
+import { assessmentDisplayName } from "../../../assessment-presentation";
 import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import type { ReportRecords } from "@vendorguard/shared";
@@ -50,7 +52,7 @@ function Records() {
                 <tr key={r.type + r.id}>
                   <td style={td}>
                     <a style={{ color: "#93c5fd" }} href={r.href}>
-                      {r.title}
+                      {r.version && (r.href.startsWith("/ai-risk-assessments/") || r.href.startsWith("/ai-impact-assessments/")) ? assessmentDisplayName(r.title, r.version) : r.title}
                     </a>
                     <div style={muted}>
                       {r.type} · {r.id}
@@ -58,7 +60,7 @@ function Records() {
                   </td>
                   <td style={td}>
                     {r.status}
-                    {r.version ? " · v" + r.version : ""}
+                    {r.version ? " · Version " + r.version : ""}
                     <div style={muted}>
                       Owner: {r.ownerUserId ?? "See source record"}
                     </div>
