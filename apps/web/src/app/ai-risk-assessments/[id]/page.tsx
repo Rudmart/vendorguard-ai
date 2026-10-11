@@ -1,4 +1,6 @@
 "use client";
+
+import { assessmentDisplayName } from "../../assessment-presentation";
 import { useEffect, useState } from "react";
 import { GovernanceInfo, useCurrentUser } from "../../current-user";
 import { useParams } from "next/navigation";
@@ -428,7 +430,9 @@ export default function AiRiskAssessmentPage() {
 
   return (
     <main style={{ maxWidth: 860, margin: "0 auto", padding: "32px 24px" }}>
-      <h1 style={{ fontSize: 24, marginBottom: 4 }}>{assessment.name}</h1>
+      <h1 style={{ fontSize: 24, marginBottom: 4 }}>AI Risk Assessment</h1>
+      <p>Identify and assess risks arising from an AI system's use.</p>
+      {assessmentDisplayName(assessment.name, assessment.version) !== "AI Risk Assessment" && <p>{assessmentDisplayName(assessment.name, assessment.version)}</p>}
       <p style={{ color: "#8b96ac", fontSize: 13, marginBottom: 24, fontStyle: "italic" }}>AI assists. Humans govern.</p>
 
       <div style={cardStyle}>

@@ -1,3 +1,5 @@
+> **Historical record — not current deployment or readiness guidance.** Original observations, commands and source paths below describe their recorded development session. Current scope: [VendorGuard AI project overview](../../projects/vendorguard-ai/README.md).
+
 ﻿
 ## SUCCESS - API is live! (session 3)
 

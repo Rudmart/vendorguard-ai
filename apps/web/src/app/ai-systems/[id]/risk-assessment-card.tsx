@@ -98,12 +98,12 @@ export default function RiskAssessmentCard({ aiSystemId }: { aiSystemId: string 
 
       {items !== null && canStart && can("ai-system:update") && (
         <button type="button" onClick={startAssessment} disabled={starting} style={buttonStyle}>
-          {starting ? "Starting..." : latest ? "Start new version" : "Start risk assessment"}
+          {starting ? "Starting..." : latest ? "Start new version" : "Start AI risk assessment"}
         </button>
       )}
       {items !== null && latest && !canStart && (
         <p style={{ color: "#fbbf24", fontSize: 12.5, margin: 0 }}>
-          v{latest.version} is {readableStatus(latest.status).toLowerCase()}. Finish it and complete its review before starting a new version.
+          Version {latest.version} is {readableStatus(latest.status).toLowerCase()}. Finish it and complete its review before starting a new version.
         </p>
       )}
 

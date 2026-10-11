@@ -1,3 +1,5 @@
+> **Historical record — not current deployment or readiness guidance.** Original observations, commands and source paths below describe their recorded development session. Current scope: [VendorGuard AI project overview](../projects/vendorguard-ai/README.md).
+
 ﻿# Framework Mapping Status
 
 Last updated: August 14, 2026
@@ -82,5 +84,5 @@ Current status of apps/mcp-server: empty folder, not started.
 
 ## Related documents
 
-- BUILD-PLAN-UPDATED.md - full prioritized checklist for the whole project
-- frameworks/*/controls.json - the actual data files referenced in this document
+- [Historical build plan](BUILD-PLAN-UPDATED.md) - the recorded prioritized checklist
+- [Framework data directory](../../frameworks/) - the data location referenced in this historical document

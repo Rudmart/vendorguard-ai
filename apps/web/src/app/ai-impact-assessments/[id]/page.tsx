@@ -1,5 +1,7 @@
 "use client";
 
+import { assessmentDisplayName } from "../../assessment-presentation";
+
 import { useEffect, useState, type CSSProperties, type FormEvent, type ReactNode } from "react";
 import { GovernanceInfo, useCurrentUser } from "../../current-user";
 import { useParams } from "next/navigation";
@@ -672,8 +674,10 @@ export default function AiImpactAssessmentPage() {
         Back to {current.aiSystem.name}
       </a>
       <h1 style={{ fontSize: 26, marginTop: 12, marginBottom: 4 }}>
-        {current.name} (version {current.version})
+        AI Impact Assessment
       </h1>
+      <p>Assess how an AI system could affect people, groups and society.</p>
+      {assessmentDisplayName(current.name, current.version) !== "AI Impact Assessment" && <p>{assessmentDisplayName(current.name, current.version)}</p>}
       <p style={{ color: colors.muted, fontStyle: "italic", marginTop: 0, marginBottom: 24 }}>
         AI supports the analysis. People own the judgment.
       </p>

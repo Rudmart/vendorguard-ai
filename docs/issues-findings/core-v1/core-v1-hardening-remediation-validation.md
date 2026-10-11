@@ -84,6 +84,8 @@ The three case studies preserve original discovery evidence and now document act
 
 ## Exact file inventory
 
+> Historical inventory of the approved hardening commit. Paths and pre-publication statements below describe that recorded stage and are intentionally retained; current navigation is available in the [findings index](README.md).
+
 Production/schema files (26):
 
 - `apps/api/src/aiControlEvidence.ts`

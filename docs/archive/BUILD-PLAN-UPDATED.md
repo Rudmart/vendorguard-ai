@@ -1,3 +1,5 @@
+> **Historical record — not current deployment or readiness guidance.** Original observations, commands and source paths below describe their recorded development session. Current scope: [VendorGuard AI project overview](../projects/vendorguard-ai/README.md).
+
 ﻿# VendorGuard AI - Build Plan (Updated)
 
 Last updated: August 13, 2026, after the login-bug debugging + CI/CD session.

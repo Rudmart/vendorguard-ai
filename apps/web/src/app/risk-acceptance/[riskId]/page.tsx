@@ -134,7 +134,7 @@ export default function RiskAcceptanceForRiskPage() {
       </a>
       {" | "}
       <a href={`/ai-risk-assessments/${risk.assessmentId}`} style={{ color: "#93c5fd", fontSize: 13, textDecoration: "none" }}>
-        Back to the risk assessment
+        Back to the AI risk assessment
       </a>
       <h1 style={{ fontSize: 20, margin: "12px 0 4px 0" }}>Risk Acceptance - {risk.title}</h1>
       <p style={muted}>

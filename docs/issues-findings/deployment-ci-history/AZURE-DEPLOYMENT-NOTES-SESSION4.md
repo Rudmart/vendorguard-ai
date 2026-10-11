@@ -1,3 +1,5 @@
+> **Historical record — not current deployment or readiness guidance.** Original observations, commands and source paths below describe their recorded development session. Current scope: [VendorGuard AI project overview](../../projects/vendorguard-ai/README.md).
+
 ﻿# Session 4 - Login Bug: Root Cause Analysis & Fixes
 
 **Date:** August 13, 2026

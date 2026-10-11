@@ -388,7 +388,7 @@ export default function AiSystemDetailPage() {
           <label style={fieldLabelStyle}>
             Assessment Status (derived)
             <div style={{ ...selectStyle, color: "#8b96ac" }}>{aiSystem.assessmentPosture ? aiSystem.assessmentPosture.state.replace(/_/g, " ") : "-"}</div>
-            <p style={helpTextStyle}>Derived from completed Risk and Impact Assessments (see Governance posture above). Not edited here.</p>
+            <p style={helpTextStyle}>Derived from completed AI Risk and AI Impact Assessments (see Governance posture above). Not edited here.</p>
           </label>
         </div>
 
@@ -595,7 +595,7 @@ export default function AiSystemDetailPage() {
       <div style={cardStyle}>
         <h2 style={{ fontSize: 15, marginTop: 0, marginBottom: 4 }}>Risk Treatment, Acceptance & Remediation</h2>
         <p style={{ color: "#8b96ac", fontSize: 12.5, marginTop: 0, marginBottom: 16 }}>
-          Treatment is planned on each risk inside its Risk Assessment. These registers cover all AI systems - use their AI system filter.
+          Treatment is planned on each risk inside its AI Risk Assessment. These registers cover all AI systems - use their AI system filter.
         </p>
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
           <a href="/risk-register" style={linkButtonStyle}>Risk Register</a>

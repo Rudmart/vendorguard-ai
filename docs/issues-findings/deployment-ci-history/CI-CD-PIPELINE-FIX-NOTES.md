@@ -1,3 +1,5 @@
+> **Historical record — not current deployment or readiness guidance.** Original observations, commands and source paths below describe their recorded development session. Current scope: [VendorGuard AI project overview](../../projects/vendorguard-ai/README.md).
+
 ﻿# CI/CD Pipeline Fix - PR Validation Never Running
 
 **Date:** August 13, 2026
@@ -64,4 +66,4 @@ A CI pipeline that is configured but never actually verified to run provides zer
 
 ## Related
 
-See AZURE-DEPLOYMENT-NOTES-SESSION4.md for the login/deployment bugs found and fixed in the same overall debugging session.
+See [Session 4](AZURE-DEPLOYMENT-NOTES-SESSION4.md) for the login/deployment bugs found and fixed in the same overall debugging session.

@@ -1,3 +1,5 @@
+> **Historical record — not current deployment or readiness guidance.** Original observations, commands and source paths below describe their recorded development session. Current scope: [VendorGuard AI project overview](../README.md).
+
 ﻿# Azure Deployment Notes
 
 ## Status: Database deployed (Part 1 of 3)
@@ -23,7 +25,7 @@
    - Consider replacing the "dev persona" login with real Azure AD / Entra ID authentication
 
 ### Connection string (for reference - treat as sensitive)
-postgresql://vgadmin:VendorGuard2026!Secure@vendorguard-db-2026.postgres.database.azure.com:5432/vendorguard?sslmode=require
+[REDACTED: historical database connection string]
 
 ### API deployment progress (session 2) - blocked on Azure quota
 - Created App Service Plan vendorguard-plan (Linux, F1 free tier, region westus2 - different region from the database, which is fine)

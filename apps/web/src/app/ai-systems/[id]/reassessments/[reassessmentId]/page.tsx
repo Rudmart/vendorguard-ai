@@ -1,5 +1,7 @@
 "use client";
 
+import { AssessmentLabel, assessmentDisplayName } from "../../../../assessment-presentation";
+
 import { useEffect, useState, type CSSProperties } from "react";
 import { useCurrentUser } from "../../../../current-user";
 import { useParams } from "next/navigation";
@@ -91,7 +93,7 @@ function AssessmentLine({ title, a, kind }: { title: string; a: AssessmentRef; k
     <p style={muted}>
       {title}:{" "}
       <a href={href} style={{ color: "#93c5fd" }}>
-        {a.name} (version {a.version})
+        <AssessmentLabel name={a.name} version={a.version} />
       </a>{" "}
       - {a.status}
       {a.reviewDecision ? ", review " + a.reviewDecision : ""}
@@ -189,10 +191,10 @@ export default function ReassessmentDetailPage() {
       <section style={card}>
         <h2 style={heading}>Governance baseline (before) and new assessments (this cycle)</h2>
         <p style={muted}>The baseline records are history and are never changed. A changed posture is recorded as a NEW assessment version.</p>
-        <AssessmentLine title="Prior risk assessment" a={data.priorRiskAssessment} kind="risk" />
-        <AssessmentLine title="Prior impact assessment" a={data.priorImpactAssessment} kind="impact" />
-        <AssessmentLine title="New risk assessment" a={data.newRiskAssessment} kind="risk" />
-        <AssessmentLine title="New impact assessment" a={data.newImpactAssessment} kind="impact" />
+        <AssessmentLine title="Prior AI risk assessment" a={data.priorRiskAssessment} kind="risk" />
+        <AssessmentLine title="Prior AI impact assessment" a={data.priorImpactAssessment} kind="impact" />
+        <AssessmentLine title="New AI risk assessment" a={data.newRiskAssessment} kind="risk" />
+        <AssessmentLine title="New AI impact assessment" a={data.newImpactAssessment} kind="impact" />
         {inProgress && can("ai-system:update") && (
           <div style={{ marginTop: 10 }}>
             <p style={muted}>
@@ -202,21 +204,21 @@ export default function ReassessmentDetailPage() {
               </a>
               , complete it through its independent review, then link it here.
             </p>
-            <span style={label}>Link new risk assessment</span>
+            <span style={label}>Link new AI risk assessment</span>
             <select style={field} value={newRisk} onChange={(e) => setNewRisk(e.target.value)}>
               <option value="">None</option>
               {data.context.availableRiskAssessments.map((a) => (
                 <option key={a.id} value={a.id}>
-                  {a.name + " (version " + a.version + ") - " + a.status}
+                  {assessmentDisplayName(a.name, a.version) + " · Version " + a.version + " - " + a.status}
                 </option>
               ))}
             </select>
-            <span style={label}>Link new impact assessment</span>
+            <span style={label}>Link new AI impact assessment</span>
             <select style={field} value={newImpact} onChange={(e) => setNewImpact(e.target.value)}>
               <option value="">None</option>
               {data.context.availableImpactAssessments.map((a) => (
                 <option key={a.id} value={a.id}>
-                  {a.name + " (version " + a.version + ") - " + a.status}
+                  {assessmentDisplayName(a.name, a.version) + " · Version " + a.version + " - " + a.status}
                 </option>
               ))}
             </select>

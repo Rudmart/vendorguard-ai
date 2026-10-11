@@ -1,5 +1,7 @@
 "use client";
 
+import { assessmentTypeLabel, WorkItemLabel } from "../../assessment-presentation";
+
 import { ListPage, formatDate, link, muted, td, th, useList, words } from "../../_lists/ui";
 
 type Item = { type: string; id: string; title: string; context: string; since: string | null; why: string; href: string };
@@ -28,7 +30,7 @@ export default function PendingReviewsPage() {
       <table style={{ width: "100%", borderCollapse: "collapse" }}>
         <thead>
           <tr>
-            {["Decision", "Item", "AI system", "Pending since", "Why you can decide"].map((h) => (
+            {["Decision", "Item", "AI System", "Pending since", "Why you can decide"].map((h) => (
               <th key={h} style={th}>
                 {h}
               </th>
@@ -38,10 +40,10 @@ export default function PendingReviewsPage() {
         <tbody>
           {rows.map((r) => (
             <tr key={r.type + r.id}>
-              <td style={td}>{words(r.type)}</td>
+              <td style={td}>{assessmentTypeLabel(r.type) ?? words(r.type)}</td>
               <td style={td}>
                 <a style={link} href={r.href}>
-                  {r.title}
+                  <WorkItemLabel type={r.type} title={r.title} />
                 </a>
               </td>
               <td style={td}>{r.context}</td>

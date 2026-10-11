@@ -1,5 +1,7 @@
 "use client";
 
+import { assessmentDisplayName } from "../assessment-presentation";
+
 import { useMemo, useState } from "react";
 import { Badge, ListPage, control, formatDate, link, systemOptions, td, th, useList, words } from "../_lists/ui";
 
@@ -24,8 +26,8 @@ export default function RiskAssessmentsPage() {
   const rows = useMemo(() => all.filter((r) => (!system || r.aiSystem.id === system) && (latestOnly === "all" || r.isLatestCompleted)), [all, system, latestOnly]);
   return (
     <ListPage
-      title="Risk Assessments"
-      purpose="Every AI risk assessment version. Completed versions are locked history; the latest completed version per AI system is the latest assessed posture."
+      title="AI Risk Assessments"
+      purpose="Identify and assess risks arising from an AI system's use. Every AI risk assessment version. Completed versions are locked history; the latest completed version per AI system is the latest assessed posture."
       error={error}
       loading={!data}
       empty={data && rows.length === 0 ? "No risk assessments yet. Start one from an AI System." : null}
@@ -49,7 +51,7 @@ export default function RiskAssessmentsPage() {
       <table style={{ width: "100%", borderCollapse: "collapse" }}>
         <thead>
           <tr>
-            {["AI system", "Version", "Name", "Status", "Review", "Assessor", "Created", "Completed"].map((h) => (
+            {["AI System", "Version", "Name", "Status", "Review", "Assessor", "Created", "Completed"].map((h) => (
               <th key={h} style={th}>
                 {h}
               </th>
@@ -61,12 +63,12 @@ export default function RiskAssessmentsPage() {
             <tr key={r.id}>
               <td style={td}>{r.aiSystem.name}</td>
               <td style={td}>
-                {"v" + r.version + " "}
+                {"Version " + r.version + " "}
                 {r.isLatestCompleted && <Badge text="Latest assessed" color="#4ade80" />}
               </td>
               <td style={td}>
                 <a style={link} href={`/ai-risk-assessments/${r.id}`}>
-                  {r.name}
+                  {assessmentDisplayName(r.name, r.version)}
                 </a>
               </td>
               <td style={td}>{words(r.status)}</td>

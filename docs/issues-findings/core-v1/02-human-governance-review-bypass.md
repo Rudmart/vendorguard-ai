@@ -62,7 +62,7 @@ The original failure paths were repeated as authenticated local API/MCP regressi
 
 The final serialized repository run passed **913/913**, with **zero timeouts** while the host remained awake. Typecheck passed; lint passed with zero errors and four pre-existing console warnings; production build passed with all **27 web pages**. Whitespace checks passed. Test assertions and deadlines were preserved.
 
-These are local automated validation results, not production exploitation evidence, production deployment certification, or comprehensive browser certification. See [the hardening validation report](../core-v1-hardening-remediation-validation.md) for scope and migration considerations.
+These are local automated validation results, not production exploitation evidence, production deployment certification, or comprehensive browser certification. See [the hardening validation report](core-v1-hardening-remediation-validation.md) for scope and migration considerations.
 
 ## 10. Current Status
 
