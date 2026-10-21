@@ -403,7 +403,15 @@ export async function registerAiControlEvidenceRoutes(app: FastifyInstance): Pro
       storageKey,
       buffer,
       data.mimetype,
-    );
+    ).catch(async (error: unknown) => {
+      // The unique attempt key is safe to compensate even if the success response was lost.
+      try { await storage.deleteFile(containerName, storageKey); }
+      catch (cleanupError) {
+        request.log.error({ err: cleanupError, storageKey }, "Evidence upload compensation failed; operator cleanup required");
+        fail(500, "Evidence upload failed and blob cleanup failed; operator cleanup is required");
+      }
+      throw error;
+    });
     try {
       const evidence = await checked(async (tx, freshToken) => {
         if (contextToken !== freshToken)

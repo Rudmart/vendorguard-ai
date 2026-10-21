@@ -161,12 +161,12 @@ function buildServerForContext(context: RequestContext) {
   mcp.setRequestHandler(CallToolRequestSchema, async (request) => {
     const { name, arguments: args } = request.params;
 
-    if (!ALLOWED_TOOLS.has(name)) {
-      await logToolCall(context, name, "DENIED", { reason: "tool not in allowlist" });
-      return { content: [{ type: "text", text: "This tool is not permitted." }], isError: true };
-    }
-
     try {
+      if (!ALLOWED_TOOLS.has(name)) {
+        await logToolCall(context, name, "DENIED", { reason: "tool not in allowlist" });
+        return { content: [{ type: "text", text: "This tool is not permitted." }], isError: true };
+      }
+
       if (name === "get_vendor") {
         const vendorId = String(args?.vendorId ?? "");
         const vendor = await prisma.vendor.findFirst({
@@ -335,7 +335,7 @@ function buildServerForContext(context: RequestContext) {
       if (name === "evaluate_evidence") {
         const evidenceDocumentId = String(args?.evidenceDocumentId ?? "");
         const document = await prisma.evidenceDocument.findFirst({
-          where: { id: evidenceDocumentId, tenantId: context.tenantId },
+          where: { id: evidenceDocumentId, tenantId: context.tenantId, deletedAt: null },
           include: { chunks: { orderBy: { chunkIndex: "asc" } } },
         });
         if (!document) {
@@ -431,9 +431,15 @@ function buildServerForContext(context: RequestContext) {
 
       await logToolCall(context, name, "ERROR", { reason: "unknown tool" });
       throw new Error(`Unknown tool: ${name}`);
-    } catch (err) {
-      await logToolCall(context, name, "ERROR", { error: String(err) });
-      throw err;
+    } catch {
+      // Provider/database errors may contain credentials or evidence content.
+      // Return no tool data if execution or its required audit write fails.
+      try {
+        await logToolCall(context, name, "ERROR", { reason: "tool_execution_failed" });
+      } catch {
+        server.log.error("MCP tool failure audit could not be saved");
+      }
+      return { content: [{ type: "text", text: "Tool execution failed." }], isError: true };
     }
   });
 

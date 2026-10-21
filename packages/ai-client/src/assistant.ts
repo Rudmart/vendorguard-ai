@@ -163,8 +163,10 @@ export function extractCitedExcerpts(rawContent: string): { displayContent: stri
   const numbersText = match[1] ?? "";
   const citedNumbers = numbersText
     .split(",")
-    .map((s) => Number.parseInt(s.trim(), 10))
-    .filter((n) => Number.isInteger(n) && n > 0);
+    .map((s) => s.trim())
+    .filter((s) => /^[1-9]\d*$/.test(s))
+    .map(Number)
+    .filter((n) => Number.isSafeInteger(n));
   const displayContent = rawContent.slice(0, match.index).trimEnd();
   return { displayContent, citedNumbers };
 }
@@ -199,6 +201,7 @@ async function assistantAnthropic(input: AskAssistantInput): Promise<AssistantRe
 
   const INSUFFICIENT_EVIDENCE_PHRASES = [
     "insufficient",
+    "cannot answer",
     "don't have enough information",
     "do not have enough information",
     "cannot provide a complete",

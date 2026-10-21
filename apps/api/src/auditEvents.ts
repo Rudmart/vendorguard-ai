@@ -76,7 +76,11 @@ export async function registerAuditEventRoutes(app: FastifyInstance) {
         )
           throw new ReportError(400, "Time filters require UTC ISO timestamps");
         const d = new Date(String(q[key]));
-        if (!Number.isFinite(d.getTime()))
+        // Date normalizes impossible dates/hours; audit boundaries must be exact.
+        if (
+          !Number.isFinite(d.getTime()) ||
+          d.toISOString().slice(0, 19) !== String(q[key]).slice(0, 19)
+        )
           throw new ReportError(400, "Invalid timestamp");
         return d;
       };

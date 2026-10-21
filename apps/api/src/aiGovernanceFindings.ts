@@ -225,6 +225,9 @@ export async function registerGovernanceFindingRoutes(app: FastifyInstance): Pro
       return reply.status(404).send({ error: "Finding not found" });
     }
     const body = (request.body ?? {}) as Record<string, unknown>;
+    if (typeof body !== "object" || Array.isArray(body)) {
+      return reply.status(400).send({ error: "Finding changes must be an object" });
+    }
     if ("status" in body) {
       return reply.status(400).send({ error: "Status changes only through review" });
     }

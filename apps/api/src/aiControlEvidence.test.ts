@@ -1,5 +1,5 @@
 import { issueTestSessionCookie } from "./testSession.js";
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { prisma } from "@vendorguard/database";
 import { server } from "./index.js";
 import { deriveAssuranceStatus } from "./aiControlEvidence.js";
@@ -97,8 +97,10 @@ beforeAll(async () => {
   ctrlB = await makeControl(version.id, "S9-2");
 });
 
-afterAll(async () => {
-  const tenants = { in: [tenantAId, tenantBId] };
+async function cleanupFixtures(tenantIds: (string | undefined)[], userIds: (string | undefined)[], frameworkId?: string) {
+  const createdTenants = tenantIds.filter((id): id is string => Boolean(id));
+  if (!createdTenants.length) return;
+  const tenants = { in: createdTenants };
   await prisma.aiControlEvidenceReview.deleteMany({ where: { tenantId: tenants } });
   await prisma.aiSystemControlEvidence.deleteMany({ where: { tenantId: tenants } });
   await prisma.evidenceDocument.deleteMany({ where: { tenantId: tenants } });
@@ -106,13 +108,31 @@ afterAll(async () => {
   await prisma.aiSystemControl.deleteMany({ where: { tenantId: tenants } });
   await prisma.aiSystemFrameworkApplicability.deleteMany({ where: { tenantId: tenants } });
   await prisma.aiSystem.deleteMany({ where: { tenantId: tenants } });
-  await prisma.framework.deleteMany({ where: { id: fwId } });
+  if (frameworkId) await prisma.framework.deleteMany({ where: { id: frameworkId } });
   await prisma.tenantMembership.deleteMany({ where: { tenantId: tenants } });
-  for (const id of [adminUserId, analystUserId, reviewerUserId, readOnlyUserId, tenantBUserId]) {
+  for (const id of userIds.filter((id): id is string => Boolean(id))) {
     await prisma.user.delete({ where: { id } });
   }
-  await prisma.tenant.delete({ where: { id: tenantAId } });
-  await prisma.tenant.delete({ where: { id: tenantBId } });
+  for (const id of createdTenants) await prisma.tenant.delete({ where: { id } });
+}
+
+afterAll(async () => {
+  await cleanupFixtures([tenantAId, tenantBId], [adminUserId, analystUserId, reviewerUserId, readOnlyUserId, tenantBUserId], fwId);
+});
+
+it("does not query cleanup when fixture setup failed before creating IDs", async () => {
+  const model = prisma.aiControlEvidenceReview;
+  const originalDeleteMany = model.deleteMany;
+  const cleanup = vi.fn(() => {
+    throw new Error("Missing fixture IDs must not reach database cleanup");
+  });
+  model.deleteMany = cleanup;
+  try {
+    await expect(cleanupFixtures([undefined, undefined], [undefined], undefined)).resolves.toBeUndefined();
+    expect(cleanup).not.toHaveBeenCalled();
+  } finally {
+    model.deleteMany = originalDeleteMany;
+  }
 });
 
 describe("Assurance status derivation", () => {

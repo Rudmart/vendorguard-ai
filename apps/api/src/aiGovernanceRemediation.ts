@@ -181,6 +181,9 @@ export async function registerGovernanceRemediationRoutes(app: FastifyInstance):
       return reply.status(409).send({ error: "This remediation is waiting for independent verification" });
     }
     const body = (request.body ?? {}) as Record<string, unknown>;
+    if (typeof body !== "object" || Array.isArray(body)) {
+      return reply.status(400).send({ error: "Remediation changes must be an object" });
+    }
     const data: { title?: string; description?: string; dueDate?: Date | null; ownerUserId?: string; status?: "OPEN" | "IN_PROGRESS" } = {};
     if ("status" in body) {
       if (body.status !== "OPEN" && body.status !== "IN_PROGRESS") {

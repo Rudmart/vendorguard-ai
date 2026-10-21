@@ -14,7 +14,11 @@ export async function registerAuthRoutes(server: FastifyInstance) {
   server.post("/auth/login", async (request, reply) => {
     const body = request.body as { displayName?: string; email?: string };
 
-    if (!body.email || !body.displayName) {
+    if (
+      !body ||
+      typeof body.email !== "string" || !body.email.trim() ||
+      typeof body.displayName !== "string" || !body.displayName.trim()
+    ) {
       return reply.status(400).send({ error: "displayName and email are required" });
     }
 

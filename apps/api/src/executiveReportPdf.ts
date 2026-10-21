@@ -44,7 +44,7 @@ export async function renderExecutiveReportPdf(report: ExecutiveReportData): Pro
     doc.fillColor(COLORS.navy).fontSize(20).font("Helvetica-Bold")
       .text("Executive Risk Report");
     doc.fillColor(COLORS.grey).fontSize(10).font("Helvetica")
-      .text(`${report.vendor.legalName}  |  Generated ${new Date().toLocaleDateString()}`);
+      .text(`${report.vendor.legalName}  |  Generated ${new Date(report.generatedAt).toLocaleDateString()}`);
     doc.moveDown(1);
 
     if (report.riskRating) {

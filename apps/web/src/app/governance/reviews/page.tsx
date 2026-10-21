@@ -98,7 +98,8 @@ export default function ReviewQueuePage() {
         setSubmitting(null);
         return;
       }
-      setFindings((prev) => prev.filter((f) => f.id !== finding.id));
+      // Requesting more evidence remains pending; refresh from authoritative state.
+      await loadQueue();
     } catch {
       alert("Could not reach the server.");
     }

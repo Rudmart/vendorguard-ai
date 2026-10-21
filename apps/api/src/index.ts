@@ -10,7 +10,7 @@ import "dotenv/config";
 import { randomUUID } from "node:crypto";
 import Fastify from "fastify";
 import cors from "@fastify/cors";
-import { prisma, resourceScope } from "@vendorguard/database";
+import { prisma, resourceScope, type AssistantConversation } from "@vendorguard/database";
 import { calculateInherentRisk, calculateAIInherentRisk, calculateAIImpactScore, calculateResidualRisk, QUESTIONNAIRE_QUESTIONS, mapQuestionnaireToRiskFactors, calculateFullRiskRating, calculateRequirementRisk, type QuestionnaireAnswers } from "@vendorguard/risk-engine";
 import { resolveApplicableRequirements } from "@vendorguard/framework-engine";
 import { runEvidenceAnalysis } from "./evidenceAnalysis.js";
@@ -23,7 +23,7 @@ import { buildExecutiveReport } from "./executiveReport.js";
 import { renderExecutiveReportPdf } from "./executiveReportPdf.js";
 import { askAssistant } from "@vendorguard/ai-client";
 import { buildAssistantContext } from "./assistantContext.js";
-import { registerAiControlEvidenceRoutes } from "./aiControlEvidence.js";
+import { registerAiControlEvidenceRoutes, cleanText, parseOptionalDate } from "./aiControlEvidence.js";
 import { resolveSession } from "./session.js";
 import { registerAiControlTestRoutes } from "./aiControlTests.js";
 import { registerGovernanceFindingRoutes } from "./aiGovernanceFindings.js";
@@ -140,6 +140,40 @@ server.get("/frameworks/:frameworkId/controls", async (request, reply) => {
   }
 });
 
+function vendorInput(body: unknown): body is Record<string, unknown> {
+  if (!body || typeof body !== "object" || Array.isArray(body)) return false;
+  const data = body as Record<string, unknown>;
+  for (const key of ["legalName", "serviceDescription", "serviceCategory", "criticality", "aiProductType"]) {
+    if (data[key] !== undefined && (typeof data[key] !== "string" || (data[key] as string).length > 4000)) return false;
+  }
+  if (data.legalName !== undefined && !(data.legalName as string).trim()) return false;
+  for (const key of ["dataSensitivity", "businessCriticality", "accessPrivilege", "operationalDependency", "fourthPartyConcentration", "geographicRegulatoryExposure"]) {
+    const value = data[key];
+    if (value !== undefined && value !== null && (typeof value !== "number" || !Number.isInteger(value) || value < 0 || value > 100)) return false;
+  }
+  for (const key of ["aiFunctionality", "customerDataTrainingPolicy", "humanOversightDocumented"]) if (data[key] !== undefined && typeof data[key] !== "boolean") return false;
+  if (data.aiProviders !== undefined && (!Array.isArray(data.aiProviders) || !data.aiProviders.every(value => typeof value === "string" && value.trim() && value.length <= 4000))) return false;
+  return true;
+}
+function vendorScoreInput(body: unknown, keys: string[]): boolean {
+  if (!body || typeof body !== "object" || Array.isArray(body)) return false;
+  const data = body as Record<string, unknown>;
+  return keys.every(key => data[key] === undefined || (typeof data[key] === "number" && Number.isFinite(data[key]) && data[key] >= 0 && data[key] <= 100));
+}
+function questionnaireAnswersInput(body: unknown): body is { answers: Record<string, unknown> } {
+  if (!body || typeof body !== "object" || Array.isArray(body)) return false;
+  const answers = (body as Record<string, unknown>).answers;
+  if (!answers || typeof answers !== "object" || Array.isArray(answers)) return false;
+  return Object.entries(answers).every(([key, value]) => {
+    const question = QUESTIONNAIRE_QUESTIONS.find(q => q.key === key);
+    if (!question) return false;
+    if (question.answerType === "boolean") return typeof value === "boolean";
+    if (question.answerType === "text") return typeof value === "string" && value.length <= 4000;
+    if (question.answerType === "scale") return typeof value === "string" && ["", "none", "advisory", "spot-check", "partial automation", "full review", "full automation"].includes(value);
+    return Array.isArray(value) && value.every(v => typeof v === "string" && ["PII", "financial", "health", "biometric", "none"].includes(v)) && new Set(value).size === value.length;
+  });
+}
+
 server.post("/vendors/:id/assessments", async (request, reply) => {
   const session = await resolveSession(request);
   if (!session) {
@@ -147,7 +181,10 @@ server.post("/vendors/:id/assessments", async (request, reply) => {
   }
   const { id: vendorId } = request.params as { id: string };
   const body = request.body as { frameworkIds?: string[] };
-  const frameworkIds = body.frameworkIds ?? [];
+  if (!body || typeof body !== "object" || Array.isArray(body) || (body.frameworkIds !== undefined && (!Array.isArray(body.frameworkIds) || !body.frameworkIds.every(id => typeof id === "string" && id.trim())))) {
+    return reply.status(400).send({ error: "frameworkIds must be an array of catalog identifiers" });
+  }
+  const frameworkIds = [...new Set(body.frameworkIds ?? [])];
 
   const vendor = await prisma.vendor.findUnique({ where: { id: vendorId } });
   if (!vendor) {
@@ -164,7 +201,8 @@ server.post("/vendors/:id/assessments", async (request, reply) => {
     return reply.status(403).send({ error: "Not authorized to create assessments" });
   }
 
-  const assessment = await prisma.assessment.create({
+  const assessment = await prisma.$transaction(async (tx) => {
+  const assessment = await tx.assessment.create({
     data: {
       tenantId: session.tenantId,
       vendorId,
@@ -175,13 +213,13 @@ server.post("/vendors/:id/assessments", async (request, reply) => {
   });
 
   for (const catalogId of frameworkIds) {
-    const framework = await prisma.framework.findUnique({ where: { catalogId } });
+    const framework = await tx.framework.findUnique({ where: { catalogId } });
     if (!framework) continue;
-    const version = await prisma.frameworkVersion.findFirst({
+    const version = await tx.frameworkVersion.findFirst({
       where: { frameworkId: framework.id, isCurrent: true },
     });
     if (!version) continue;
-    await prisma.assessmentFramework.create({
+    await tx.assessmentFramework.create({
       data: {
         tenantId: session.tenantId,
         assessmentId: assessment.id,
@@ -193,7 +231,7 @@ server.post("/vendors/:id/assessments", async (request, reply) => {
   }
 
 
-  await prisma.auditEvent.create({
+  await tx.auditEvent.create({
     data: {
       tenantId: session.tenantId,
       actorUserId: session.userId,
@@ -202,6 +240,8 @@ server.post("/vendors/:id/assessments", async (request, reply) => {
       targetId: assessment.id,
       outcome: "SUCCESS",
     },
+  });
+  return assessment;
   });
   return reply.status(201).send(assessment);
 });
@@ -212,9 +252,9 @@ server.post("/assessments/:id/findings", async (request, reply) => {
     return reply.status(401).send({ error: "Not logged in" });
   }
   const { id: assessmentId } = request.params as { id: string };
-  const body = request.body as { controlId?: string; status?: string };
+  const body = (request.body ?? {}) as { controlId?: string; status?: string };
 
-  if (!body.controlId || !body.status) {
+  if (typeof body.controlId !== "string" || !body.controlId || !body.status) {
     return reply.status(400).send({ error: "controlId and status are required" });
   }
 
@@ -304,7 +344,13 @@ server.get("/reviews/findings", async (request, reply) => {
   }
 
   const findings = await prisma.controlFinding.findMany({
-    where: { tenantId: session.tenantId, requiresHumanReview: true },
+    where: {
+      tenantId: session.tenantId,
+      requiresHumanReview: true,
+      // Match the decision endpoint: attributed proposals and independent humans only.
+      proposedByUserId: { not: session.userId },
+      assessment: { startedByUserId: { not: session.userId } },
+    },
     select: {
       id: true,
       status: true,
@@ -344,7 +390,7 @@ server.post("/assessments/:id/findings/:findingId/review", async (request, reply
     return reply.status(400).send({ error: "Invalid session context" });
   }
   const { id: assessmentId, findingId } = request.params as { id: string; findingId: string };
-  const body = request.body as {
+  const body = (request.body ?? {}) as {
     decision?: string;
     rationale?: string;
     finalStatus?: string;
@@ -357,7 +403,7 @@ server.post("/assessments/:id/findings/:findingId/review", async (request, reply
     return reply.status(400).send({ error: "rationale is required" });
   }
   const validStatuses = ["PASS", "PARTIAL", "FAIL", "INSUFFICIENT_EVIDENCE", "CONFLICTING_EVIDENCE", "NOT_APPLICABLE"] as const;
-  if (body.finalStatus && !validStatuses.includes(body.finalStatus as (typeof validStatuses)[number])) {
+  if (body.finalStatus != null && !validStatuses.includes(body.finalStatus as (typeof validStatuses)[number])) {
     return reply.status(400).send({ error: "Invalid finalStatus" });
   }
   try {
@@ -374,7 +420,7 @@ server.post("/assessments/:id/findings/:findingId/reconcile", async (request, re
   if (!session) return reply.code(401).send({ error: "Not logged in" });
   if (!roleHasPermission(session.role as Role, "finding:propose")) return reply.code(403).send({ error: "Not authorized to reconcile proposals" });
   const { id, findingId } = request.params as { id: string; findingId: string };
-  const body = request.body as { rationale?: string; proposedStatus?: string };
+  const body = (request.body ?? {}) as { rationale?: string; proposedStatus?: string };
   if (typeof body.rationale !== "string" || !body.rationale.trim() || body.rationale.length > 4000 || !["PASS", "PARTIAL", "FAIL", "INSUFFICIENT_EVIDENCE", "CONFLICTING_EVIDENCE", "NOT_APPLICABLE"].includes(body.proposedStatus ?? "")) return reply.code(400).send({ error: "Reconciliation rationale and proposedStatus are required" });
   const finding = await prisma.controlFinding.findFirst({ where: { id: findingId, assessmentId: id, tenantId: session.tenantId } });
   if (!finding) return reply.code(404).send({ error: "Finding not found" });
@@ -405,14 +451,18 @@ server.post("/vendors/:id/risk-acceptance", async (request, reply) => {
   }
 
   const { id: vendorId } = request.params as { id: string };
-  const body = request.body as {
+  const body = (request.body ?? {}) as {
     justification?: string;
     assessmentId?: string;
     expiresAt?: string;
   };
-  if (!body.justification || !body.justification.trim()) {
+  if (typeof body.justification !== "string" || !body.justification.trim()) {
     return reply.status(400).send({ error: "justification is required" });
   }
+  const justification = body.justification;
+  if (body.assessmentId !== undefined && (typeof body.assessmentId !== "string" || !body.assessmentId.trim())) return reply.status(400).send({ error: "Invalid assessmentId" });
+  const expiresAt = parseOptionalDate(body.expiresAt);
+  if (expiresAt === "invalid") return reply.status(400).send({ error: "Invalid expiresAt" });
 
   const vendor = await prisma.vendor.findFirst({
     where: { id: vendorId, tenantId: session.tenantId },
@@ -420,17 +470,22 @@ server.post("/vendors/:id/risk-acceptance", async (request, reply) => {
   if (!vendor) {
     return reply.status(404).send({ error: "Vendor not found" });
   }
+  if (body.assessmentId && !await prisma.assessment.findFirst({ where: { id: body.assessmentId, tenantId: session.tenantId, vendorId } })) return reply.status(404).send({ error: "Assessment not found" });
 
-  const riskAcceptance = await prisma.riskAcceptance.create({
+  const riskAcceptance = await prisma.$transaction(async (tx) => {
+  const riskAcceptance = await tx.riskAcceptance.create({
     data: {
       tenantId: session.tenantId,
       vendorId: vendor.id,
       assessmentId: body.assessmentId,
       approvedByUserId: session.userId,
       status: "APPROVED", // legacy single-step vendor acceptance - behaviour unchanged (Step 13 backlog)
-      justification: body.justification,
-      expiresAt: body.expiresAt ? new Date(body.expiresAt) : undefined,
+      justification,
+      expiresAt,
     },
+  });
+  await tx.auditEvent.create({ data: { tenantId: session.tenantId, actorUserId: session.userId, action: "vendor.risk_accepted", targetType: "RiskAcceptance", targetId: riskAcceptance.id, outcome: "SUCCESS" } });
+  return riskAcceptance;
   });
 
   return reply.status(200).send({ riskAcceptance });
@@ -568,7 +623,7 @@ server.get("/vendors/:id/executive-report/export", async (request, reply) => {
     return reply.status(401).send({ error: "Not logged in" });
   }
   reply.header("Cache-Control", "private, no-store");
-  if (!hasAnyPermission(session, ["vendor:read"])) {
+  if (!hasAnyPermission(session, ["vendor:read"]) || !roleHasPermission(session.role as Role, "report:export")) {
     await prisma.auditEvent.create({ data: { tenantId: session.tenantId, actorUserId: session.userId,
       action: "report.denied", targetType: "Vendor", outcome: "DENIED" } });
     return reply.status(403).send({ error: "Not authorized to view vendor reports" });
@@ -650,95 +705,118 @@ server.post("/vendors/:id/assistant/messages", async (request, reply) => {
   if (!session) {
     return reply.status(401).send({ error: "Not logged in" });
   }
+  if (!hasAnyPermission(session, ["vendor:read"])) {
+    return reply.status(403).send({ error: "Not authorized to access vendor assistance" });
+  }
   const { id: vendorId } = request.params as { id: string };
   const body = request.body as { conversationId?: string; question?: string };
-  const question = body.question;
-  if (!question || question.trim().length === 0) {
+  const question = body?.question;
+  if (typeof question !== "string" || question.trim().length === 0) {
     return reply.status(400).send({ error: "question is required" });
   }
-
-  const vendor = await prisma.vendor.findFirst({
-    where: { id: vendorId, tenantId: session.tenantId },
-  });
-  if (!vendor) {
-    return reply.status(404).send({ error: "Vendor not found" });
+  if (body.conversationId != null && (typeof body.conversationId !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(body.conversationId))) {
+    return reply.status(400).send({ error: "conversationId must be a valid UUID" });
   }
 
-  const MODEL_VERSION = "claude-sonnet-4-5-20250929";
+  const MODEL_VERSION = process.env.AI_PROVIDER === "anthropic" ? "claude-sonnet-4-5-20250929" : "fake";
   const PROMPT_TEMPLATE_VERSION = "assistant-v1";
 
-  let conversation;
-  if (body.conversationId) {
-    conversation = await prisma.assistantConversation.findFirst({
-      where: { id: body.conversationId, tenantId: session.tenantId, vendorId },
+  let conversation: AssistantConversation | null = null;
+  let result: Awaited<ReturnType<typeof askAssistant>>;
+  try {
+    const vendor = await prisma.vendor.findFirst({
+      where: { id: vendorId, tenantId: session.tenantId },
     });
-    if (!conversation) {
-      return reply.status(404).send({ error: "Conversation not found" });
+    if (!vendor) {
+      return reply.status(404).send({ error: "Vendor not found" });
     }
-  } else {
-    conversation = await prisma.assistantConversation.create({
-      data: {
-        tenantId: session.tenantId,
-        vendorId,
-        userId: session.userId,
-        modelVersion: MODEL_VERSION,
-        promptTemplateVersion: PROMPT_TEMPLATE_VERSION,
-      },
+    if (body.conversationId) {
+      conversation = await prisma.assistantConversation.findFirst({
+        where: { id: body.conversationId, tenantId: session.tenantId, vendorId, userId: session.userId },
+      });
+      if (!conversation) {
+        return reply.status(404).send({ error: "Conversation not found" });
+      }
+    }
+
+    // Earlier answers may contain evidence the caller can no longer analyze.
+    const priorMessages = conversation && evidenceAllowed(session.role as Role, "analysis") ? await prisma.assistantMessage.findMany({
+      where: { tenantId: session.tenantId, conversationId: conversation.id },
+      orderBy: { createdAt: "asc" },
+    }) : [];
+
+    const context = await buildAssistantContext(session.tenantId, vendorId, session.role as Role);
+    result = await askAssistant({
+      question,
+      priorMessages: priorMessages.map((m) => ({
+        role: m.role as "user" | "assistant",
+        content: m.content,
+      })),
+      context,
     });
+  } catch {
+    // Provider/database errors can contain credentials or supplied content.
+    request.log.error("Assistant generation failed");
+    return reply.status(500).send({ error: "Could not generate assistant response" });
   }
 
-  const priorMessages = await prisma.assistantMessage.findMany({
-    where: { tenantId: session.tenantId, conversationId: conversation.id },
-    orderBy: { createdAt: "asc" },
-  });
+  // Do not hold database locks while waiting for an AI provider. Persist a
+  // complete exchange and its audit atomically only after generation succeeds.
+  let saved;
+  try {
+    saved = await prisma.$transaction(async (tx) => {
+      const activeConversation = conversation ?? await tx.assistantConversation.create({
+        data: { tenantId: session.tenantId, vendorId, userId: session.userId, modelVersion: MODEL_VERSION, promptTemplateVersion: PROMPT_TEMPLATE_VERSION },
+      });
+      await tx.$queryRaw`SELECT "id" FROM "assistant_conversations" WHERE "id" = ${activeConversation.id} FOR UPDATE`;
+      const latest = await tx.assistantMessage.findFirst({ where: { tenantId: session.tenantId, conversationId: activeConversation.id }, orderBy: { createdAt: "desc" }, select: { createdAt: true } });
+      // Explicit times preserve user/assistant order within an atomic exchange,
+      // including concurrent continuations (PostgreSQL now() is transaction-wide).
+      const sentAt = Math.max(Date.now(), (latest?.createdAt.getTime() ?? 0) + 1);
+      await tx.assistantMessage.create({
+        data: {
+          tenantId: session.tenantId,
+          conversationId: activeConversation.id,
+          role: "user",
+          content: question,
+          promptInjectionFlagged: false,
+          createdAt: new Date(sentAt),
+        },
+      });
 
-  const context = await buildAssistantContext(session.tenantId, vendorId, session.role as Role);
+      const assistantMessage = await tx.assistantMessage.create({
+        data: {
+          tenantId: session.tenantId,
+          conversationId: activeConversation.id,
+          role: "assistant",
+          content: result.content,
+          citationsJson: result.citations,
+          promptInjectionFlagged: result.promptInjectionFlagged,
+          createdAt: new Date(sentAt + 1),
+        },
+      });
 
-  const result = await askAssistant({
-    question,
-    priorMessages: priorMessages.map((m) => ({
-      role: m.role as "user" | "assistant",
-      content: m.content,
-    })),
-    context,
-  });
-
-  await prisma.assistantMessage.create({
-    data: {
-      tenantId: session.tenantId,
-      conversationId: conversation.id,
-      role: "user",
-      content: question,
-      promptInjectionFlagged: false,
-    },
-  });
-
-  const assistantMessage = await prisma.assistantMessage.create({
-    data: {
-      tenantId: session.tenantId,
-      conversationId: conversation.id,
-      role: "assistant",
-      content: result.content,
-      citationsJson: result.citations,
-      promptInjectionFlagged: result.promptInjectionFlagged,
-    },
-  });
-
-  await prisma.auditEvent.create({
-    data: {
-      tenantId: session.tenantId,
-      actorUserId: session.userId,
-      action: "assistant.message_sent",
-      targetType: "Vendor",
-      targetId: vendorId,
-      outcome: "SUCCESS",
-    },
-  });
+      await tx.auditEvent.create({
+        data: {
+          tenantId: session.tenantId,
+          actorUserId: session.userId,
+          action: "assistant.message_sent",
+          targetType: "Vendor",
+          targetId: vendorId,
+          outcome: "SUCCESS",
+        },
+      });
+      return { conversationId: activeConversation.id, assistantMessage };
+    });
+  } catch {
+    request.log.error("Assistant persistence failed");
+    return reply.status(500).send({ error: "Could not save assistant response" });
+  }
 
   return reply.status(200).send({
-    conversationId: conversation.id,
+    conversationId: saved.conversationId,
     message: {
-      id: assistantMessage.id,
+      id: saved.assistantMessage.id,
       content: result.content,
       insufficientEvidence: result.insufficientEvidence,
       citations: result.citations,
@@ -845,6 +923,7 @@ server.post("/assessments/:id/ai-risk-score", async (request, reply) => {
     return reply.status(401).send({ error: "Not logged in" });
   }
   const { id } = request.params as { id: string };
+  if (!vendorScoreInput(request.body, ["modelRisk", "dataRisk", "securityRisk", "regulatoryRisk", "humanOversightRisk", "governanceRisk", "controlEffectiveness"])) return reply.status(400).send({ error: "Risk factors must be numbers from 0 to 100" });
   const body = request.body as {
     modelRisk?: number;
     dataRisk?: number;
@@ -883,7 +962,8 @@ server.post("/assessments/:id/ai-risk-score", async (request, reply) => {
   const controlEffectiveness = body.controlEffectiveness ?? 0;
   const residualResult = calculateResidualRisk(inherentResult.score, controlEffectiveness);
 
-  const updated = await prisma.assessment.update({
+  const updated = await prisma.$transaction(async (tx) => {
+  const updated = await tx.assessment.update({
     where: { id },
     data: {
       aiInherentScore: inherentResult.score,
@@ -894,7 +974,7 @@ server.post("/assessments/:id/ai-risk-score", async (request, reply) => {
     },
   });
 
-  await prisma.auditEvent.create({
+  await tx.auditEvent.create({
     data: {
       tenantId: session.tenantId,
       actorUserId: session.userId,
@@ -903,6 +983,8 @@ server.post("/assessments/:id/ai-risk-score", async (request, reply) => {
       targetId: updated.id,
       outcome: "SUCCESS",
     },
+  });
+  return updated;
   });
 
   return {
@@ -917,6 +999,7 @@ server.post("/assessments/:id/ai-impact-score", async (request, reply) => {
     return reply.status(401).send({ error: "Not logged in" });
   }
   const { id } = request.params as { id: string };
+  if (!vendorScoreInput(request.body, ["potentialHarmSeverity", "individualsAffectedScale", "decisionAutonomyLevel", "sensitiveDataInvolved", "regulatoryExposureLevel", "explainabilityLevel"])) return reply.status(400).send({ error: "Impact factors must be numbers from 0 to 100" });
   const body = request.body as {
     potentialHarmSeverity?: number;
     individualsAffectedScale?: number;
@@ -951,7 +1034,8 @@ server.post("/assessments/:id/ai-impact-score", async (request, reply) => {
     explainabilityLevel: body.explainabilityLevel,
   });
 
-  const updated = await prisma.assessment.update({
+  const updated = await prisma.$transaction(async (tx) => {
+  const updated = await tx.assessment.update({
     where: { id },
     data: {
       impactScore: impactResult.score,
@@ -960,7 +1044,7 @@ server.post("/assessments/:id/ai-impact-score", async (request, reply) => {
     },
   });
 
-  await prisma.auditEvent.create({
+  await tx.auditEvent.create({
     data: {
       tenantId: session.tenantId,
       actorUserId: session.userId,
@@ -969,6 +1053,8 @@ server.post("/assessments/:id/ai-impact-score", async (request, reply) => {
       targetId: updated.id,
       outcome: "SUCCESS",
     },
+  });
+  return updated;
   });
 
   return {
@@ -998,7 +1084,12 @@ server.post("/assessments/:id/questionnaire", async (request, reply) => {
     return reply.status(403).send({ error: "Not authorized to create questionnaires" });
   }
 
-  const questionnaire = await prisma.questionnaire.create({
+  const questionnaire = await prisma.$transaction(async (tx) => {
+  // This route opens the current questionnaire; repeated page visits are not new versions.
+  await tx.$queryRaw`SELECT id FROM assessments WHERE id=${id} AND "tenantId"=${session.tenantId} FOR UPDATE`;
+  const existing = await tx.questionnaire.findFirst({ where: { tenantId: session.tenantId, assessmentId: id }, orderBy: { createdAt: "desc" } });
+  if (existing) return existing;
+  const questionnaire = await tx.questionnaire.create({
     data: {
       tenantId: session.tenantId,
       assessmentId: id,
@@ -1008,7 +1099,7 @@ server.post("/assessments/:id/questionnaire", async (request, reply) => {
     },
   });
 
-  await prisma.auditEvent.create({
+  await tx.auditEvent.create({
     data: {
       tenantId: session.tenantId,
       actorUserId: session.userId,
@@ -1017,6 +1108,8 @@ server.post("/assessments/:id/questionnaire", async (request, reply) => {
       targetId: questionnaire.id,
       outcome: "SUCCESS",
     },
+  });
+  return questionnaire;
   });
 
   return { questionnaire, questions: QUESTIONNAIRE_QUESTIONS };
@@ -1049,7 +1142,8 @@ server.patch("/questionnaires/:id/responses", async (request, reply) => {
     return reply.status(401).send({ error: "Not logged in" });
   }
   const { id } = request.params as { id: string };
-  const body = request.body as { answers: Record<string, unknown> };
+  if (!questionnaireAnswersInput(request.body)) return reply.status(400).send({ error: "Invalid questionnaire answers" });
+  const body = request.body;
 
   const questionnaire = await prisma.questionnaire.findUnique({ where: { id } });
   if (!questionnaire) {
@@ -1066,17 +1160,21 @@ server.patch("/questionnaires/:id/responses", async (request, reply) => {
     return reply.status(403).send({ error: "Not authorized to answer questionnaires" });
   }
 
-  for (const [questionKey, value] of Object.entries(body.answers ?? {})) {
-    const existing = await prisma.questionnaireResponse.findFirst({
+  return prisma.$transaction(async (tx) => {
+  await tx.$queryRaw`SELECT id FROM questionnaires WHERE id=${id} AND "tenantId"=${session.tenantId} FOR UPDATE`;
+  const current = await tx.questionnaire.findUniqueOrThrow({ where: { id } });
+  if (current.status !== "DRAFT" && current.status !== "IN_PROGRESS") throw Object.assign(new Error("Only a draft or in-progress questionnaire can be edited"), { statusCode: 409 });
+  for (const [questionKey, value] of Object.entries(body.answers)) {
+    const existing = await tx.questionnaireResponse.findFirst({
       where: { questionnaireId: id, questionKey },
     });
     if (existing) {
-      await prisma.questionnaireResponse.update({
+      await tx.questionnaireResponse.update({
         where: { id: existing.id },
         data: { answerJson: { value } as object, answeredByUserId: session.userId },
       });
     } else {
-      await prisma.questionnaireResponse.create({
+      await tx.questionnaireResponse.create({
         data: {
           tenantId: session.tenantId,
           questionnaireId: id,
@@ -1088,12 +1186,12 @@ server.patch("/questionnaires/:id/responses", async (request, reply) => {
     }
   }
 
-  const updated = await prisma.questionnaire.update({
+  const updated = await tx.questionnaire.update({
     where: { id },
-    data: { status: questionnaire.status === "DRAFT" ? "IN_PROGRESS" : questionnaire.status },
+    data: { status: current.status === "DRAFT" ? "IN_PROGRESS" : current.status },
   });
 
-  await prisma.auditEvent.create({
+  await tx.auditEvent.create({
     data: {
       tenantId: session.tenantId,
       actorUserId: session.userId,
@@ -1105,6 +1203,7 @@ server.patch("/questionnaires/:id/responses", async (request, reply) => {
   });
 
   return { questionnaire: updated };
+  });
 });
 
 server.post("/questionnaires/:id/submit", async (request, reply) => {
@@ -1132,8 +1231,12 @@ server.post("/questionnaires/:id/submit", async (request, reply) => {
     return reply.status(403).send({ error: "Not authorized to submit questionnaires" });
   }
 
+  return prisma.$transaction(async (tx) => {
+  await tx.$queryRaw`SELECT id FROM questionnaires WHERE id=${id} AND "tenantId"=${session.tenantId} FOR UPDATE`;
+  const current = await tx.questionnaire.findUniqueOrThrow({ where: { id }, include: { responses: true } });
+  if (current.status !== "DRAFT" && current.status !== "IN_PROGRESS") throw Object.assign(new Error("Only a draft or in-progress questionnaire can be submitted"), { statusCode: 409 });
   const answers: QuestionnaireAnswers = {};
-  for (const r of questionnaire.responses) {
+  for (const r of current.responses) {
     answers[r.questionKey] = r.answerJson as { value: boolean | string | string[] };
   }
   const { aiRiskFactors, aiImpactFactors } = mapQuestionnaireToRiskFactors(answers);
@@ -1142,12 +1245,13 @@ server.post("/questionnaires/:id/submit", async (request, reply) => {
   const residualResult = calculateResidualRisk(inherentResult.score, 0);
   const impactResult = calculateAIImpactScore(aiImpactFactors);
 
-  await prisma.assessment.update({
-    where: { id: questionnaire.assessmentId },
+  await tx.assessment.update({
+    where: { id: current.assessmentId },
     data: {
       aiInherentScore: inherentResult.score,
       aiResidualScore: residualResult.score,
       aiRiskBand: residualResult.band,
+      aiControlEffectiveness: 0,
       aiFactorInputsJson: inherentResult.factors as object,
       impactScore: impactResult.score,
       impactBand: impactResult.band,
@@ -1155,12 +1259,12 @@ server.post("/questionnaires/:id/submit", async (request, reply) => {
     },
   });
 
-  const updated = await prisma.questionnaire.update({
+  const updated = await tx.questionnaire.update({
     where: { id },
     data: { status: "SUBMITTED", submittedByUserId: session.userId },
   });
 
-  await prisma.auditEvent.create({
+  await tx.auditEvent.create({
     data: {
       tenantId: session.tenantId,
       actorUserId: session.userId,
@@ -1172,6 +1276,7 @@ server.post("/questionnaires/:id/submit", async (request, reply) => {
   });
 
   return { questionnaire: updated, inherent: inherentResult, residual: residualResult, impact: impactResult };
+  });
 });
 
 server.post("/questionnaires/:id/review", async (request, reply) => {
@@ -1198,12 +1303,17 @@ server.post("/questionnaires/:id/review", async (request, reply) => {
     return reply.status(403).send({ error: "Cannot review your own submission" });
   }
 
-  const updated = await prisma.questionnaire.update({
+  return prisma.$transaction(async (tx) => {
+  await tx.$queryRaw`SELECT id FROM questionnaires WHERE id=${id} AND "tenantId"=${session.tenantId} FOR UPDATE`;
+  const current = await tx.questionnaire.findUniqueOrThrow({ where: { id } });
+  if (current.status !== "SUBMITTED") throw Object.assign(new Error("Only submitted questionnaires can be reviewed"), { statusCode: 409 });
+  if (!current.submittedByUserId || current.submittedByUserId === session.userId) throw Object.assign(new Error("Independent review requires an attributed submission"), { statusCode: 403 });
+  const updated = await tx.questionnaire.update({
     where: { id },
     data: { status: "REVIEWED", reviewedByUserId: session.userId },
   });
 
-  await prisma.auditEvent.create({
+  await tx.auditEvent.create({
     data: {
       tenantId: session.tenantId,
       actorUserId: session.userId,
@@ -1215,6 +1325,7 @@ server.post("/questionnaires/:id/review", async (request, reply) => {
   });
 
   return { questionnaire: updated };
+  });
 });
 
 server.post("/questionnaires/:id/approve", async (request, reply) => {
@@ -1241,12 +1352,17 @@ server.post("/questionnaires/:id/approve", async (request, reply) => {
     return reply.status(403).send({ error: "Cannot approve your own submission" });
   }
 
-  const updated = await prisma.questionnaire.update({
+  return prisma.$transaction(async (tx) => {
+  await tx.$queryRaw`SELECT id FROM questionnaires WHERE id=${id} AND "tenantId"=${session.tenantId} FOR UPDATE`;
+  const current = await tx.questionnaire.findUniqueOrThrow({ where: { id } });
+  if (current.status !== "REVIEWED") throw Object.assign(new Error("Only reviewed questionnaires can be approved"), { statusCode: 409 });
+  if (!current.submittedByUserId || !current.reviewedByUserId || current.submittedByUserId === session.userId) throw Object.assign(new Error("Independent approval requires an attributed submission and review"), { statusCode: 403 });
+  const updated = await tx.questionnaire.update({
     where: { id },
     data: { status: "APPROVED", approvedByUserId: session.userId },
   });
 
-  await prisma.auditEvent.create({
+  await tx.auditEvent.create({
     data: {
       tenantId: session.tenantId,
       actorUserId: session.userId,
@@ -1258,6 +1374,7 @@ server.post("/questionnaires/:id/approve", async (request, reply) => {
   });
 
   return { questionnaire: updated };
+  });
 });
 
 
@@ -1267,6 +1384,7 @@ server.post("/assessments/:id/risk-rating", async (request, reply) => {
     return reply.status(401).send({ error: "Not logged in" });
   }
   const { id } = request.params as { id: string };
+  if (!vendorScoreInput(request.body, ["businessCriticality", "dataSensitivity", "aiAutonomy", "regulatoryExposure", "securityPosture", "modelRisk", "vendorMaturity", "controlEffectiveness"])) return reply.status(400).send({ error: "Risk factors must be numbers from 0 to 100" });
   const body = request.body as {
     businessCriticality?: number;
     dataSensitivity?: number;
@@ -1308,7 +1426,8 @@ server.post("/assessments/:id/risk-rating", async (request, reply) => {
     controlEffectiveness,
   );
 
-  const riskRating = await prisma.riskRating.create({
+  const riskRating = await prisma.$transaction(async (tx) => {
+  const riskRating = await tx.riskRating.create({
     data: {
       tenantId: session.tenantId,
       assessmentId: id,
@@ -1322,7 +1441,7 @@ server.post("/assessments/:id/risk-rating", async (request, reply) => {
     },
   });
 
-  await prisma.auditEvent.create({
+  await tx.auditEvent.create({
     data: {
       tenantId: session.tenantId,
       actorUserId: session.userId,
@@ -1331,6 +1450,8 @@ server.post("/assessments/:id/risk-rating", async (request, reply) => {
       targetId: id,
       outcome: "SUCCESS",
     },
+  });
+  return riskRating;
   });
 
   return { riskRating, result };
@@ -1342,11 +1463,14 @@ server.post("/vendors/:id/evidence", async (request, reply) => {
     return reply.status(401).send({ error: "Not logged in" });
   }
   const { id: vendorId } = request.params as { id: string };
-  const body = request.body as { displayFilename?: string; documentType?: string; expirationDate?: string };
-
-  if (!body.displayFilename || !body.documentType) {
+  const body = (request.body ?? {}) as { displayFilename?: unknown; documentType?: unknown; expirationDate?: unknown };
+  const displayFilename = cleanText(body.displayFilename, 255);
+  const documentType = cleanText(body.documentType, 200);
+  const expirationDate = parseOptionalDate(body.expirationDate);
+  if (!displayFilename || !documentType) {
     return reply.status(400).send({ error: "displayFilename and documentType are required" });
   }
+  if (expirationDate === "invalid") return reply.status(400).send({ error: "expirationDate must be a valid date" });
 
   const vendor = await prisma.vendor.findUnique({ where: { id: vendorId } });
   if (!vendor) {
@@ -1363,32 +1487,33 @@ server.post("/vendors/:id/evidence", async (request, reply) => {
     return reply.status(403).send({ error: "Not authorized to upload evidence" });
   }
 
-  const evidence = await prisma.evidenceDocument.create({
-    data: {
-      tenantId: session.tenantId,
-      vendorId,
-      displayFilename: body.displayFilename,
-      storageKey: `manual-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-      mimeType: "application/octet-stream",
-      sizeBytes: 0,
-      sha256Hash: "manual-entry",
-      documentType: body.documentType,
-      state: "UPLOADED",
-      expirationDate: body.expirationDate ? new Date(body.expirationDate) : null,
-      uploadedByUserId: session.userId,
-    },
-  });
-
-
-  await prisma.auditEvent.create({
-    data: {
-      tenantId: session.tenantId,
-      actorUserId: session.userId,
-      action: "evidence.created",
-      targetType: "EvidenceDocument",
-      targetId: evidence.id,
-      outcome: "SUCCESS",
-    },
+  const evidence = await prisma.$transaction(async (tx) => {
+    const evidence = await tx.evidenceDocument.create({
+      data: {
+        tenantId: session.tenantId,
+        vendorId,
+        displayFilename,
+        storageKey: `manual-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        mimeType: "application/octet-stream",
+        sizeBytes: 0,
+        sha256Hash: "manual-entry",
+        documentType,
+        state: "UPLOADED",
+        expirationDate,
+        uploadedByUserId: session.userId,
+      },
+    });
+    await tx.auditEvent.create({
+      data: {
+        tenantId: session.tenantId,
+        actorUserId: session.userId,
+        action: "evidence.created",
+        targetType: "EvidenceDocument",
+        targetId: evidence.id,
+        outcome: "SUCCESS",
+      },
+    });
+    return evidence;
   });
   return reply.status(201).send(evidence);
 });
@@ -1431,11 +1556,12 @@ server.post("/vendors/:id/evidence/upload", async (request, reply) => {
 
   const documentTypeField = data.fields.documentType as { value?: string } | undefined;
   const expirationDateField = data.fields.expirationDate as { value?: string } | undefined;
-  const documentType = documentTypeField?.value;
-  const expirationDateRaw = expirationDateField?.value;
+  const documentType = cleanText(documentTypeField?.value, 200);
+  const expirationDate = parseOptionalDate(expirationDateField?.value);
   if (!documentType) {
     return reply.status(400).send({ error: "documentType is required" });
   }
+  if (expirationDate === "invalid") return reply.status(400).send({ error: "expirationDate must be a valid date" });
 
   const buffer = await data.toBuffer();
   const MAX_FILE_SIZE_BYTES = 25 * 1024 * 1024;
@@ -1443,26 +1569,51 @@ server.post("/vendors/:id/evidence/upload", async (request, reply) => {
     return reply.status(400).send({ error: "File exceeds 25 MB limit" });
   }
 
-  const storageKey = "evidence/" + vendorId + "/" + Date.now() + "-" + data.filename;
+  const storageKey = "evidence/" + vendorId + "/" + randomUUID();
   const containerName = process.env.AZURE_STORAGE_CONTAINER_EVIDENCE ?? "evidence";
   const storageClient = getStorageClient();
-  const uploadResult = await storageClient.uploadFile(containerName, storageKey, buffer, data.mimetype);
-
-  const evidence = await prisma.evidenceDocument.create({
-    data: {
-      tenantId: session.tenantId,
-      vendorId,
-      displayFilename: data.filename,
-      storageKey: uploadResult.storageKey,
-      mimeType: uploadResult.mimeType,
-      sizeBytes: uploadResult.sizeBytes,
-      sha256Hash: uploadResult.sha256Hash,
-      documentType,
-      state: "UPLOADED",
-      expirationDate: expirationDateRaw ? new Date(expirationDateRaw) : null,
-      uploadedByUserId: session.userId,
-    },
+  const uploadResult = await storageClient.uploadFile(containerName, storageKey, buffer, data.mimetype).catch(async (error: unknown) => {
+    // A lost success response can leave a blob behind. This key belongs only to this attempt.
+    try { await storageClient.deleteFile(containerName, storageKey); }
+    catch (cleanupError) {
+      request.log.error({ err: cleanupError, storageKey }, "Evidence upload compensation failed; operator cleanup required");
+      throw new Error("Evidence upload failed and blob cleanup failed; operator cleanup is required");
+    }
+    throw error;
   });
+
+  let evidence;
+  try {
+    evidence = await prisma.$transaction(async (tx) => {
+      const evidence = await tx.evidenceDocument.create({
+        data: {
+          tenantId: session.tenantId,
+          vendorId,
+          displayFilename: data.filename.slice(0, 255),
+          storageKey: uploadResult.storageKey,
+          mimeType: uploadResult.mimeType,
+          sizeBytes: uploadResult.sizeBytes,
+          sha256Hash: uploadResult.sha256Hash,
+          documentType,
+          state: "UPLOADED",
+          expirationDate,
+          uploadedByUserId: session.userId,
+        },
+      });
+      await tx.auditEvent.create({ data: {
+        tenantId: session.tenantId, actorUserId: session.userId,
+        action: "evidence.uploaded", targetType: "EvidenceDocument", targetId: evidence.id, outcome: "SUCCESS",
+      } });
+      return evidence;
+    });
+  } catch (error) {
+    try { await storageClient.deleteFile(containerName, uploadResult.storageKey); }
+    catch (cleanupError) {
+      request.log.error({ err: cleanupError, storageKey: uploadResult.storageKey }, "Evidence upload compensation failed; operator cleanup required");
+      return reply.status(500).send({ error: "Evidence persistence failed and blob cleanup failed; operator cleanup is required" });
+    }
+    throw error;
+  }
 
   let chunksExtracted = 0;
   try {
@@ -1476,17 +1627,6 @@ server.post("/vendors/:id/evidence/upload", async (request, reply) => {
   } catch (extractionError) {
     server.log.error(extractionError, "Evidence text extraction failed");
   }
-
-  await prisma.auditEvent.create({
-    data: {
-      tenantId: session.tenantId,
-      actorUserId: session.userId,
-      action: "evidence.uploaded",
-      targetType: "EvidenceDocument",
-      targetId: evidence.id,
-      outcome: "SUCCESS",
-    },
-  });
 
   return reply.status(201).send({ ...evidence, chunksExtracted });
 });
@@ -1514,11 +1654,15 @@ server.post("/vendors/:id/remediations", async (request, reply) => {
     return reply.status(401).send({ error: "Not logged in" });
   }
   const { id: vendorId } = request.params as { id: string };
-  const body = request.body as { title?: string; description?: string; dueDate?: string; findingId?: string };
-
-  if (!body.title || !body.description) {
+  const body = (request.body ?? {}) as { title?: unknown; description?: unknown; dueDate?: unknown; findingId?: unknown };
+  const title = cleanText(body.title, 200);
+  const description = cleanText(body.description, 4000);
+  const dueDate = parseOptionalDate(body.dueDate);
+  if (!title || !description) {
     return reply.status(400).send({ error: "title and description are required" });
   }
+  if (dueDate === "invalid") return reply.status(400).send({ error: "dueDate must be a valid date" });
+  if (body.findingId != null && (typeof body.findingId !== "string" || !body.findingId.trim())) return reply.status(400).send({ error: "findingId must be a finding id" });
 
   const vendor = await prisma.vendor.findUnique({ where: { id: vendorId } });
   if (!vendor) {
@@ -1535,16 +1679,19 @@ server.post("/vendors/:id/remediations", async (request, reply) => {
     return reply.status(403).send({ error: "Not authorized to create remediations" });
   }
 
-  const remediation = await prisma.remediationAction.create({
-    data: {
-      tenantId: session.tenantId,
-      vendorId,
-      findingId: body.findingId ?? null,
-      title: body.title,
-      description: body.description,
-      status: "OPEN",
-      dueDate: body.dueDate ? new Date(body.dueDate) : null,
-    },
+  const findingId = body.findingId as string | null | undefined;
+  if (findingId && !await prisma.controlFinding.findFirst({ where: { id: findingId, tenantId: session.tenantId, vendorId } })) {
+    return reply.status(404).send({ error: "Finding not found for this vendor" });
+  }
+  const remediation = await prisma.$transaction(async (tx) => {
+    const created = await tx.remediationAction.create({
+      data: { tenantId: session.tenantId, vendorId, findingId: findingId ?? null, title, description, status: "OPEN", dueDate },
+    });
+    await tx.auditEvent.create({ data: {
+      tenantId: session.tenantId, actorUserId: session.userId, action: "remediation.created",
+      targetType: "RemediationAction", targetId: created.id, outcome: "SUCCESS",
+    } });
+    return created;
   });
 
   return reply.status(201).send(remediation);
@@ -1601,7 +1748,7 @@ server.patch("/remediations/:id", async (request, reply) => {
     return reply.status(401).send({ error: "Not logged in" });
   }
   const { id } = request.params as { id: string };
-  const body = request.body as { status?: string };
+  const body = (request.body ?? {}) as { status?: string };
 
   const validStatuses = ["OPEN", "IN_PROGRESS", "OVERDUE", "CLOSED"] as const;
   if (!body.status || !validStatuses.includes(body.status as (typeof validStatuses)[number])) {
@@ -1627,6 +1774,8 @@ server.patch("/remediations/:id", async (request, reply) => {
     return reply.status(403).send({ error: "Not authorized to update remediations" });
   }
 
+  // Repeating the same transition must not replace the original closure attribution.
+  if (existing.status === body.status) return existing;
   const updated = await prisma.remediationAction.update({
     where: { id },
     data: {
@@ -1636,6 +1785,11 @@ server.patch("/remediations/:id", async (request, reply) => {
     },
   });
 
+  await prisma.auditEvent.create({ data: {
+    tenantId: session.tenantId, actorUserId: session.userId, action: "remediation.status_changed",
+    targetType: "RemediationAction", targetId: updated.id, outcome: "SUCCESS",
+    metadataJson: { from: existing.status, to: updated.status },
+  } });
   return updated;
 });
 
@@ -1706,6 +1860,7 @@ server.post("/vendors", async (request, reply) => {
     return reply.status(403).send({ error: "Not authorized to create vendors" });
   }
 
+  if (!vendorInput(request.body)) return reply.status(400).send({ error: "Invalid vendor input" });
   const body = request.body as {
     legalName?: string;
     serviceDescription?: string;
@@ -1723,13 +1878,15 @@ server.post("/vendors", async (request, reply) => {
   if (!body.legalName) {
     return reply.status(400).send({ error: "legalName is required" });
   }
+  const legalName = body.legalName;
 
   // Third-Party AI authorization hardening: the vendor belongs to the authenticated tenant (was: first tenant in the database).
 
-  const vendor = await prisma.vendor.create({
+  const vendor = await prisma.$transaction(async (tx) => {
+  const vendor = await tx.vendor.create({
     data: {
       tenantId: session.tenantId,
-      legalName: body.legalName,
+      legalName,
       serviceDescription: body.serviceDescription || "",
       serviceCategory: body.serviceCategory || "",
       criticality: body.criticality || "",
@@ -1744,7 +1901,7 @@ server.post("/vendors", async (request, reply) => {
   });
 
 
-  await prisma.auditEvent.create({
+  await tx.auditEvent.create({
     data: {
       tenantId: session.tenantId,
       actorUserId: session.userId,
@@ -1753,6 +1910,8 @@ server.post("/vendors", async (request, reply) => {
       targetId: vendor.id,
       outcome: "SUCCESS",
     },
+  });
+  return vendor;
   });
   return reply.status(201).send(vendor);
 });
@@ -1806,6 +1965,7 @@ server.patch("/vendors/:id", async (request, reply) => {
   } catch {
     return reply.status(403).send({ error: "Not authorized to update vendors" });
   }
+  if (!vendorInput(request.body)) return reply.status(400).send({ error: "Invalid vendor input" });
   const body = request.body as {
     legalName?: string;
     serviceDescription?: string;
@@ -1822,7 +1982,8 @@ server.patch("/vendors/:id", async (request, reply) => {
     customerDataTrainingPolicy?: boolean;
     humanOversightDocumented?: boolean;
   };
-  const vendor = await prisma.vendor.update({
+  const vendor = await prisma.$transaction(async (tx) => {
+  const vendor = await tx.vendor.update({
     where: { id },
     data: {
       ...(body.legalName !== undefined && { legalName: body.legalName }),
@@ -1842,7 +2003,7 @@ server.patch("/vendors/:id", async (request, reply) => {
     },
   });
 
-  await prisma.auditEvent.create({
+  await tx.auditEvent.create({
     data: {
       tenantId: session.tenantId,
       actorUserId: session.userId,
@@ -1851,6 +2012,8 @@ server.patch("/vendors/:id", async (request, reply) => {
       targetId: vendor.id,
       outcome: "SUCCESS",
     },
+  });
+  return vendor;
   });
   return vendor;
 });
@@ -1874,9 +2037,11 @@ server.delete("/vendors/:id", async (request, reply) => {
   } catch {
     return reply.status(403).send({ error: "Not authorized to delete vendors" });
   }
-  await prisma.vendor.update({ where: { id }, data: { deletedAt: new Date() } });
+  await prisma.$transaction(async (tx) => {
+  const deleted = await tx.vendor.updateMany({ where: { id, tenantId: session.tenantId, deletedAt: null }, data: { deletedAt: new Date() } });
+  if (deleted.count === 0) return;
 
-  await prisma.auditEvent.create({
+  await tx.auditEvent.create({
     data: {
       tenantId: session.tenantId,
       actorUserId: session.userId,
@@ -1885,6 +2050,7 @@ server.delete("/vendors/:id", async (request, reply) => {
       targetId: existing.id,
       outcome: "SUCCESS",
     },
+  });
   });
   return reply.status(204).send();
 });
@@ -1908,6 +2074,22 @@ const DECISION_ROLE_VALUES = ["ADVISORY", "RECOMMENDS", "DECIDES", "EXECUTES"];
 const HUMAN_OVERSIGHT_VALUES = ["REQUIRED", "OPTIONAL", "NOT_APPLICABLE"];
 const IMPACT_LEVEL_VALUES = ["LOW", "MODERATE", "HIGH"];
 const DATA_SENSITIVITY_VALUES = ["PUBLIC", "INTERNAL", "CONFIDENTIAL", "RESTRICTED"];
+
+// Validate runtime input before array methods or Prisma receive client values.
+function validAiSystemInput(body: unknown): boolean {
+  if (!body || typeof body !== "object" || Array.isArray(body)) return false;
+  const fields = body as Record<string, unknown>;
+  if (fields.name !== undefined && (typeof fields.name !== "string" || !fields.name.trim())) return false;
+  for (const field of ["description", "ownerUserId"]) {
+    const value = fields[field];
+    if (value !== undefined && value !== null && typeof value !== "string") return false;
+  }
+  for (const field of ["dataCategories", "affectedPopulation", "regulatoryRelevance"]) {
+    const value = fields[field];
+    if (value !== undefined && (!Array.isArray(value) || value.some((item) => typeof item !== "string"))) return false;
+  }
+  return fields.externalImpact === undefined || fields.externalImpact === null || typeof fields.externalImpact === "boolean";
+}
 const ASSESSMENT_STATUS_VALUES = ["NOT_ASSESSED", "ASSESSMENT_REQUIRED", "ASSESSED"];
 
 server.post("/ai-systems", async (request, reply) => {
@@ -1921,6 +2103,9 @@ server.post("/ai-systems", async (request, reply) => {
     return reply.status(403).send({ error: "Not authorized to create AI systems" });
   }
 
+  if (!validAiSystemInput(request.body)) {
+    return reply.status(400).send({ error: "Invalid AI system input" });
+  }
   const body = request.body as {
     name?: string;
     description?: string;
@@ -2056,6 +2241,9 @@ server.patch("/ai-systems/:id", async (request, reply) => {
     return reply.status(404).send({ error: "AI system not found" });
   }
 
+  if (!validAiSystemInput(request.body)) {
+    return reply.status(400).send({ error: "Invalid AI system input" });
+  }
   const body = request.body as {
     name?: string;
     description?: string;
@@ -2268,7 +2456,13 @@ server.post("/ai-systems/:id/vendors", async (request, reply) => {
     return reply.status(404).send({ error: "AI system not found" });
   }
 
+  if (!request.body || typeof request.body !== "object" || Array.isArray(request.body)) {
+    return reply.status(400).send({ error: "Invalid vendor link input" });
+  }
   const body = request.body as { vendorId?: string; role?: string };
+  if (body.vendorId !== undefined && typeof body.vendorId !== "string") {
+    return reply.status(400).send({ error: "Invalid vendorId" });
+  }
   if (!body.vendorId) {
     return reply.status(400).send({ error: "vendorId is required" });
   }
@@ -2424,6 +2618,23 @@ const AI_CONTROL_EFFECTIVENESS_VALUES = ["NOT_ASSESSED", "INEFFECTIVE", "PARTIAL
 const AI_RISK_TREATMENT_VALUES = ["ACCEPT", "MITIGATE", "AVOID", "TRANSFER"];
 const AI_ASSESSMENT_REVIEW_DECISIONS = ["APPROVED", "REJECTED", "CHANGES_REQUESTED"];
 
+function validRiskInput(body: unknown, kind: "assessment" | "risk" | "review"): boolean {
+  if (!body || typeof body !== "object" || Array.isArray(body)) return false;
+  const fields = body as Record<string, unknown>;
+  const nonblank = kind === "assessment" ? ["name"] : kind === "risk" ? ["title", "statement"] : ["rationale"];
+  for (const field of nonblank) {
+    const value = fields[field];
+    if (value !== undefined && (typeof value !== "string" || !value.trim())) return false;
+  }
+  const optionalText = kind === "assessment" ? ["assessorUserId"] : kind === "risk" ? ["controlId", "existingControls", "treatmentRationale", "treatmentOwnerUserId"] : [];
+  for (const field of optionalText) {
+    const value = fields[field];
+    if (value !== undefined && value !== null && typeof value !== "string") return false;
+  }
+  const date = fields.treatmentTargetDate;
+  return kind !== "risk" || date === undefined || date === null || (typeof date === "string" && (!date || Number.isFinite(new Date(date).getTime())));
+}
+
 function scoreToRiskBand(score: number): "LOW" | "MODERATE" | "HIGH" | "CRITICAL" {
   if (score <= 4) return "LOW";
   if (score <= 9) return "MODERATE";
@@ -2457,6 +2668,9 @@ server.post("/ai-systems/:id/risk-assessments", async (request, reply) => {
     return reply.status(404).send({ error: "AI system not found" });
   }
 
+  if (!validRiskInput(request.body, "assessment")) {
+    return reply.status(400).send({ error: "Invalid risk assessment input" });
+  }
   const body = request.body as { name?: string; assessorUserId?: string };
   if (!body.name) {
     return reply.status(400).send({ error: "name is required" });
@@ -2602,6 +2816,9 @@ server.patch("/ai-risk-assessments/:id", async (request, reply) => {
     return reply.status(409).send({ error: "This risk assessment is completed and cannot be changed. Start a new version to record changes." });
   }
 
+  if (!validRiskInput(request.body, "assessment")) {
+    return reply.status(400).send({ error: "Invalid risk assessment input" });
+  }
   const body = request.body as { name?: string; status?: string; assessorUserId?: string | null };
 
   if (body.status !== undefined && !AI_RISK_ASSESSMENT_STATUSES.includes(body.status)) {
@@ -2682,6 +2899,9 @@ server.post("/ai-risk-assessments/:id/risks", async (request, reply) => {
     return reply.status(409).send({ error: "This risk assessment is completed. Start a new version to record new risks." });
   }
 
+  if (!validRiskInput(request.body, "risk")) {
+    return reply.status(400).send({ error: "Invalid risk input" });
+  }
   const body = request.body as {
     title?: string;
     category?: string;
@@ -2771,6 +2991,9 @@ server.patch("/ai-risks/:id", async (request, reply) => {
     return reply.status(404).send({ error: "Risk not found" });
   }
 
+  if (!validRiskInput(request.body, "risk")) {
+    return reply.status(400).send({ error: "Invalid risk input" });
+  }
   const body = request.body as {
     title?: string;
     category?: string;
@@ -2860,8 +3083,9 @@ server.patch("/ai-risks/:id", async (request, reply) => {
   const residualLikelihood = body.residualLikelihood !== undefined ? body.residualLikelihood : existing.residualLikelihood;
   const residualImpact = body.residualImpact !== undefined ? body.residualImpact : existing.residualImpact;
   const residualChanged = body.residualLikelihood !== undefined || body.residualImpact !== undefined;
-  let residualScore = existing.residualScore;
-  let residualRating: string | null = existing.residualRating;
+  // A residual result exists only when both residual inputs are present.
+  let residualScore: number | null = null;
+  let residualRating: string | null = null;
   if (residualLikelihood !== null && residualLikelihood !== undefined && residualImpact !== null && residualImpact !== undefined) {
     residualScore = residualLikelihood * residualImpact;
     residualRating = scoreToRiskBand(residualScore);
@@ -3020,6 +3244,9 @@ server.post("/ai-risk-assessments/:id/review", async (request, reply) => {
     return reply.status(404).send({ error: "AI risk assessment not found" });
   }
 
+  if (!validRiskInput(request.body, "review")) {
+    return reply.status(400).send({ error: "Invalid risk assessment review input" });
+  }
   const body = request.body as { decision?: string; rationale?: string; reconciliationRationale?: unknown };
   if (!body.decision || !AI_ASSESSMENT_REVIEW_DECISIONS.includes(body.decision)) {
     return reply.status(400).send({ error: "Invalid or missing decision" });
@@ -3093,22 +3320,30 @@ server.post("/ai-risks/:id/remediation", async (request, reply) => {
     return reply.status(404).send({ error: "Risk not found" });
   }
 
-  const body = request.body as { title?: string; description?: string; ownerUserId?: string; dueDate?: string };
-  if (!body.title) {
+  const body = (request.body ?? {}) as { title?: unknown; description?: unknown; ownerUserId?: unknown; dueDate?: unknown };
+  const title = cleanText(body.title, 200);
+  const description = cleanText(body.description, 4000);
+  const dueDate = parseOptionalDate(body.dueDate);
+  const ownerUserId = body.ownerUserId == null ? null : cleanText(body.ownerUserId, 200);
+  if (!title) {
     return reply.status(400).send({ error: "title is required" });
   }
-  if (!body.description) {
+  if (!description) {
     return reply.status(400).send({ error: "description is required" });
+  }
+  if (dueDate === "invalid") return reply.status(400).send({ error: "dueDate must be a valid date" });
+  if (body.ownerUserId != null && (!ownerUserId || !await prisma.tenantMembership.findFirst({ where: { tenantId: session.tenantId, userId: ownerUserId } }))) {
+    return reply.status(400).send({ error: "ownerUserId must belong to a user in this tenant" });
   }
 
   const remediation = await prisma.remediationAction.create({
     data: {
       tenantId: session.tenantId,
       aiRiskId: risk.id,
-      title: body.title,
-      description: body.description,
-      ownerUserId: body.ownerUserId ?? null,
-      dueDate: body.dueDate ? new Date(body.dueDate) : null,
+      title,
+      description,
+      ownerUserId,
+      dueDate,
     },
   });
 
@@ -3317,6 +3552,9 @@ server.post("/ai-systems/:id/impact-assessments", async (request, reply) => {
   }
 
   const body = (request.body ?? {}) as { name?: string; assessorUserId?: string };
+  if (body.assessorUserId != null && typeof body.assessorUserId !== "string") {
+    return reply.status(400).send({ error: "assessorUserId must be a string" });
+  }
   let assessorUserId: string | null = session.userId ?? null;
   if (body.assessorUserId) {
     const membership = await prisma.tenantMembership.findFirst({
@@ -3702,7 +3940,7 @@ server.post("/ai-impact-assessments/:id/review", async (request, reply) => {
   if (!body.decision || !AI_ASSESSMENT_REVIEW_DECISIONS.includes(body.decision)) {
     return reply.status(400).send({ error: "Invalid or missing decision" });
   }
-  if (!body.rationale || !body.rationale.trim()) {
+  if (typeof body.rationale !== "string" || !body.rationale.trim()) {
     return reply.status(400).send({ error: "rationale is required" });
   }
   if (assessment.status === "COMPLETED" || assessment.reviewDecision === "APPROVED") {
