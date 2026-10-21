@@ -3,7 +3,6 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { useCurrentUser } from "./current-user";
-import SignOutButton from "./sign-out-button";
 
 type NavItem = {
   label: string;
@@ -25,13 +24,13 @@ const navSections: NavSectionDef[] = [
     items: [
       { label: "AI Inventory", href: "/ai-inventory", built: true, icon: "\u2728" },
       { label: "AI Use Cases", href: "/ai-use-cases", built: true, icon: "\uD83E\uDDED" },
-      { label: "Pending Reviews", href: "/reviews/pending", built: true, icon: "\u2611" },
+      { label: "Governance Reviews", href: "/reviews/pending", built: true, icon: "\u2611" },
     ],
   },
   {
     title: "AI Risk",
     items: [
-      { label: "Risk Register", href: "/risk-register", built: true, icon: "\uD83D\uDCCB" },
+      { label: "AI Risk Register", href: "/risk-register", built: true, icon: "\uD83D\uDCCB" },
       { label: "AI Risk Assessments", href: "/risk-assessments", built: true, icon: "\uD83D\uDCCA" },
       { label: "AI Impact Assessments", href: "/impact-assessments", built: true, icon: "\uD83C\uDFAF" },
       { label: "Findings", href: "/findings", built: true, icon: "\u26A0" },
@@ -52,15 +51,15 @@ const navSections: NavSectionDef[] = [
     items: [
       { label: "Governance Monitoring", href: "/governance-monitoring", built: true, icon: "\uD83D\uDCE1" },
       { label: "AI Incidents", href: "/ai-incidents", built: true, icon: "!" },
-      { label: "Reassessments", href: "/reassessments", built: true, icon: "\uD83D\uDD04" },
+      { label: "AI Reassessments", href: "/reassessments", built: true, icon: "\uD83D\uDD04" },
     ],
   },
-  { title: "Reporting", items: [{ label: "Governance Report", href: "/reports/ai-governance", built: true, icon: "\uD83D\uDCCA" }] },
+  { title: "Reporting", items: [{ label: "Governance Reports", href: "/reports/ai-governance", built: true, icon: "\uD83D\uDCCA" }] },
   {
     title: "Learning Center",
     items: [
       { label: "AI Governance Workflow", href: "/grc-guide", built: true, icon: "\uD83C\uDF93", color: "#86efac" },
-      { label: "AI TPRM Workflow", href: "/tprm-guide", built: true, icon: "\uD83D\uDCDA", color: "#86efac" },
+      { label: "Third-Party AI Risk Workflow", href: "/tprm-guide", built: true, icon: "\uD83D\uDCDA", color: "#86efac" },
     ],
   },
   { title: "System", items: [{ label: "Audit Logs", href: "/audit-log", built: true, icon: "\uD83D\uDCC4" }] },
@@ -74,7 +73,8 @@ const styles = {
     padding: "20px 12px",
     display: "flex",
     flexDirection: "column" as const,
-    height: "100vh",
+    // Content-box height excludes the existing 20px top/bottom padding.
+    height: "calc(100vh - 40px)",
     overflowY: "auto" as const,
     position: "sticky" as const,
     top: 0,
@@ -220,9 +220,6 @@ export default function Sidebar() {
             />
           </div>
         ))}
-      <div style={styles.footer}>
-        <SignOutButton />
-      </div>
     </aside>
   );
 }

@@ -13,11 +13,11 @@ export default function PendingReviewsPage() {
   const rows = data?.items ?? [];
   return (
     <ListPage
-      title="Pending Reviews"
-      purpose="Decisions you are eligible to make now - your role allows it and separation of duties does not prevent it (you did not create, request, submit, own or assess the item). Open an item to decide it in its authoritative workflow."
+      title="Governance Reviews"
+      purpose="Review and decide AI governance items requiring human oversight."
       error={error}
       loading={!data}
-      empty={data && rows.length === 0 ? "No AI governance decisions are waiting for you." : null}
+      empty={data && rows.length === 0 ? "You're all caught up. No AI governance decisions currently require your review." : null}
       controls={
         <p style={{ ...muted, margin: 0 }}>
           Vendor finding reviews for you: {vendorCount}.{" "}

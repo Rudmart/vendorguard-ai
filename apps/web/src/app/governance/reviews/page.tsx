@@ -113,7 +113,7 @@ export default function ReviewQueuePage() {
   if (forbidden) {
     return (
       <div style={{ padding: 32 }}>
-        <h1 style={{ fontSize: 20, fontWeight: 700, marginBottom: 8 }}>Pending Reviews</h1>
+        <h1 style={{ fontSize: 20, fontWeight: 700, marginBottom: 8 }}>Vendor Finding Reviews</h1>
         <div style={{ color: "#f59e0b", fontSize: 14 }}>
           Your role does not have authority to review findings. Contact an administrator if you believe this is incorrect.
         </div>
@@ -124,7 +124,7 @@ export default function ReviewQueuePage() {
   if (error) {
     return (
       <div style={{ padding: 32 }}>
-        <h1 style={{ fontSize: 20, fontWeight: 700, marginBottom: 8 }}>Pending Reviews</h1>
+        <h1 style={{ fontSize: 20, fontWeight: 700, marginBottom: 8 }}>Vendor Finding Reviews</h1>
         <div style={{ color: "#dc2626", fontSize: 14 }}>{error}</div>
       </div>
     );
@@ -132,14 +132,14 @@ export default function ReviewQueuePage() {
 
   return (
     <div style={{ padding: 32, maxWidth: 900 }}>
-      <h1 style={{ fontSize: 20, fontWeight: 700, marginBottom: 4 }}>Pending Reviews</h1>
+      <h1 style={{ fontSize: 20, fontWeight: 700, marginBottom: 4 }}>Vendor Finding Reviews</h1>
       <p style={{ color: "#8b96ac", fontSize: 13, marginBottom: 24 }}>
         {findings.length} finding{findings.length === 1 ? "" : "s"} awaiting human review.
       </p>
 
       {findings.length === 0 && (
         <div style={{ color: "#8b96ac", fontSize: 14, marginTop: 40 }}>
-          Nothing is currently pending review.
+          You're all caught up. No vendor findings currently require your review.
         </div>
       )}
 
