@@ -30,7 +30,7 @@ export default function AuditLogPage() {
   }>("/audit-events?" + query);
   return (
     <ListPage
-      title="Audit Log"
+      title="Audit Logs"
       purpose="Tenant-scoped authoritative audit events. Narrative metadata is intentionally excluded."
       error={error}
       loading={!data && !error}

@@ -81,6 +81,7 @@ describe("Impact assessment input and live-summary regression", () => {
     expect((await request("POST", `/ai-impact-assessments/${assessmentId}/review`, { decision: "APPROVED", rationale: "Denied" }, role)).statusCode).toBe(403);
   });
   it("preserves returned decisions, locks completed records, and advances version history", async () => {
+    expect((await request("PATCH", `/ai-impact-assessments/${assessmentId}`, { noItemsJustification: "Assessor reviewed the disposable assessment scope and identified no impacts" })).statusCode).toBe(200);
     expect((await request("POST", `/ai-impact-assessments/${assessmentId}/review`, { decision: "APPROVED", rationale: " " }, "REVIEWER")).statusCode).toBe(400);
     expect((await request("PATCH", `/ai-impact-assessments/${assessmentId}`, { status: "COMPLETED" })).statusCode).toBe(400);
     expect((await request("PATCH", `/ai-impact-assessments/${assessmentId}`, { status: "READY_FOR_REVIEW" })).statusCode).toBe(200);

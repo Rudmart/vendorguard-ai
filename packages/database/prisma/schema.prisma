@@ -109,6 +109,7 @@ enum AssessmentStatus {
 // ---------------------------------------------------------------------------
 
 model Tenant {
+  systemApprovals AiSystemApproval[]
   governanceDecisions GovernanceDecision[]
   retirements AiSystemRetirement[]
   id               String           @id @default(uuid())
@@ -966,6 +967,7 @@ enum AiAssessmentReviewDecision {
 }
 
 model AiSystem {
+  approvalHistory AiSystemApproval[]
   retirements AiSystemRetirement[]
   retiredAt DateTime?
   incidents AiIncident[]
@@ -1039,6 +1041,7 @@ model AiSystemVendor {
 }
 
 model AiRiskAssessment {
+  noItemsJustification String?
   decisionHistory GovernanceDecision[]
   reassessmentsAsPrior AiReassessment[] @relation("ReassessmentPriorRisk")
   reassessmentsAsNew   AiReassessment[] @relation("ReassessmentNewRisk")
@@ -1157,6 +1160,7 @@ enum AiImpactReversibility {
 }
 
 model AiImpactAssessment {
+  noItemsJustification String?
   decisionHistory GovernanceDecision[]
   reassessmentsAsPrior AiReassessment[] @relation("ReassessmentPriorImpact")
   reassessmentsAsNew   AiReassessment[] @relation("ReassessmentNewImpact")
@@ -1958,4 +1962,25 @@ model GovernanceDecision {
   @@index([tenantId, riskAssessmentId])
   @@index([tenantId, impactAssessmentId])
   @@map("governance_decisions")
+}
+
+// Independent system approval: pending requests are mutable only until a human decision.
+model AiSystemApproval {
+  id String @id @default(uuid())
+  tenantId String
+  aiSystemId String
+  status String @default("PENDING_REVIEW")
+  activeRequestKey String? @unique
+  requestedByUserId String
+  requestedAt DateTime @default(now())
+  requestRationale String
+  contextHash String
+  independentOfUserIds String[]
+  decidedByUserId String?
+  decidedAt DateTime?
+  decisionRationale String?
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  aiSystem AiSystem @relation(fields: [aiSystemId], references: [id], onDelete: Cascade)
+  @@index([tenantId, aiSystemId])
+  @@map("ai_system_approvals")
 }

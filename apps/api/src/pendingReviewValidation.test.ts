@@ -263,7 +263,7 @@ it("keeps vendor decision history protected from direct API mutation", async () 
   expect(await prisma.reviewDecision.findMany({ where: { findingId: row.finding.id } })).toEqual(history);
 });
 for (const kind of ["risk", "impact"] as const) it(`tracks ${kind} assessment return, resubmission and final review in the queue`, async () => {
-  const data = { tenantId: tenants[0]!, aiSystemId: systemId, name: "Section16 queue assessment", version: 1, status: "READY_FOR_REVIEW" as const, assessorUserId: users[1]! };
+  const data = { tenantId: tenants[0]!, aiSystemId: systemId, noItemsJustification: "Assessor recorded no items in this queue test scope", name: "Section16 queue assessment", version: 1, status: "READY_FOR_REVIEW" as const, assessorUserId: users[1]! };
   const row = kind === "risk" ? await prisma.aiRiskAssessment.create({ data }) : await prisma.aiImpactAssessment.create({ data });
   const url = `/ai-${kind}-assessments/${row.id}`;
   expect((await queue()).find(x => x.id === row.id)).toMatchObject({ href: url });
@@ -282,7 +282,7 @@ for (const kind of ["risk", "impact"] as const) it(`tracks ${kind} assessment re
   expect(history.every(x => x.version === 1 && x.correlationId)).toBe(true);
 });
 for (const [index, model] of ["AuditEvent", "GovernanceDecision"].entries()) for (const kind of ["risk", "impact"] as const) it(`keeps ${kind} assessment queued on ${model} failure`, async () => {
-  const data = { tenantId: tenants[0]!, aiSystemId: systemId, name: "Section16 atomic decision", version: index + 2, status: "READY_FOR_REVIEW" as const, assessorUserId: users[1]! };
+  const data = { tenantId: tenants[0]!, aiSystemId: systemId, noItemsJustification: "Assessor recorded no items in this audit rollback test scope", name: "Section16 atomic decision", version: index + 2, status: "READY_FOR_REVIEW" as const, assessorUserId: users[1]! };
   const row = kind === "risk" ? await prisma.aiRiskAssessment.create({ data }) : await prisma.aiImpactAssessment.create({ data });
   failModel = model;
   const res = await call("POST", `/ai-${kind}-assessments/${row.id}/review`, { decision: "APPROVED", rationale: "Atomic review" }); failModel = "";

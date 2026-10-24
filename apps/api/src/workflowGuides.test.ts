@@ -29,13 +29,13 @@ function routeExists(href: string): boolean {
 
 describe("AI workflow guides - titles and naming", () => {
   it("uses the AI-focused guide titles", () => {
-    expect(govPage).toContain('title="AI Governance Workflow Guide"');
-    expect(tprmPage).toContain('title="AI TPRM Workflow Guide"');
+    expect(govPage).toContain('title="AI Governance Workflow"');
+    expect(tprmPage).toContain('title="Third-Party AI Risk Workflow"');
   });
 
   it("sidebar Learning Center uses the AI-focused labels and keeps the existing routes", () => {
     expect(sidebar).toContain('label: "AI Governance Workflow", href: "/grc-guide"');
-    expect(sidebar).toContain('label: "AI TPRM Workflow", href: "/tprm-guide"');
+    expect(sidebar).toContain('label: "Third-Party AI Risk Workflow", href: "/tprm-guide"');
   });
 
   it("no generic GRC / TPRM guide naming remains on the guide surfaces", () => {
@@ -57,24 +57,24 @@ describe("AI workflow guides - stages", () => {
     expect(stages("AI_TPRM_STAGES")).toHaveLength(12);
   });
 
-  it("Retirement remains PLANNED; AI Incidents is AVAILABLE", () => {
+  it("Retirement and AI Incidents are available", () => {
     const gov = stages("AI_GOVERNANCE_STAGES");
     expect(gov.find(s => s.includes('title: "AI Incident"'))).toContain('status: "AVAILABLE"');
     for (const title of ["Retirement"]) {
       const stage = gov.find((s) => s.includes(`title: "${title}"`));
       expect(stage, title).toBeDefined();
-      expect(stage).toContain('status: "PLANNED"');
+      expect(stage).toContain('status: "AVAILABLE"');
     }
   });
 
-  it("AI Use Cases V1: Define AI Use Case is AVAILABLE and links to the real AI Use Cases page (20 available, 1 planned)", () => {
+  it("AI Use Cases V1: Define AI Use Case is AVAILABLE and links to the real AI Use Cases page (21 available, none planned)", () => {
     const gov = stages("AI_GOVERNANCE_STAGES");
     const stage = gov.find((s) => s.includes('title: "Define AI Use Case"'));
     expect(stage).toContain('status: "AVAILABLE"');
     expect(stage).toContain('href: "/ai-use-cases"');
     expect(routeExists("/ai-use-cases")).toBe(true);
-    expect(gov.filter((s) => s.includes('status: "AVAILABLE"'))).toHaveLength(20);
-    expect(gov.filter((s) => s.includes('status: "PLANNED"'))).toHaveLength(1);
+    expect(gov.filter((s) => s.includes('status: "AVAILABLE"'))).toHaveLength(21);
+    expect(gov.filter((s) => s.includes('status: "PLANNED"'))).toHaveLength(0);
   });
 
   it("every PLANNED stage has no links (no dead links to unbuilt features)", () => {

@@ -1,4 +1,5 @@
 "use client";
+import SystemApproval from "../../system-approval";
 import { useEffect, useState } from "react";
 import { useCurrentUser } from "../../current-user";
 import { useParams } from "next/navigation";
@@ -470,7 +471,7 @@ export default function AiSystemDetailPage() {
         <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 8 }}>
           <select style={{ ...selectStyle, width: "auto" }} value={lifecycleDraft} onChange={(e) => setLifecycleDraft(e.target.value)}>
             {LIFECYCLE_OPTIONS.map((l) => (
-              <option key={l} value={l}>{l.replace(/_/g, " ")}</option>
+              <option key={l} value={l} disabled={(l === "APPROVED" || l === "PENDING_APPROVAL") && l !== aiSystem.lifecycleStatus}>{l.replace(/_/g, " ")}</option>
             ))}
           </select>
           <button
@@ -604,6 +605,7 @@ export default function AiSystemDetailPage() {
         </div>
       </div>
 
+      <SystemApproval id={String(id)} retired={aiSystem.lifecycleStatus === "RETIRED"} />
       <MonitoringCard aiSystemId={String(id)} />
     </main>
   );

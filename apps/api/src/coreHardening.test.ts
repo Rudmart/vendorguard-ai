@@ -48,7 +48,7 @@ const identity = (role: string) => ({
   displayName: "Hardening fixture",
 });
 async function request(
-  method: "GET" | "POST",
+  method: "GET" | "POST" | "PATCH",
   url: string,
   role = "ADMIN",
   payload?: object,
@@ -920,6 +920,8 @@ describe("M1 append-only, attributable decision history", () => {
                 data: {
                   ...common,
                   version: 90,
+                  status: "READY_FOR_REVIEW",
+                  noItemsJustification: "Assessor documented no items for reconciliation fixture",
                   assessorUserId: users.ANALYST!,
                 },
               })
@@ -927,6 +929,8 @@ describe("M1 append-only, attributable decision history", () => {
                 data: {
                   ...common,
                   version: 90,
+                  status: "READY_FOR_REVIEW",
+                  noItemsJustification: "Assessor documented no items for reconciliation fixture",
                   assessorUserId: users.ANALYST!,
                 },
               });
@@ -983,6 +987,8 @@ describe("M1 append-only, attributable decision history", () => {
     it(`retains both ${kind} assessment rationales and version context`, async () => {
       const data = {
         name: "Review history regression",
+        status: "READY_FOR_REVIEW" as const,
+        noItemsJustification: "Assessor documented no items for history fixture",
         tenantId: tenant,
         aiSystemId: system,
         version: 1,
@@ -1009,6 +1015,7 @@ describe("M1 append-only, attributable decision history", () => {
           })
         ).statusCode,
       ).toBe(200);
+      expect((await request("PATCH", url, "ANALYST", { status: "READY_FOR_REVIEW" })).statusCode).toBe(200);
       expect(
         (
           await request("POST", `${url}/review`, "REVIEWER", {

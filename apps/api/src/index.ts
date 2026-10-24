@@ -1,3 +1,5 @@
+import { registerSystemApprovalRoutes, productionApprovalIssue } from "./aiSystemApproval.js";
+import { assessmentReadiness } from "./assessmentReadiness.js";
 import { appendGovernanceDecision } from "./governanceDecisionHistory.js";
 import { roleHasPermission } from "@vendorguard/shared";
 import { proposeLegacyFinding, reviewLegacyFinding } from "./legacyFindingGovernance.js";
@@ -69,6 +71,7 @@ server.register(rateLimit, {
 
 registerGovernanceWriteGuard(server);
 server.register(registerRetirementRoutes);
+server.register(registerSystemApprovalRoutes);
 server.register(registerAuthRoutes);
 server.register(registerAiControlEvidenceRoutes);
 server.register(registerAiControlTestRoutes);
@@ -2352,6 +2355,14 @@ server.patch("/ai-systems/:id", async (request, reply) => {
     }
   }
 
+  if (body.lifecycleStatus === "APPROVED" && existing.lifecycleStatus !== "APPROVED") return reply.status(409).send({ error: "Use the independent system approval workflow" });
+  if (body.lifecycleStatus === "PRODUCTION" && existing.lifecycleStatus !== "PRODUCTION") {
+    if (Object.keys(request.body as object).some(key => key !== "lifecycleStatus")) return reply.status(400).send({ error: "Production progression must be a separate action after governance changes" });
+    if (existing.lifecycleStatus !== "APPROVED") return reply.status(409).send({ error: "An independently approved system is required before production" });
+    const issue = await productionApprovalIssue(existing.id, session.tenantId);
+    if (issue) return reply.status(409).send({ error: issue });
+  }
+
   const lifecycleChanged = body.lifecycleStatus !== undefined && body.lifecycleStatus !== existing.lifecycleStatus;
 
   const updated = await prisma.aiSystem.update({
@@ -2819,7 +2830,7 @@ server.patch("/ai-risk-assessments/:id", async (request, reply) => {
   if (!validRiskInput(request.body, "assessment")) {
     return reply.status(400).send({ error: "Invalid risk assessment input" });
   }
-  const body = request.body as { name?: string; status?: string; assessorUserId?: string | null };
+  const body = request.body as { name?: string; status?: string; assessorUserId?: string | null; noItemsJustification?: unknown };
 
   if (body.status !== undefined && !AI_RISK_ASSESSMENT_STATUSES.includes(body.status)) {
     return reply.status(400).send({ error: "Invalid status" });
@@ -2846,11 +2857,23 @@ server.patch("/ai-risk-assessments/:id", async (request, reply) => {
     }
   }
 
+  let noItemsJustification = existing.noItemsJustification;
+  if (body.noItemsJustification !== undefined) {
+    if (session.userId !== assessorUserId) return reply.status(403).send({ error: "Only the assigned assessor may record the no-items justification" });
+    if (body.noItemsJustification !== null && (typeof body.noItemsJustification !== "string" || !body.noItemsJustification.trim() || body.noItemsJustification.length > 4000)) return reply.status(400).send({ error: "noItemsJustification must be nonempty text of at most 4000 characters or null" });
+    noItemsJustification = typeof body.noItemsJustification === "string" ? body.noItemsJustification.trim() : null;
+  }
+  if (body.status === "READY_FOR_REVIEW") {
+    const issue = await assessmentReadiness("risk", existing.id, session.tenantId, assessorUserId, noItemsJustification);
+    if (issue) return reply.status(400).send({ error: issue });
+  }
+
   const statusChanged = body.status !== undefined && body.status !== existing.status;
 
   const updated = await prisma.aiRiskAssessment.update({
     where: { id: existing.id },
     data: {
+      noItemsJustification,
       name: body.name ?? undefined,
       status: (body.status as never) ?? undefined,
       assessorUserId,
@@ -3266,6 +3289,10 @@ server.post("/ai-risk-assessments/:id/review", async (request, reply) => {
     await auditDenied("self_review");
     return reply.status(403).send({ error: "The assessor cannot also review their own assessment" });
   }
+
+  if (assessment.status !== "READY_FOR_REVIEW") return reply.status(409).send({ error: "Only an assessment submitted for review can be decided" });
+  const readinessIssue = await assessmentReadiness("risk", assessment.id, session.tenantId, assessment.assessorUserId, assessment.noItemsJustification);
+  if (body.decision === "APPROVED" && readinessIssue) return reply.status(400).send({ error: readinessIssue });
 
   const newStatus = body.decision === "APPROVED" ? "COMPLETED" : "IN_PROGRESS";
 
@@ -3704,8 +3731,8 @@ server.patch("/ai-impact-assessments/:id", async (request, reply) => {
     return reply.status(409).send({ error: AI_IMPACT_LOCKED_MESSAGE });
   }
 
-  const body = (request.body ?? {}) as { name?: unknown; status?: unknown };
-  const data: { name?: string; status?: string } = {};
+  const body = (request.body ?? {}) as { name?: unknown; status?: unknown; noItemsJustification?: unknown };
+  const data: { name?: string; status?: string; noItemsJustification?: string | null } = {};
   if (body.name !== undefined) {
     if (typeof body.name !== "string" || !body.name.trim()) {
       return reply.status(400).send({ error: "name cannot be empty" });
@@ -3719,6 +3746,15 @@ server.patch("/ai-impact-assessments/:id", async (request, reply) => {
       });
     }
     data.status = body.status;
+  }
+  if (body.noItemsJustification !== undefined) {
+    if (session.userId !== assessment.assessorUserId) return reply.status(403).send({ error: "Only the assigned assessor may record the no-items justification" });
+    if (body.noItemsJustification !== null && (typeof body.noItemsJustification !== "string" || !body.noItemsJustification.trim() || body.noItemsJustification.length > 4000)) return reply.status(400).send({ error: "noItemsJustification must be nonempty text of at most 4000 characters or null" });
+    data.noItemsJustification = typeof body.noItemsJustification === "string" ? body.noItemsJustification.trim() : null;
+  }
+  if (body.status === "READY_FOR_REVIEW") {
+    const issue = await assessmentReadiness("impact", assessment.id, session.tenantId, assessment.assessorUserId, data.noItemsJustification !== undefined ? data.noItemsJustification : assessment.noItemsJustification);
+    if (issue) return reply.status(400).send({ error: issue });
   }
   if (Object.keys(data).length === 0) {
     return reply.status(400).send({ error: "No changes provided" });
@@ -3957,6 +3993,10 @@ server.post("/ai-impact-assessments/:id/review", async (request, reply) => {
     await auditDenied("self_review");
     return reply.status(403).send({ error: "The assessor cannot also review their own impact assessment" });
   }
+
+  if (assessment.status !== "READY_FOR_REVIEW") return reply.status(409).send({ error: "Only an assessment submitted for review can be decided" });
+  const readinessIssue = await assessmentReadiness("impact", assessment.id, session.tenantId, assessment.assessorUserId, assessment.noItemsJustification);
+  if (body.decision === "APPROVED" && readinessIssue) return reply.status(400).send({ error: readinessIssue });
 
   const newStatus = body.decision === "APPROVED" ? "COMPLETED" : "IN_PROGRESS";
 

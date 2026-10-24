@@ -36,7 +36,7 @@ export default function AssessmentsPage() {
 
   return (
     <main style={{ maxWidth: 900, margin: "0 auto", padding: "32px 24px" }}>
-      <h1 style={{ fontSize: 24, marginBottom: 4 }}>Assessment Workspace</h1>
+      <h1 style={{ fontSize: 24, marginBottom: 4 }}>Vendor Assessments</h1>
       <p style={{ color: "#8b96ac", fontSize: 13, marginBottom: 24 }}>
         {items.length} assessment{items.length === 1 ? "" : "s"} across your portfolio
       </p>

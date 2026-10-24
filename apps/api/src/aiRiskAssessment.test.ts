@@ -426,6 +426,7 @@ describe("AI Risk Assessment - human review (separation of duties)", () => {
   it("allows a REVIEWER to approve an assessment assessed by someone else, and completes it", async () => {
     const sysId = await createAiSystem(tenantAId, "ADMIN", adminUserId);
     const assessmentId = await createAssessment(sysId, tenantAId, "ANALYST", analystUserId, "Distinct Reviewer Test");
+    expect((await server.inject({ method: "PATCH", url: `/ai-risk-assessments/${assessmentId}`, cookies: { vg_session: await cookieFor(analystUserId, "ANALYST", tenantAId) }, payload: { status: "READY_FOR_REVIEW", noItemsJustification: "Assessor documented no risks identified in the test scope" } })).statusCode).toBe(200);
     const res = await server.inject({
       method: "POST", url: `/ai-risk-assessments/${assessmentId}/review`,
       cookies: { vg_session: await cookieFor(reviewerUserId, "REVIEWER", tenantAId) },
@@ -442,6 +443,7 @@ describe("AI Risk Assessment - human review (separation of duties)", () => {
   it("a REJECTED review does not complete the assessment", async () => {
     const sysId = await createAiSystem(tenantAId, "ADMIN", adminUserId);
     const assessmentId = await createAssessment(sysId, tenantAId, "ANALYST", analystUserId, "Rejected Review Test");
+    expect((await server.inject({ method: "PATCH", url: `/ai-risk-assessments/${assessmentId}`, cookies: { vg_session: await cookieFor(analystUserId, "ANALYST", tenantAId) }, payload: { status: "READY_FOR_REVIEW", noItemsJustification: "Assessor documented no risks identified in the test scope" } })).statusCode).toBe(200);
     const res = await server.inject({
       method: "POST", url: `/ai-risk-assessments/${assessmentId}/review`,
       cookies: { vg_session: await cookieFor(reviewerUserId, "REVIEWER", tenantAId) },
@@ -485,6 +487,7 @@ describe("AI Risk Assessment - human review (separation of duties)", () => {
   it("blocks a second review once approved and preserves the original review", async () => {
     const sysId = await createAiSystem(tenantAId, "ADMIN", adminUserId);
     const assessmentId = await createAssessment(sysId, tenantAId, "ANALYST", analystUserId, "Second Review Test");
+    expect((await server.inject({ method: "PATCH", url: `/ai-risk-assessments/${assessmentId}`, cookies: { vg_session: await cookieFor(analystUserId, "ANALYST", tenantAId) }, payload: { status: "READY_FOR_REVIEW", noItemsJustification: "Assessor documented no risks identified in the test scope" } })).statusCode).toBe(200);
     const first = await server.inject({
       method: "POST", url: `/ai-risk-assessments/${assessmentId}/review`,
       cookies: { vg_session: await cookieFor(reviewerUserId, "REVIEWER", tenantAId) },

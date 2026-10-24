@@ -27,7 +27,7 @@ export default async function FrameworksPage() {
 
   return (
     <main style={{ maxWidth: 800, margin: "0 auto", padding: "40px 20px" }}>
-      <h1 style={{ fontSize: 28, marginBottom: 4 }}>Framework Explorer</h1>
+      <h1 style={{ fontSize: 28, marginBottom: 4 }}>Compliance Frameworks</h1>
       <p style={{ color: "#8b96ac", marginBottom: 32 }}>
         {frameworks.length} frameworks available
       </p>

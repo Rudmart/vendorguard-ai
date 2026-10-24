@@ -439,9 +439,14 @@ export async function loadReportData(session: Session, aiSystemId?: string) {
             }),
           )
         : [];
+      const systemApprovals = bounded(await tx.aiSystemApproval.findMany({
+        where: systemWhere, take,
+        select: { id: true, aiSystemId: true, status: true, decidedAt: true, decidedByUserId: true },
+      }));
       return {
         generatedAt,
         systems,
+        systemApprovals,
         riskAssessments,
         impactAssessments,
         risks,

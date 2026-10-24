@@ -33,7 +33,7 @@ export default function RiskRegisterPage() {
   const rows = useMemo(() => all.filter((r) => (!system || r.aiSystem.id === system) && (!band || r.residualRating === band)), [all, system, band]);
   return (
     <ListPage
-      title="Risk Register"
+      title="AI Risk Register"
       purpose="Latest assessed posture: risks from each AI system's latest COMPLETED risk assessment. It is an assessment snapshot, not real-time monitoring. Planned treatment is a plan; only an approved Risk Acceptance is authoritative."
       error={error}
       loading={!data}

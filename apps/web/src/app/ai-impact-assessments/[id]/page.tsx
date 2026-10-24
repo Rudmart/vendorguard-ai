@@ -1,4 +1,5 @@
 "use client";
+import AssessmentSubmission from "../../assessment-submission";
 
 import { assessmentDisplayName } from "../../assessment-presentation";
 
@@ -41,6 +42,8 @@ type ImpactSummary = {
 type Person = { id: string; displayName: string; email: string } | null;
 
 type ImpactAssessment = {
+  noItemsJustification?: string | null;
+  assessorUserId?: string | null;
   id: string;
   name: string;
   version: number;
@@ -720,6 +723,7 @@ export default function AiImpactAssessmentPage() {
             </button>
           </div>
         )}
+        <AssessmentSubmission kind="impact" id={current.id} status={current.status} count={current.impacts.length} justification={current.noItemsJustification} assessorUserId={current.assessorUserId} refresh={reload} />
         <ErrorText message={statusError} />
 
         <div style={{ ...insetStyle, marginTop: 16 }}>

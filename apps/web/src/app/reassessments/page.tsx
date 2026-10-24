@@ -25,7 +25,7 @@ export default function ReassessmentsPage() {
   const rows = useMemo(() => all.filter((r) => (!system || r.aiSystem.id === system) && (!status || r.status === status)), [all, system, status]);
   return (
     <ListPage
-      title="Reassessments"
+      title="AI Reassessments"
       purpose="Governed review cycles across AI systems. In-progress cycles first, then completed cycles newest first. Each reassessment is started and completed on its AI system."
       error={error}
       loading={!data}

@@ -845,7 +845,9 @@ export function buildReport(data: ReportData, filter: ReportFilter) {
     null,
     "historical",
   );
+  const systemApprovalRefs = data.systemApprovals.map(a => ref(a.id, "AiSystemApproval", "System governance approval", a.status, [a.aiSystemId], `/ai-systems/${a.aiSystemId}#system-approval`, {}, decision(a.id, a.status === "PENDING_REVIEW" ? null : a.status, a.decidedByUserId, a.decidedAt))).filter(inScope);
   const pending = [
+    ...systemApprovalRefs,
     ...riskAs,
     ...impactAs,
     ...useCases,

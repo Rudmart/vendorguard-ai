@@ -41,6 +41,9 @@ async function newRiskAssessment(sysId: string) {
 }
 
 async function approve(assessmentId: string) {
+  const count = await prisma.aiRisk.count({ where: { assessmentId, tenantId: tenantAId } });
+  const submitted = await call("PATCH", `/ai-risk-assessments/${assessmentId}`, analystUserId, "ANALYST", { status: "READY_FOR_REVIEW", ...(count === 0 ? { noItemsJustification: "Assessor reviewed the disposable reassessment fixture scope and identified no risks" } : {}) });
+  expect(submitted.status).toBe(200);
   const res = await call("POST", `/ai-risk-assessments/${assessmentId}/review`, reviewerUserId, "REVIEWER", { decision: "APPROVED", rationale: "Reviewed" });
   expect(res.status).toBe(200);
 }

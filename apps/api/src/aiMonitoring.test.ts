@@ -297,9 +297,9 @@ describe("Derived governance context", () => {
 describe("Lifecycle audit enrichment", () => {
   it("records from/to on lifecycle changes, not on other updates; retirement keeps its own event", async () => {
     const sysId = await newSystem();
-    expect((await call("PATCH", `/ai-systems/${sysId}`, adminUserId, "ADMIN", { lifecycleStatus: "PRODUCTION" })).status).toBe(200);
+    expect((await call("PATCH", `/ai-systems/${sysId}`, adminUserId, "ADMIN", { lifecycleStatus: "ASSESSMENT" })).status).toBe(200);
     const lc = await prisma.auditEvent.findFirst({ where: { tenantId: tenantAId, action: "ai_system.lifecycle_changed", targetId: sysId } });
-    expect(lc?.metadataJson).toEqual({ from: "PROPOSED", to: "PRODUCTION" });
+    expect(lc?.metadataJson).toEqual({ from: "PROPOSED", to: "ASSESSMENT" });
     expect((await call("PATCH", `/ai-systems/${sysId}`, adminUserId, "ADMIN", { name: "Renamed" })).status).toBe(200);
     const upd = await prisma.auditEvent.findFirst({ where: { tenantId: tenantAId, action: "ai_system.updated", targetId: sysId } });
     expect(upd).not.toBeNull();

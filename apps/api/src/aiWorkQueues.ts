@@ -47,6 +47,21 @@ export async function pendingReviewsFor(session: Session): Promise<PendingItem[]
   const t = session.tenantId;
   const items: PendingItem[] = [];
 
+  if (hasPermission(session, "ai-system:approve")) {
+    const approvals = await prisma.aiSystemApproval.findMany({ where: { tenantId: t, status: "PENDING_REVIEW", requestedByUserId: { not: me }, aiSystem: { tenantId: t, lifecycleStatus: "PENDING_APPROVAL", ownerUserId: { not: me } } }, include: { aiSystem: { select: { name: true } } } });
+    for (const a of approvals.filter(a => !a.independentOfUserIds.includes(me))) items.push({ type: "AI_SYSTEM_APPROVAL", id: a.id, title: a.aiSystem.name, context: a.aiSystem.name, since: a.requestedAt, why: "System readiness awaiting an independent human decision", href: `/ai-systems/${a.aiSystemId}#system-approval` });
+  }
+
+  if (hasPermission(session, "ai-use-case:review")) {
+    const useCases = await prisma.aiUseCase.findMany({
+      where: { tenantId: t, status: "PENDING_REVIEW", ownerUserId: { not: null }, aiSystem: { tenantId: t, lifecycleStatus: { not: "RETIRED" } } },
+      include: { aiSystem: { select: { name: true } } },
+    });
+    for (const u of useCases.filter(x => x.createdByUserId !== me && x.ownerUserId !== me)) {
+      items.push({ type: "AI_USE_CASE_REVIEW", id: u.id, title: u.name, context: u.aiSystem.name, since: u.submittedAt, why: "Use case awaiting independent review (you are neither creator nor business owner)", href: `/ai-use-cases/${u.id}` });
+    }
+  }
+
   if (hasPermission(session, "ai-control-evidence:review")) {
     const links = await prisma.aiSystemControlEvidence.findMany({
       where: { tenantId: t, status: "PENDING_REVIEW", aiSystemControl: {aiSystem:{lifecycleStatus:{not:"RETIRED"}}} },

@@ -1,4 +1,5 @@
 "use client";
+import AssessmentSubmission from "../../assessment-submission";
 
 import { assessmentDisplayName } from "../../assessment-presentation";
 import { useEffect, useState } from "react";
@@ -40,6 +41,8 @@ type Risk = {
 };
 
 type AssessmentDetail = {
+  noItemsJustification?: string | null;
+  assessorUserId?: string | null;
   id: string;
   name: string;
   status: string;
@@ -435,6 +438,7 @@ export default function AiRiskAssessmentPage() {
       {assessmentDisplayName(assessment.name, assessment.version) !== "AI Risk Assessment" && <p>{assessmentDisplayName(assessment.name, assessment.version)}</p>}
       <p style={{ color: "#8b96ac", fontSize: 13, marginBottom: 24, fontStyle: "italic" }}>AI assists. Humans govern.</p>
 
+      <AssessmentSubmission kind="risk" id={assessment.id} status={assessment.status} count={assessment.risks.length} justification={assessment.noItemsJustification} assessorUserId={assessment.assessorUserId} refresh={loadAssessment} />
       <div style={cardStyle}>
         <h2 style={{ fontSize: 15, marginTop: 0, marginBottom: 16 }}>Assessment Overview</h2>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16 }}>

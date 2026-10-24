@@ -20,7 +20,7 @@ export default function GovernanceReportPage() {
   );
   return (
     <ListPage
-      title="Executive & Governance Reporting"
+      title="Governance Reports"
       purpose="AI ASSISTS. HUMANS GOVERN. Recorded facts, with source traceability; no automatic governance decisions."
       error={error}
       loading={!data && !error}

@@ -410,6 +410,7 @@ describe("AI Impact Assessment - human review (separation of duties)", () => {
 
   it("allows an independent REVIEWER to approve, completes the assessment, and audits it", async () => {
     const { assessmentId } = await newAssessmentId();
+    expect((await server.inject({ method: "PATCH", url: `/ai-impact-assessments/${assessmentId}`, cookies: { vg_session: await cookieFor(analystUserId, "ANALYST", tenantAId) }, payload: { status: "READY_FOR_REVIEW", noItemsJustification: "Assessor documented no impacts identified in the test scope" } })).statusCode).toBe(200);
     const res = await review(assessmentId, reviewerUserId, "REVIEWER", "APPROVED", "Independent review complete");
     expect(res.statusCode).toBe(200);
     const body = JSON.parse(res.body);
@@ -425,6 +426,7 @@ describe("AI Impact Assessment - human review (separation of duties)", () => {
 
   it("blocks a second review after approval, preserves the original, and audits the denial", async () => {
     const { assessmentId } = await newAssessmentId();
+    expect((await server.inject({ method: "PATCH", url: `/ai-impact-assessments/${assessmentId}`, cookies: { vg_session: await cookieFor(analystUserId, "ANALYST", tenantAId) }, payload: { status: "READY_FOR_REVIEW", noItemsJustification: "Assessor documented no impacts identified in the test scope" } })).statusCode).toBe(200);
     await review(assessmentId, reviewerUserId, "REVIEWER", "APPROVED", "Original approval");
     const before = await prisma.aiImpactAssessment.findUnique({ where: { id: assessmentId } });
     const second = await review(assessmentId, adminUserId, "ADMIN", "REJECTED", "Attempted overwrite");
@@ -439,6 +441,7 @@ describe("AI Impact Assessment - human review (separation of duties)", () => {
 
   it("allows only one of two simultaneous approvals to succeed", async () => {
     const { assessmentId } = await newAssessmentId();
+    expect((await server.inject({ method: "PATCH", url: `/ai-impact-assessments/${assessmentId}`, cookies: { vg_session: await cookieFor(analystUserId, "ANALYST", tenantAId) }, payload: { status: "READY_FOR_REVIEW", noItemsJustification: "Assessor documented no impacts identified in the test scope" } })).statusCode).toBe(200);
     const [first, second] = await Promise.all([
       review(assessmentId, reviewerUserId, "REVIEWER", "APPROVED", "Reviewer approval"),
       review(assessmentId, adminUserId, "ADMIN", "APPROVED", "Admin approval"),
@@ -453,6 +456,7 @@ describe("AI Impact Assessment - human review (separation of duties)", () => {
 
   it("a REJECTED review keeps the assessment editable and not completed", async () => {
     const { assessmentId } = await newAssessmentId();
+    expect((await server.inject({ method: "PATCH", url: `/ai-impact-assessments/${assessmentId}`, cookies: { vg_session: await cookieFor(analystUserId, "ANALYST", tenantAId) }, payload: { status: "READY_FOR_REVIEW", noItemsJustification: "Assessor documented no impacts identified in the test scope" } })).statusCode).toBe(200);
     const res = await review(assessmentId, reviewerUserId, "REVIEWER", "REJECTED", "Needs more detail");
     expect(res.statusCode).toBe(200);
     expect(JSON.parse(res.body).status).toBe("IN_PROGRESS");
@@ -486,6 +490,7 @@ describe("AI Impact Assessment - immutability after COMPLETED", () => {
     lockedAssessmentId = assessmentId;
     lockedImpactId = JSON.parse((await addImpact(assessmentId, adverseImpact)).body).id;
     await addImpact(assessmentId, beneficialImpact);
+    expect((await server.inject({ method: "PATCH", url: `/ai-impact-assessments/${assessmentId}`, cookies: { vg_session: await cookieFor(analystUserId, "ANALYST", tenantAId) }, payload: { status: "READY_FOR_REVIEW" } })).statusCode).toBe(200);
     const approved = await review(assessmentId, reviewerUserId, "REVIEWER", "APPROVED", "Approved before lock test");
     expect(approved.statusCode).toBe(200);
     snapshotBefore = await snapshot(assessmentId);
