@@ -11,7 +11,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@fastify/cookie": "9",
+    "@fastify/cookie": "11",
     "@fastify/cors": "8",
     "@modelcontextprotocol/sdk": "^1.0.0",
     "@vendorguard/ai-client": "workspace:^",
