@@ -109,6 +109,7 @@ enum AssessmentStatus {
 // ---------------------------------------------------------------------------
 
 model Tenant {
+  vendorReassessments VendorReassessment[]
   systemApprovals AiSystemApproval[]
   governanceDecisions GovernanceDecision[]
   retirements AiSystemRetirement[]
@@ -220,6 +221,7 @@ model TenantMembership {
 // ---------------------------------------------------------------------------
 
 model Vendor {
+  reassessments VendorReassessment[]
   id                       String    @id @default(uuid())
   tenantId                 String
   legalName                String
@@ -327,6 +329,8 @@ model Subprocessor {
 // ---------------------------------------------------------------------------
 
 model Assessment {
+  priorVendorReassessments VendorReassessment[] @relation("VendorPriorAssessment")
+  newVendorReassessment VendorReassessment? @relation("VendorNewAssessment")
   id                    String            @id @default(uuid())
   tenantId              String
   vendorId              String
@@ -603,6 +607,7 @@ model ControlMapping {
 // ---------------------------------------------------------------------------
 
 model ControlFinding {
+  vendorAcceptances RiskAcceptance[] @relation("VendorAcceptanceFinding")
   proposedStatus FindingStatus?
   proposedByUserId String?
   proposedBy User? @relation("FindingProposer", fields: [proposedByUserId], references: [id], onDelete: Restrict)
@@ -711,6 +716,10 @@ model RemediationAction {
 }
 
 model RiskAcceptance {
+  vendorFindingId String?
+  vendorRiskSnapshot Json?
+  vendorRiskContextHash String?
+  vendorFinding ControlFinding? @relation("VendorAcceptanceFinding", fields: [vendorFindingId], references: [id], onDelete: Restrict)
   reassessments AiReassessment[] // Step 14: context only - never renewed or changed
   id               String    @id @default(uuid())
   tenantId         String
@@ -750,6 +759,32 @@ enum RiskAcceptanceStatus {
   PENDING_REVIEW
   APPROVED
   REJECTED
+}
+
+model VendorReassessment {
+  id String @id @default(uuid())
+  tenantId String
+  vendorId String
+  priorAssessmentId String
+  newAssessmentId String @unique
+  activeKey String? @unique
+  trigger String
+  rationale String
+  materialChanges String
+  targetDate DateTime?
+  status String @default("IN_PROGRESS")
+  startedByUserId String
+  startedAt DateTime @default(now())
+  completedByUserId String?
+  completedAt DateTime?
+  conclusion String?
+  priorSnapshot Json
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  vendor Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  priorAssessment Assessment @relation("VendorPriorAssessment", fields: [priorAssessmentId], references: [id], onDelete: Restrict)
+  newAssessment Assessment @relation("VendorNewAssessment", fields: [newAssessmentId], references: [id], onDelete: Restrict)
+  @@index([tenantId, vendorId, status])
+  @@map("vendor_reassessments")
 }
 
 // ---------------------------------------------------------------------------

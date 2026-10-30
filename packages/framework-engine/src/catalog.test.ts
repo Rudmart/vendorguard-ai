@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   FRAMEWORK_CATALOG,
@@ -23,10 +25,13 @@ describe("framework catalog integrity", () => {
     }
   });
 
-  it("no CONDITIONAL or DEFERRED framework claims seeded controls", () => {
-    const notActive = FRAMEWORK_CATALOG.filter((f) => f.status !== "ACTIVE");
-    for (const f of notActive) {
-      expect(f.seededControlCount, `${f.id} is ${f.status} but claims seeded controls`).toBe(0);
+  it("DEFERRED content remains unseeded and populated CONDITIONAL counts match source-linked files", () => {
+    for (const f of FRAMEWORK_CATALOG.filter(f => f.status === "DEFERRED")) expect(f.seededControlCount).toBe(0);
+    for (const f of FRAMEWORK_CATALOG.filter(f => f.status === "CONDITIONAL" && f.seededControlCount > 0)) {
+      const data = JSON.parse(readFileSync(resolve("../../frameworks", f.id, "controls.json"), "utf8"));
+      expect(data.controls).toHaveLength(f.seededControlCount);
+      expect(data.sourceUrl).toBe(f.sourceUrl);
+      expect(data.licenseNote).toBeTruthy();
     }
   });
 
@@ -59,12 +64,11 @@ describe("framework catalog integrity", () => {
     );
   });
 
-  it("OWASP/MITRE/NIST 800-53 platform frameworks are catalogued under PLATFORM_SECURITY, not vendor assessment", () => {
+  it("OWASP/MITRE platform frameworks are catalogued under PLATFORM_SECURITY, not vendor assessment", () => {
     const platformIds = [
       "owasp-api-top10",
       "owasp-web-top10",
       "owasp-llm-top10-platform",
-      "nist-800-53",
       "mitre-attack",
       "mitre-atlas-platform",
     ];

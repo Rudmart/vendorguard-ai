@@ -162,20 +162,25 @@ it("rejects foreign and wrong-vendor assessment relationships on vendor acceptan
   const ownOtherVendor = await vendor();
   const other = await prisma.assessment.create({ data: { tenantId: tenants[0]!, vendorId: ownOtherVendor.id, scoringModelVersion: "section17", startedByUserId: users[1]! } });
   for (const id of [foreign.id, other.id, randomUUID()]) {
-    expect((await call("POST", `/vendors/${vendorId}/risk-acceptance`, { justification: "Wrong relationship", assessmentId: id }, "REVIEWER")).statusCode).toBe(404);
+    expect((await call("POST", `/vendors/${vendorId}/risk-acceptance`, { justification: "Wrong relationship", residualRiskStatement: "Residual risk requires an independent decision", expiresAt: new Date(Date.now() + 86_400_000).toISOString(), assessmentId: id }, "REVIEWER")).statusCode).toBe(404);
     expect(await prisma.riskAcceptance.count({ where: { vendorId, assessmentId: id } })).toBe(0);
   }
 });
-it("records legacy vendor acceptance with human attribution and an atomic audit", async () => {
+it("records requested vendor acceptance with independent human attribution and an atomic audit", async () => {
   const a = await assessment();
+  const payload = { justification: "Human business decision", residualRiskStatement: "Residual risk requires independent acceptance", expiresAt: new Date(Date.now() + 86_400_000).toISOString(), assessmentId: a.id };
   failModel = "AuditEvent";
-  const failed = await call("POST", `/vendors/${vendorId}/risk-acceptance`, { justification: "Human business decision", assessmentId: a.id }, "REVIEWER"); failModel = "";
+  const failed = await call("POST", `/vendors/${vendorId}/risk-acceptance`, payload, "REVIEWER"); failModel = "";
   expect(failed.statusCode).toBe(500);
   expect(await prisma.riskAcceptance.count({ where: { assessmentId: a.id } })).toBe(0);
-  const good = await call("POST", `/vendors/${vendorId}/risk-acceptance`, { justification: "Human business decision", assessmentId: a.id }, "REVIEWER");
-  expect(good.statusCode).toBe(200);
-  expect(good.json().riskAcceptance).toMatchObject({ approvedByUserId: users[2], status: "APPROVED" });
-  expect(await prisma.auditEvent.findFirst({ where: { targetId: good.json().riskAcceptance.id, actorUserId: users[2], action: "vendor.risk_accepted" } })).not.toBeNull();
+  const good = await call("POST", `/vendors/${vendorId}/risk-acceptance`, payload, "REVIEWER");
+  expect(good.statusCode).toBe(201);
+  expect(good.json().riskAcceptance).toMatchObject({ requestedByUserId: users[2], approvedByUserId: null, status: "PENDING_REVIEW" });
+  expect(await prisma.auditEvent.findFirst({ where: { targetId: good.json().riskAcceptance.id, actorUserId: users[2], action: "vendor.risk_acceptance_requested" } })).not.toBeNull();
+  const decision = await call("POST", `/vendor-risk-acceptances/${good.json().riskAcceptance.id}/decision`, { decision: "APPROVED", rationale: "Independent review of the recorded residual risk" }, "ADMIN");
+  expect(decision.statusCode).toBe(200);
+  expect(decision.json().riskAcceptance).toMatchObject({ requestedByUserId: users[2], approvedByUserId: users[0], status: "APPROVED" });
+  expect(await prisma.auditEvent.findFirst({ where: { targetId: good.json().riskAcceptance.id, actorUserId: users[0], action: "vendor.risk_acceptance_decided" } })).not.toBeNull();
 });
 for (const action of ["submit", "review", "approve"] as const) it(`permits only one concurrent questionnaire ${action} and preserves the winner`, async () => {
   const q = await questionnaire(action === "submit" ? "IN_PROGRESS" : action === "review" ? "SUBMITTED" : "REVIEWED");

@@ -14,6 +14,9 @@ type FrameworkDetail = {
   frameworkId: string;
   frameworkName: string;
   version: string;
+  sourceUrl?: string;
+  licenseNote?: string;
+  demonstrationSubsetDisclaimer?: string;
   controls: Control[];
 };
 
@@ -51,6 +54,9 @@ export default async function FrameworkDetailPage({ params }: { params: { framew
       <p style={{ color: "#8b96ac", marginBottom: 32 }}>
         Version {data.version} &middot; {data.controls.length} controls
       </p>
+      {data.demonstrationSubsetDisclaimer && <p>{data.demonstrationSubsetDisclaimer}</p>}
+      {data.licenseNote && <p>{data.licenseNote}</p>}
+      {data.sourceUrl && <p><a href={data.sourceUrl} target="_blank" rel="noreferrer">Authoritative source</a></p>}
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         {data.controls.map((c) => (
           <div

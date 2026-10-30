@@ -1,0 +1,55 @@
+{
+  "frameworkId": "sox-icfr",
+  "frameworkName": "SOX Section 404 (vendor-facing ICFR review subset)",
+  "version": "Sarbanes-Oxley Section 404",
+  "sourceUrl": "https://uscode.house.gov/view.xhtml?req=granuleid:USC-prelim-title15-section7262&num=0&edition=prelim",
+  "licenseNote": "Original scoped implementation-review summaries with source identifiers. Not a reproduction of the complete source publication; not legal advice.",
+  "contentType": "SCOPED_REVIEW_SUMMARIES",
+  "demonstrationSubsetDisclaimer": "Scoped reference/assessment support only, not full framework coverage and not a compliance conclusion, certification, attestation or vendor approval.",
+  "controls": [
+    {
+      "controlId": "404-01",
+      "title": "Identify financial-reporting dependencies",
+      "domain": "Vendor governance",
+      "summary": "Document the vendor-specific scope, accountable human, implementation evidence and testing outcome relevant to identify financial-reporting dependencies. Record exceptions and the human governance determination separately.",
+      "expectedEvidenceTypes": [
+        "Implementation record",
+        "Assessment evidence"
+      ],
+      "validationGuidance": "An authorized human must establish applicability and evaluate actual source requirements and evidence. Library presence is not a test result, approval or compliance conclusion."
+    },
+    {
+      "controlId": "404-02",
+      "title": "Assign internal-control accountability",
+      "domain": "Vendor governance",
+      "summary": "Document the vendor-specific scope, accountable human, implementation evidence and testing outcome relevant to assign internal-control accountability. Record exceptions and the human governance determination separately.",
+      "expectedEvidenceTypes": [
+        "Implementation record",
+        "Assessment evidence"
+      ],
+      "validationGuidance": "An authorized human must establish applicability and evaluate actual source requirements and evidence. Library presence is not a test result, approval or compliance conclusion."
+    },
+    {
+      "controlId": "404-03",
+      "title": "Document control assessment evidence",
+      "domain": "Vendor governance",
+      "summary": "Document the vendor-specific scope, accountable human, implementation evidence and testing outcome relevant to document control assessment evidence. Record exceptions and the human governance determination separately.",
+      "expectedEvidenceTypes": [
+        "Implementation record",
+        "Assessment evidence"
+      ],
+      "validationGuidance": "An authorized human must establish applicability and evaluate actual source requirements and evidence. Library presence is not a test result, approval or compliance conclusion."
+    },
+    {
+      "controlId": "404-04",
+      "title": "Escalate financial-reporting control gaps",
+      "domain": "Vendor governance",
+      "summary": "Document the vendor-specific scope, accountable human, implementation evidence and testing outcome relevant to escalate financial-reporting control gaps. Record exceptions and the human governance determination separately.",
+      "expectedEvidenceTypes": [
+        "Implementation record",
+        "Assessment evidence"
+      ],
+      "validationGuidance": "An authorized human must establish applicability and evaluate actual source requirements and evidence. Library presence is not a test result, approval or compliance conclusion."
+    }
+  ]
+}

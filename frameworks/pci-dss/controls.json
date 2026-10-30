@@ -1,0 +1,143 @@
+{
+  "frameworkId": "pci-dss",
+  "frameworkName": "PCI DSS 4.0.1 (requirement references only)",
+  "version": "4.0.1",
+  "sourceUrl": "https://www.pcisecuritystandards.org/document_library/",
+  "licenseNote": "Reference metadata only. No proprietary control, safeguard, criterion, testing-procedure or points-of-focus text is reproduced or adapted. Obtain authorized source content and permissions from its owner before substantive assessment.",
+  "contentType": "REFERENCE_METADATA",
+  "demonstrationSubsetDisclaimer": "Scoped reference/assessment support only, not full framework coverage and not a compliance conclusion, certification, attestation or vendor approval.",
+  "controls": [
+    {
+      "controlId": "1",
+      "title": "Reference to PCI DSS requirement 1",
+      "domain": "Reference metadata",
+      "summary": "Reference-only index entry 1. Consult the authorized source publication to determine the actual applicable requirements; this entry does not contain authoritative control text.",
+      "expectedEvidenceTypes": [
+        "Authorized source reference",
+        "Human applicability determination"
+      ],
+      "validationGuidance": "An authorized human must establish applicability and evaluate actual source requirements and evidence. Library presence is not a test result, approval or compliance conclusion."
+    },
+    {
+      "controlId": "2",
+      "title": "Reference to PCI DSS requirement 2",
+      "domain": "Reference metadata",
+      "summary": "Reference-only index entry 2. Consult the authorized source publication to determine the actual applicable requirements; this entry does not contain authoritative control text.",
+      "expectedEvidenceTypes": [
+        "Authorized source reference",
+        "Human applicability determination"
+      ],
+      "validationGuidance": "An authorized human must establish applicability and evaluate actual source requirements and evidence. Library presence is not a test result, approval or compliance conclusion."
+    },
+    {
+      "controlId": "3",
+      "title": "Reference to PCI DSS requirement 3",
+      "domain": "Reference metadata",
+      "summary": "Reference-only index entry 3. Consult the authorized source publication to determine the actual applicable requirements; this entry does not contain authoritative control text.",
+      "expectedEvidenceTypes": [
+        "Authorized source reference",
+        "Human applicability determination"
+      ],
+      "validationGuidance": "An authorized human must establish applicability and evaluate actual source requirements and evidence. Library presence is not a test result, approval or compliance conclusion."
+    },
+    {
+      "controlId": "4",
+      "title": "Reference to PCI DSS requirement 4",
+      "domain": "Reference metadata",
+      "summary": "Reference-only index entry 4. Consult the authorized source publication to determine the actual applicable requirements; this entry does not contain authoritative control text.",
+      "expectedEvidenceTypes": [
+        "Authorized source reference",
+        "Human applicability determination"
+      ],
+      "validationGuidance": "An authorized human must establish applicability and evaluate actual source requirements and evidence. Library presence is not a test result, approval or compliance conclusion."
+    },
+    {
+      "controlId": "5",
+      "title": "Reference to PCI DSS requirement 5",
+      "domain": "Reference metadata",
+      "summary": "Reference-only index entry 5. Consult the authorized source publication to determine the actual applicable requirements; this entry does not contain authoritative control text.",
+      "expectedEvidenceTypes": [
+        "Authorized source reference",
+        "Human applicability determination"
+      ],
+      "validationGuidance": "An authorized human must establish applicability and evaluate actual source requirements and evidence. Library presence is not a test result, approval or compliance conclusion."
+    },
+    {
+      "controlId": "6",
+      "title": "Reference to PCI DSS requirement 6",
+      "domain": "Reference metadata",
+      "summary": "Reference-only index entry 6. Consult the authorized source publication to determine the actual applicable requirements; this entry does not contain authoritative control text.",
+      "expectedEvidenceTypes": [
+        "Authorized source reference",
+        "Human applicability determination"
+      ],
+      "validationGuidance": "An authorized human must establish applicability and evaluate actual source requirements and evidence. Library presence is not a test result, approval or compliance conclusion."
+    },
+    {
+      "controlId": "7",
+      "title": "Reference to PCI DSS requirement 7",
+      "domain": "Reference metadata",
+      "summary": "Reference-only index entry 7. Consult the authorized source publication to determine the actual applicable requirements; this entry does not contain authoritative control text.",
+      "expectedEvidenceTypes": [
+        "Authorized source reference",
+        "Human applicability determination"
+      ],
+      "validationGuidance": "An authorized human must establish applicability and evaluate actual source requirements and evidence. Library presence is not a test result, approval or compliance conclusion."
+    },
+    {
+      "controlId": "8",
+      "title": "Reference to PCI DSS requirement 8",
+      "domain": "Reference metadata",
+      "summary": "Reference-only index entry 8. Consult the authorized source publication to determine the actual applicable requirements; this entry does not contain authoritative control text.",
+      "expectedEvidenceTypes": [
+        "Authorized source reference",
+        "Human applicability determination"
+      ],
+      "validationGuidance": "An authorized human must establish applicability and evaluate actual source requirements and evidence. Library presence is not a test result, approval or compliance conclusion."
+    },
+    {
+      "controlId": "9",
+      "title": "Reference to PCI DSS requirement 9",
+      "domain": "Reference metadata",
+      "summary": "Reference-only index entry 9. Consult the authorized source publication to determine the actual applicable requirements; this entry does not contain authoritative control text.",
+      "expectedEvidenceTypes": [
+        "Authorized source reference",
+        "Human applicability determination"
+      ],
+      "validationGuidance": "An authorized human must establish applicability and evaluate actual source requirements and evidence. Library presence is not a test result, approval or compliance conclusion."
+    },
+    {
+      "controlId": "10",
+      "title": "Reference to PCI DSS requirement 10",
+      "domain": "Reference metadata",
+      "summary": "Reference-only index entry 10. Consult the authorized source publication to determine the actual applicable requirements; this entry does not contain authoritative control text.",
+      "expectedEvidenceTypes": [
+        "Authorized source reference",
+        "Human applicability determination"
+      ],
+      "validationGuidance": "An authorized human must establish applicability and evaluate actual source requirements and evidence. Library presence is not a test result, approval or compliance conclusion."
+    },
+    {
+      "controlId": "11",
+      "title": "Reference to PCI DSS requirement 11",
+      "domain": "Reference metadata",
+      "summary": "Reference-only index entry 11. Consult the authorized source publication to determine the actual applicable requirements; this entry does not contain authoritative control text.",
+      "expectedEvidenceTypes": [
+        "Authorized source reference",
+        "Human applicability determination"
+      ],
+      "validationGuidance": "An authorized human must establish applicability and evaluate actual source requirements and evidence. Library presence is not a test result, approval or compliance conclusion."
+    },
+    {
+      "controlId": "12",
+      "title": "Reference to PCI DSS requirement 12",
+      "domain": "Reference metadata",
+      "summary": "Reference-only index entry 12. Consult the authorized source publication to determine the actual applicable requirements; this entry does not contain authoritative control text.",
+      "expectedEvidenceTypes": [
+        "Authorized source reference",
+        "Human applicability determination"
+      ],
+      "validationGuidance": "An authorized human must establish applicability and evaluate actual source requirements and evidence. Library presence is not a test result, approval or compliance conclusion."
+    }
+  ]
+}

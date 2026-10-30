@@ -151,27 +151,35 @@ describe("GET /reviews/findings (queue)", () => {
 });
 
 describe("POST /vendors/:id/risk-acceptance (higher authority bar than finding review)", () => {
-  it("rejects a REVIEWER-authorized-but-wrong-permission check correctly, since REVIEWER IS in RISK_ACCEPTANCE_ROLES", async () => {
+  it("allows a REVIEWER to request acceptance without approving their own request", async () => {
     const res = await server.inject({
       method: "POST",
       url: `/vendors/${vendorId}/risk-acceptance`,
       cookies: { vg_session: await cookieFor(reviewerUserId, "REVIEWER") },
-      payload: { justification: "Compensating controls in place, residual risk accepted for this quarter." },
+      payload: { justification: "Compensating controls in place, residual risk proposed for this quarter.", assessmentId, residualRiskStatement: "Residual vendor risk remains", expiresAt: new Date(Date.now() + 86_400_000).toISOString() },
     });
-    expect(res.statusCode).toBe(200);
+    expect(res.statusCode).toBe(201);
     const body = JSON.parse(res.body);
     expect(body.riskAcceptance.tenantId).toBe(tenantId);
-    expect(body.riskAcceptance.approvedByUserId).toBe(reviewerUserId);
+    expect(body.riskAcceptance.requestedByUserId).toBe(reviewerUserId);
+    expect(body.riskAcceptance.approvedByUserId).toBeNull();
+    expect(body.riskAcceptance.status).toBe("PENDING_REVIEW");
+    expect((await server.inject({ method: "POST", url: `/vendor-risk-acceptances/${body.riskAcceptance.id}/decision`, cookies: { vg_session: await cookieFor(reviewerUserId, "REVIEWER") }, payload: { decision: "APPROVED", rationale: "Self approval attempt" } })).statusCode).toBe(403);
   });
 
-  it("rejects an ANALYST, who is not in RISK_ACCEPTANCE_ROLES even though finding review authority differs", async () => {
+  it("allows an ANALYST proposal but denies final acceptance authority", async () => {
     const res = await server.inject({
       method: "POST",
       url: `/vendors/${vendorId}/risk-acceptance`,
       cookies: { vg_session: await cookieFor(analystUserId, "ANALYST") },
-      payload: { justification: "test" },
+      payload: { justification: "Independent acceptance requested", assessmentId, residualRiskStatement: "Residual vendor risk remains", expiresAt: new Date(Date.now() + 86_400_000).toISOString() },
     });
-    expect(res.statusCode).toBe(403);
+    expect(res.statusCode).toBe(201);
+    const id = res.json().riskAcceptance.id;
+    expect((await server.inject({ method: "POST", url: `/vendor-risk-acceptances/${id}/decision`, cookies: { vg_session: await cookieFor(analystUserId, "ANALYST") }, payload: { decision: "APPROVED", rationale: "Unauthorized decision" } })).statusCode).toBe(403);
+    const decision = await server.inject({ method: "POST", url: `/vendor-risk-acceptances/${id}/decision`, cookies: { vg_session: await cookieFor(reviewerUserId, "REVIEWER") }, payload: { decision: "APPROVED", rationale: "Independent review of residual risk" } });
+    expect(decision.statusCode).toBe(200);
+    expect(decision.json().riskAcceptance.approvedByUserId).toBe(reviewerUserId);
   });
 
   it("rejects a risk acceptance with no justification", async () => {

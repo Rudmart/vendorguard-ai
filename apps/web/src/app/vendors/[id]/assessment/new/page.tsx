@@ -1,21 +1,9 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { GovernanceInfo, useCurrentUser } from "../../../../current-user";
 import { useRouter, useParams } from "next/navigation";
 
-const AVAILABLE_FRAMEWORKS = [
-  { id: "nist-csf-2.0", name: "NIST Cybersecurity Framework 2.0" },
-  { id: "iso-27001-2022", name: "ISO/IEC 27001:2022" },
-  { id: "nist-ai-rmf", name: "NIST AI Risk Management Framework" },
-  { id: "nist-800-161", name: "NIST SP 800-161r1 (Supply Chain)" },
-  { id: "ffiec-outsourcing", name: "FFIEC IT Examination Handbook" },
-  { id: "glba-safeguards", name: "GLBA Safeguards Rule" },
-  { id: "nist-800-66", name: "NIST SP 800-66 (HIPAA)" },
-  { id: "iso-22301", name: "ISO 22301 (Business Continuity)" },
-  { id: "eu-ai-act", name: "EU AI Act (Regulation (EU) 2024/1689)" },
-  { id: "iso-42001", name: "ISO/IEC 42001:2023 (AI Management System)" },
-  { id: "iso-23894", name: "ISO/IEC 23894:2023 (AI Risk Management)" },
-];
+
 
 export default function NewAssessmentPage() {
   const router = useRouter();
@@ -25,6 +13,16 @@ export default function NewAssessmentPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const { can } = useCurrentUser();
+  const [frameworks, setFrameworks] = useState<{ id: string; name: string }[]>([]);
+  useEffect(() => {
+    let active = true;
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/frameworks/available`, { credentials: "include" }).then(async r => {
+      if (!r.ok) throw new Error("Could not load the available framework library");
+      const data = await r.json();
+      if (active) setFrameworks(data.frameworks.map((f: { frameworkId: string; frameworkName: string }) => ({ id: f.frameworkId, name: f.frameworkName })));
+    }).catch(() => { if (active) setError("Could not load the available framework library"); });
+    return () => { active = false; };
+  }, []);
 
   function toggle(id: string) {
     setSelected((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
@@ -65,7 +63,7 @@ export default function NewAssessmentPage() {
       </p>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 24 }}>
-        {AVAILABLE_FRAMEWORKS.map((fw) => (
+        {frameworks.map((fw) => (
           <label
             key={fw.id}
             style={{

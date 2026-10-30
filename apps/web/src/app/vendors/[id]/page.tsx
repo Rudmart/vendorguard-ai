@@ -1,3 +1,4 @@
+import VendorGovernance from "./vendor-governance";
 import { cookies } from "next/headers";
 import { Can } from "../../current-user";
 import { redirect, notFound } from "next/navigation";
@@ -131,6 +132,7 @@ export default async function VendorDetailPage({ params }: { params: { id: strin
           <div style={{ fontSize: 15 }}>{vendor.criticality || "Not set"}</div>
         </div>
       </div>
+      <VendorGovernance vendorId={vendor.id} />
     </main>
   );
 }

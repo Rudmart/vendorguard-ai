@@ -1,0 +1,66 @@
+{
+  "frameworkId": "soc2-tsc",
+  "frameworkName": "SOC 2 / AICPA Trust Services Criteria (category references only)",
+  "version": "2017 TSC / 2022 points of focus",
+  "sourceUrl": "https://www.aicpa-cima.com/resources/download/2017-trust-services-criteria-with-revised-points-of-focus-2022",
+  "licenseNote": "Reference metadata only. No proprietary control, safeguard, criterion, testing-procedure or points-of-focus text is reproduced or adapted. Obtain authorized source content and permissions from its owner before substantive assessment.",
+  "contentType": "REFERENCE_METADATA",
+  "demonstrationSubsetDisclaimer": "Scoped reference/assessment support only, not full framework coverage and not a compliance conclusion, certification, attestation or vendor approval.",
+  "controls": [
+    {
+      "controlId": "SEC",
+      "title": "TSC category reference: Security",
+      "domain": "Reference metadata",
+      "summary": "Reference-only index entry SEC. Consult the authorized source publication to determine the actual applicable requirements; this entry does not contain authoritative control text.",
+      "expectedEvidenceTypes": [
+        "Authorized source reference",
+        "Human applicability determination"
+      ],
+      "validationGuidance": "An authorized human must establish applicability and evaluate actual source requirements and evidence. Library presence is not a test result, approval or compliance conclusion."
+    },
+    {
+      "controlId": "AV",
+      "title": "TSC category reference: Availability",
+      "domain": "Reference metadata",
+      "summary": "Reference-only index entry AV. Consult the authorized source publication to determine the actual applicable requirements; this entry does not contain authoritative control text.",
+      "expectedEvidenceTypes": [
+        "Authorized source reference",
+        "Human applicability determination"
+      ],
+      "validationGuidance": "An authorized human must establish applicability and evaluate actual source requirements and evidence. Library presence is not a test result, approval or compliance conclusion."
+    },
+    {
+      "controlId": "PI",
+      "title": "TSC category reference: Processing integrity",
+      "domain": "Reference metadata",
+      "summary": "Reference-only index entry PI. Consult the authorized source publication to determine the actual applicable requirements; this entry does not contain authoritative control text.",
+      "expectedEvidenceTypes": [
+        "Authorized source reference",
+        "Human applicability determination"
+      ],
+      "validationGuidance": "An authorized human must establish applicability and evaluate actual source requirements and evidence. Library presence is not a test result, approval or compliance conclusion."
+    },
+    {
+      "controlId": "CONF",
+      "title": "TSC category reference: Confidentiality",
+      "domain": "Reference metadata",
+      "summary": "Reference-only index entry CONF. Consult the authorized source publication to determine the actual applicable requirements; this entry does not contain authoritative control text.",
+      "expectedEvidenceTypes": [
+        "Authorized source reference",
+        "Human applicability determination"
+      ],
+      "validationGuidance": "An authorized human must establish applicability and evaluate actual source requirements and evidence. Library presence is not a test result, approval or compliance conclusion."
+    },
+    {
+      "controlId": "PRIV",
+      "title": "TSC category reference: Privacy",
+      "domain": "Reference metadata",
+      "summary": "Reference-only index entry PRIV. Consult the authorized source publication to determine the actual applicable requirements; this entry does not contain authoritative control text.",
+      "expectedEvidenceTypes": [
+        "Authorized source reference",
+        "Human applicability determination"
+      ],
+      "validationGuidance": "An authorized human must establish applicability and evaluate actual source requirements and evidence. Library presence is not a test result, approval or compliance conclusion."
+    }
+  ]
+}

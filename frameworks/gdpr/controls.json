@@ -1,0 +1,121 @@
+{
+  "frameworkId": "gdpr",
+  "frameworkName": "GDPR (selected vendor-processing obligations)",
+  "version": "2016/679",
+  "sourceUrl": "https://eur-lex.europa.eu/eli/reg/2016/679/oj/eng",
+  "licenseNote": "Original scoped implementation-review summaries with source identifiers. Not a reproduction of the complete source publication; not legal advice.",
+  "contentType": "SCOPED_REVIEW_SUMMARIES",
+  "demonstrationSubsetDisclaimer": "Scoped reference/assessment support only, not full framework coverage and not a compliance conclusion, certification, attestation or vendor approval.",
+  "controls": [
+    {
+      "controlId": "5",
+      "title": "Processing principles and accountability",
+      "domain": "Vendor governance",
+      "summary": "Document the vendor-specific scope, accountable human, implementation evidence and testing outcome relevant to processing principles and accountability. Record exceptions and the human governance determination separately.",
+      "expectedEvidenceTypes": [
+        "Implementation record",
+        "Assessment evidence"
+      ],
+      "validationGuidance": "An authorized human must establish applicability and evaluate actual source requirements and evidence. Library presence is not a test result, approval or compliance conclusion."
+    },
+    {
+      "controlId": "6",
+      "title": "Lawful processing context",
+      "domain": "Vendor governance",
+      "summary": "Document the vendor-specific scope, accountable human, implementation evidence and testing outcome relevant to lawful processing context. Record exceptions and the human governance determination separately.",
+      "expectedEvidenceTypes": [
+        "Implementation record",
+        "Assessment evidence"
+      ],
+      "validationGuidance": "An authorized human must establish applicability and evaluate actual source requirements and evidence. Library presence is not a test result, approval or compliance conclusion."
+    },
+    {
+      "controlId": "12",
+      "title": "Accessible transparency arrangements",
+      "domain": "Vendor governance",
+      "summary": "Document the vendor-specific scope, accountable human, implementation evidence and testing outcome relevant to accessible transparency arrangements. Record exceptions and the human governance determination separately.",
+      "expectedEvidenceTypes": [
+        "Implementation record",
+        "Assessment evidence"
+      ],
+      "validationGuidance": "An authorized human must establish applicability and evaluate actual source requirements and evidence. Library presence is not a test result, approval or compliance conclusion."
+    },
+    {
+      "controlId": "25",
+      "title": "Data protection in service design",
+      "domain": "Vendor governance",
+      "summary": "Document the vendor-specific scope, accountable human, implementation evidence and testing outcome relevant to data protection in service design. Record exceptions and the human governance determination separately.",
+      "expectedEvidenceTypes": [
+        "Implementation record",
+        "Assessment evidence"
+      ],
+      "validationGuidance": "An authorized human must establish applicability and evaluate actual source requirements and evidence. Library presence is not a test result, approval or compliance conclusion."
+    },
+    {
+      "controlId": "28",
+      "title": "Processor and subprocessor responsibilities",
+      "domain": "Vendor governance",
+      "summary": "Document the vendor-specific scope, accountable human, implementation evidence and testing outcome relevant to processor and subprocessor responsibilities. Record exceptions and the human governance determination separately.",
+      "expectedEvidenceTypes": [
+        "Implementation record",
+        "Assessment evidence"
+      ],
+      "validationGuidance": "An authorized human must establish applicability and evaluate actual source requirements and evidence. Library presence is not a test result, approval or compliance conclusion."
+    },
+    {
+      "controlId": "30",
+      "title": "Records of processing activities",
+      "domain": "Vendor governance",
+      "summary": "Document the vendor-specific scope, accountable human, implementation evidence and testing outcome relevant to records of processing activities. Record exceptions and the human governance determination separately.",
+      "expectedEvidenceTypes": [
+        "Implementation record",
+        "Assessment evidence"
+      ],
+      "validationGuidance": "An authorized human must establish applicability and evaluate actual source requirements and evidence. Library presence is not a test result, approval or compliance conclusion."
+    },
+    {
+      "controlId": "32",
+      "title": "Risk-appropriate processing security",
+      "domain": "Vendor governance",
+      "summary": "Document the vendor-specific scope, accountable human, implementation evidence and testing outcome relevant to risk-appropriate processing security. Record exceptions and the human governance determination separately.",
+      "expectedEvidenceTypes": [
+        "Implementation record",
+        "Assessment evidence"
+      ],
+      "validationGuidance": "An authorized human must establish applicability and evaluate actual source requirements and evidence. Library presence is not a test result, approval or compliance conclusion."
+    },
+    {
+      "controlId": "33",
+      "title": "Breach notification coordination",
+      "domain": "Vendor governance",
+      "summary": "Document the vendor-specific scope, accountable human, implementation evidence and testing outcome relevant to breach notification coordination. Record exceptions and the human governance determination separately.",
+      "expectedEvidenceTypes": [
+        "Implementation record",
+        "Assessment evidence"
+      ],
+      "validationGuidance": "An authorized human must establish applicability and evaluate actual source requirements and evidence. Library presence is not a test result, approval or compliance conclusion."
+    },
+    {
+      "controlId": "35",
+      "title": "Impact assessment cooperation",
+      "domain": "Vendor governance",
+      "summary": "Document the vendor-specific scope, accountable human, implementation evidence and testing outcome relevant to impact assessment cooperation. Record exceptions and the human governance determination separately.",
+      "expectedEvidenceTypes": [
+        "Implementation record",
+        "Assessment evidence"
+      ],
+      "validationGuidance": "An authorized human must establish applicability and evaluate actual source requirements and evidence. Library presence is not a test result, approval or compliance conclusion."
+    },
+    {
+      "controlId": "44",
+      "title": "International transfer governance",
+      "domain": "Vendor governance",
+      "summary": "Document the vendor-specific scope, accountable human, implementation evidence and testing outcome relevant to international transfer governance. Record exceptions and the human governance determination separately.",
+      "expectedEvidenceTypes": [
+        "Implementation record",
+        "Assessment evidence"
+      ],
+      "validationGuidance": "An authorized human must establish applicability and evaluate actual source requirements and evidence. Library presence is not a test result, approval or compliance conclusion."
+    }
+  ]
+}

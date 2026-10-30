@@ -53,6 +53,11 @@ function evaluateConditionalTrigger(
   tenant: TenantApplicabilityProfile,
 ): boolean {
   switch (frameworkId) {
+    case "nist-800-53": return vendor.servesGovernmentCustomers;
+    case "cis-controls-v8": return vendor.serviceCategory === "Cloud/SaaS" || vendor.servesGovernmentCustomers;
+    case "soc2-tsc": return vendor.serviceCategory === "Cloud/SaaS";
+    case "gdpr": return vendor.dataClassifications.some(c => ["PII", "PHI"].includes(c)) && (tenant.operatesInEu || vendor.processingLocations.some(c => EU_MEMBER_STATE_CODES.has(c)));
+    case "nist-800-218a": return vendor.aiFunctionality && vendor.aiProductType === "GENERATIVE";
     case "csa-caiq":
       return vendor.serviceCategory === "Cloud/SaaS";
     case "pci-dss":

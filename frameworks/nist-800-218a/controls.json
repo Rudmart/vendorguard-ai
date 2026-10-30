@@ -1,0 +1,55 @@
+{
+  "frameworkId": "nist-800-218a",
+  "frameworkName": "NIST SP 800-218A (selected AI development review checks)",
+  "version": "2024",
+  "sourceUrl": "https://csrc.nist.gov/pubs/sp/800/218/a/final",
+  "licenseNote": "Original scoped implementation-review summaries with source identifiers. Not a reproduction of the complete source publication; not legal advice.",
+  "contentType": "SCOPED_REVIEW_SUMMARIES",
+  "demonstrationSubsetDisclaimer": "Scoped reference/assessment support only, not full framework coverage and not a compliance conclusion, certification, attestation or vendor approval.",
+  "controls": [
+    {
+      "controlId": "VG-AI-DEV-01",
+      "title": "Assign secure AI development responsibilities",
+      "domain": "Vendor governance",
+      "summary": "Document the vendor-specific scope, accountable human, implementation evidence and testing outcome relevant to assign secure ai development responsibilities. Record exceptions and the human governance determination separately.",
+      "expectedEvidenceTypes": [
+        "Implementation record",
+        "Assessment evidence"
+      ],
+      "validationGuidance": "An authorized human must establish applicability and evaluate actual source requirements and evidence. Library presence is not a test result, approval or compliance conclusion."
+    },
+    {
+      "controlId": "VG-AI-DEV-02",
+      "title": "Protect development assets and model provenance",
+      "domain": "Vendor governance",
+      "summary": "Document the vendor-specific scope, accountable human, implementation evidence and testing outcome relevant to protect development assets and model provenance. Record exceptions and the human governance determination separately.",
+      "expectedEvidenceTypes": [
+        "Implementation record",
+        "Assessment evidence"
+      ],
+      "validationGuidance": "An authorized human must establish applicability and evaluate actual source requirements and evidence. Library presence is not a test result, approval or compliance conclusion."
+    },
+    {
+      "controlId": "VG-AI-DEV-03",
+      "title": "Review AI-specific development threats",
+      "domain": "Vendor governance",
+      "summary": "Document the vendor-specific scope, accountable human, implementation evidence and testing outcome relevant to review ai-specific development threats. Record exceptions and the human governance determination separately.",
+      "expectedEvidenceTypes": [
+        "Implementation record",
+        "Assessment evidence"
+      ],
+      "validationGuidance": "An authorized human must establish applicability and evaluate actual source requirements and evidence. Library presence is not a test result, approval or compliance conclusion."
+    },
+    {
+      "controlId": "VG-AI-DEV-04",
+      "title": "Handle disclosed model and software weaknesses",
+      "domain": "Vendor governance",
+      "summary": "Document the vendor-specific scope, accountable human, implementation evidence and testing outcome relevant to handle disclosed model and software weaknesses. Record exceptions and the human governance determination separately.",
+      "expectedEvidenceTypes": [
+        "Implementation record",
+        "Assessment evidence"
+      ],
+      "validationGuidance": "An authorized human must establish applicability and evaluate actual source requirements and evidence. Library presence is not a test result, approval or compliance conclusion."
+    }
+  ]
+}

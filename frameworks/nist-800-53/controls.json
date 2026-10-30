@@ -1,0 +1,143 @@
+{
+  "frameworkId": "nist-800-53",
+  "frameworkName": "NIST SP 800-53 Rev. 5 (selected vendor controls)",
+  "version": "Rev. 5",
+  "sourceUrl": "https://csrc.nist.gov/pubs/sp/800/53/r5/upd1/final",
+  "licenseNote": "Original scoped implementation-review summaries with source identifiers. Not a reproduction of the complete source publication; not legal advice.",
+  "contentType": "SCOPED_REVIEW_SUMMARIES",
+  "demonstrationSubsetDisclaimer": "Scoped reference/assessment support only, not full framework coverage and not a compliance conclusion, certification, attestation or vendor approval.",
+  "controls": [
+    {
+      "controlId": "AC-2",
+      "title": "Account lifecycle accountability",
+      "domain": "Vendor governance",
+      "summary": "Document the vendor-specific scope, accountable human, implementation evidence and testing outcome relevant to account lifecycle accountability. Record exceptions and the human governance determination separately.",
+      "expectedEvidenceTypes": [
+        "Implementation record",
+        "Assessment evidence"
+      ],
+      "validationGuidance": "An authorized human must establish applicability and evaluate actual source requirements and evidence. Library presence is not a test result, approval or compliance conclusion."
+    },
+    {
+      "controlId": "AC-3",
+      "title": "Access decision enforcement",
+      "domain": "Vendor governance",
+      "summary": "Document the vendor-specific scope, accountable human, implementation evidence and testing outcome relevant to access decision enforcement. Record exceptions and the human governance determination separately.",
+      "expectedEvidenceTypes": [
+        "Implementation record",
+        "Assessment evidence"
+      ],
+      "validationGuidance": "An authorized human must establish applicability and evaluate actual source requirements and evidence. Library presence is not a test result, approval or compliance conclusion."
+    },
+    {
+      "controlId": "AU-2",
+      "title": "Auditable event selection",
+      "domain": "Vendor governance",
+      "summary": "Document the vendor-specific scope, accountable human, implementation evidence and testing outcome relevant to auditable event selection. Record exceptions and the human governance determination separately.",
+      "expectedEvidenceTypes": [
+        "Implementation record",
+        "Assessment evidence"
+      ],
+      "validationGuidance": "An authorized human must establish applicability and evaluate actual source requirements and evidence. Library presence is not a test result, approval or compliance conclusion."
+    },
+    {
+      "controlId": "AU-6",
+      "title": "Review of recorded events",
+      "domain": "Vendor governance",
+      "summary": "Document the vendor-specific scope, accountable human, implementation evidence and testing outcome relevant to review of recorded events. Record exceptions and the human governance determination separately.",
+      "expectedEvidenceTypes": [
+        "Implementation record",
+        "Assessment evidence"
+      ],
+      "validationGuidance": "An authorized human must establish applicability and evaluate actual source requirements and evidence. Library presence is not a test result, approval or compliance conclusion."
+    },
+    {
+      "controlId": "CA-7",
+      "title": "Continuing assurance activities",
+      "domain": "Vendor governance",
+      "summary": "Document the vendor-specific scope, accountable human, implementation evidence and testing outcome relevant to continuing assurance activities. Record exceptions and the human governance determination separately.",
+      "expectedEvidenceTypes": [
+        "Implementation record",
+        "Assessment evidence"
+      ],
+      "validationGuidance": "An authorized human must establish applicability and evaluate actual source requirements and evidence. Library presence is not a test result, approval or compliance conclusion."
+    },
+    {
+      "controlId": "CM-3",
+      "title": "Reviewed configuration changes",
+      "domain": "Vendor governance",
+      "summary": "Document the vendor-specific scope, accountable human, implementation evidence and testing outcome relevant to reviewed configuration changes. Record exceptions and the human governance determination separately.",
+      "expectedEvidenceTypes": [
+        "Implementation record",
+        "Assessment evidence"
+      ],
+      "validationGuidance": "An authorized human must establish applicability and evaluate actual source requirements and evidence. Library presence is not a test result, approval or compliance conclusion."
+    },
+    {
+      "controlId": "CP-9",
+      "title": "Recoverable information copies",
+      "domain": "Vendor governance",
+      "summary": "Document the vendor-specific scope, accountable human, implementation evidence and testing outcome relevant to recoverable information copies. Record exceptions and the human governance determination separately.",
+      "expectedEvidenceTypes": [
+        "Implementation record",
+        "Assessment evidence"
+      ],
+      "validationGuidance": "An authorized human must establish applicability and evaluate actual source requirements and evidence. Library presence is not a test result, approval or compliance conclusion."
+    },
+    {
+      "controlId": "IA-2",
+      "title": "Attributable user authentication",
+      "domain": "Vendor governance",
+      "summary": "Document the vendor-specific scope, accountable human, implementation evidence and testing outcome relevant to attributable user authentication. Record exceptions and the human governance determination separately.",
+      "expectedEvidenceTypes": [
+        "Implementation record",
+        "Assessment evidence"
+      ],
+      "validationGuidance": "An authorized human must establish applicability and evaluate actual source requirements and evidence. Library presence is not a test result, approval or compliance conclusion."
+    },
+    {
+      "controlId": "IR-4",
+      "title": "Incident response responsibilities",
+      "domain": "Vendor governance",
+      "summary": "Document the vendor-specific scope, accountable human, implementation evidence and testing outcome relevant to incident response responsibilities. Record exceptions and the human governance determination separately.",
+      "expectedEvidenceTypes": [
+        "Implementation record",
+        "Assessment evidence"
+      ],
+      "validationGuidance": "An authorized human must establish applicability and evaluate actual source requirements and evidence. Library presence is not a test result, approval or compliance conclusion."
+    },
+    {
+      "controlId": "RA-3",
+      "title": "Documented risk assessment",
+      "domain": "Vendor governance",
+      "summary": "Document the vendor-specific scope, accountable human, implementation evidence and testing outcome relevant to documented risk assessment. Record exceptions and the human governance determination separately.",
+      "expectedEvidenceTypes": [
+        "Implementation record",
+        "Assessment evidence"
+      ],
+      "validationGuidance": "An authorized human must establish applicability and evaluate actual source requirements and evidence. Library presence is not a test result, approval or compliance conclusion."
+    },
+    {
+      "controlId": "SA-9",
+      "title": "External service governance",
+      "domain": "Vendor governance",
+      "summary": "Document the vendor-specific scope, accountable human, implementation evidence and testing outcome relevant to external service governance. Record exceptions and the human governance determination separately.",
+      "expectedEvidenceTypes": [
+        "Implementation record",
+        "Assessment evidence"
+      ],
+      "validationGuidance": "An authorized human must establish applicability and evaluate actual source requirements and evidence. Library presence is not a test result, approval or compliance conclusion."
+    },
+    {
+      "controlId": "SI-2",
+      "title": "Correction of identified flaws",
+      "domain": "Vendor governance",
+      "summary": "Document the vendor-specific scope, accountable human, implementation evidence and testing outcome relevant to correction of identified flaws. Record exceptions and the human governance determination separately.",
+      "expectedEvidenceTypes": [
+        "Implementation record",
+        "Assessment evidence"
+      ],
+      "validationGuidance": "An authorized human must establish applicability and evaluate actual source requirements and evidence. Library presence is not a test result, approval or compliance conclusion."
+    }
+  ]
+}

@@ -48,7 +48,7 @@ export type ControlMapping = z.infer<typeof controlMappingSchema>;
  *  - VENDOR_ASSESSMENT: content you assess *vendors* against (seeded as
  *    Framework/Control rows, shown in the Framework Explorer).
  *  - PLATFORM_SECURITY: frameworks that govern how *this application* is
- *    built and secured (OWASP Top 10s, MITRE ATT&CK/ATLAS, NIST 800-53).
+ *    built and secured (OWASP Top 10s and MITRE ATT&CK/ATLAS).
  *    These never appear as seeded controls - they're referenced in
  *    docs/threat-model.md and enforced through engineering practice, CI
  *    security gates, and code review, not through the framework engine's
@@ -56,12 +56,11 @@ export type ControlMapping = z.infer<typeof controlMappingSchema>;
  *
  * `status`:
  *  - ACTIVE: seeded now, controls exist under frameworks/<id>.
- *  - CONDITIONAL: not seeded by default; the applicability engine should
+ *  - CONDITIONAL: scoped library entries may be seeded; the applicability engine should
  *    only surface it when a vendor record matches `activationTriggers`
  *    (e.g. handlesCardholderData=true -> PCI DSS). Building a full control
- *    set for a framework nobody's vendor triggers wastes seed-maintenance
- *    effort, so conditional frameworks stay data-modeled but empty until
- *    a real vendor needs them.
+ *    set is not implied by reference metadata. Availability does not establish
+ *    legal applicability, effectiveness or compliance.
  *  - DEFERRED: acknowledged as in-scope for a mature TPRM program, not
  *    scheduled; usually because it requires a licensing/usage decision
  *    (e.g. Shared Assessments SIG content) before any content can be

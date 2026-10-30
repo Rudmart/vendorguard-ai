@@ -1,3 +1,4 @@
+import { registerVendorGovernanceRoutes } from "./vendorGovernance.js";
 import { registerSystemApprovalRoutes, productionApprovalIssue } from "./aiSystemApproval.js";
 import { assessmentReadiness } from "./assessmentReadiness.js";
 import { appendGovernanceDecision } from "./governanceDecisionHistory.js";
@@ -43,7 +44,7 @@ import { registerWorkQueueRoutes } from "./aiWorkQueues.js";
 import { registerAiIncidentRoutes } from "./aiIncidents.js";
 import { registerAiUseCaseRoutes } from "./aiUseCases.js";
 import { registerAuthRoutes } from "./auth-routes.js";
-import { requireFindingReviewAuthority, requireRiskAcceptanceAuthority, AuthorizationError, requestContextSchema, assertOwnedByTenant, requirePermission } from "@vendorguard/auth";
+import { requireFindingReviewAuthority, AuthorizationError, requestContextSchema, assertOwnedByTenant, requirePermission } from "@vendorguard/auth";
 import type { Role } from "@vendorguard/shared";
 import { DATA_CATEGORIES, AFFECTED_POPULATIONS, REGULATORY_RELEVANCE_TAGS } from "@vendorguard/shared";
 import { readdirSync, readFileSync } from "fs";
@@ -73,6 +74,7 @@ registerGovernanceWriteGuard(server);
 server.register(registerRetirementRoutes);
 server.register(registerSystemApprovalRoutes);
 server.register(registerAuthRoutes);
+server.register(registerVendorGovernanceRoutes);
 server.register(registerAiControlEvidenceRoutes);
 server.register(registerAiControlTestRoutes);
 server.register(registerGovernanceFindingRoutes);
@@ -430,83 +432,6 @@ server.post("/assessments/:id/findings/:findingId/reconcile", async (request, re
   try { return await proposeLegacyFinding(session, id, finding.controlId, body.proposedStatus as never, body.rationale.trim()); }
   catch (error) { const e = error as Error & { statusCode?: number }; return reply.code(e.statusCode ?? 500).send({ error: e.statusCode ? e.message : "Reconciliation failed" }); }
 });
-server.post("/vendors/:id/risk-acceptance", async (request, reply) => {
-  const session = await resolveSession(request);
-  if (!session) {
-    return reply.status(401).send({ error: "Not logged in" });
-  }
-
-  // Accepting business risk is a higher bar than accepting a finding -
-  // only ADMIN and REVIEWER roles, enforced server-side.
-  try {
-    const context = requestContextSchema.parse({
-      userId: session.userId,
-      tenantId: session.tenantId,
-      role: session.role,
-      correlationId: randomUUID(),
-    });
-    requireRiskAcceptanceAuthority(context);
-  } catch (err) {
-    if (err instanceof AuthorizationError) {
-      return reply.status(403).send({ error: err.message });
-    }
-    return reply.status(400).send({ error: "Invalid session context" });
-  }
-
-  const { id: vendorId } = request.params as { id: string };
-  const body = (request.body ?? {}) as {
-    justification?: string;
-    assessmentId?: string;
-    expiresAt?: string;
-  };
-  if (typeof body.justification !== "string" || !body.justification.trim()) {
-    return reply.status(400).send({ error: "justification is required" });
-  }
-  const justification = body.justification;
-  if (body.assessmentId !== undefined && (typeof body.assessmentId !== "string" || !body.assessmentId.trim())) return reply.status(400).send({ error: "Invalid assessmentId" });
-  const expiresAt = parseOptionalDate(body.expiresAt);
-  if (expiresAt === "invalid") return reply.status(400).send({ error: "Invalid expiresAt" });
-
-  const vendor = await prisma.vendor.findFirst({
-    where: { id: vendorId, tenantId: session.tenantId },
-  });
-  if (!vendor) {
-    return reply.status(404).send({ error: "Vendor not found" });
-  }
-  if (body.assessmentId && !await prisma.assessment.findFirst({ where: { id: body.assessmentId, tenantId: session.tenantId, vendorId } })) return reply.status(404).send({ error: "Assessment not found" });
-
-  const riskAcceptance = await prisma.$transaction(async (tx) => {
-  const riskAcceptance = await tx.riskAcceptance.create({
-    data: {
-      tenantId: session.tenantId,
-      vendorId: vendor.id,
-      assessmentId: body.assessmentId,
-      approvedByUserId: session.userId,
-      status: "APPROVED", // legacy single-step vendor acceptance - behaviour unchanged (Step 13 backlog)
-      justification,
-      expiresAt,
-    },
-  });
-  await tx.auditEvent.create({ data: { tenantId: session.tenantId, actorUserId: session.userId, action: "vendor.risk_accepted", targetType: "RiskAcceptance", targetId: riskAcceptance.id, outcome: "SUCCESS" } });
-  return riskAcceptance;
-  });
-
-  return reply.status(200).send({ riskAcceptance });
-});
-
-server.get("/vendors/:id/risk-acceptance", async (request, reply) => {
-  const session = await resolveSession(request);
-  if (!session) {
-    return reply.status(401).send({ error: "Not logged in" });
-  }
-  const { id: vendorId } = request.params as { id: string };
-  const riskAcceptances = await prisma.riskAcceptance.findMany({
-    where: { vendorId, tenantId: session.tenantId },
-    orderBy: { createdAt: "desc" },
-  });
-  return reply.status(200).send({ riskAcceptances });
-});
-
 // Third-Party AI read authorization hardening (Option A - enforce the existing permission catalog).
 function hasAnyPermission(session: { tenantId: string; role: string }, permissions: string[]): boolean {
   return permissions.some((permission) => {

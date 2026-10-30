@@ -13,6 +13,7 @@ type Vendor = {
   serviceCategory: string;
   criticality: string | null;
   risk: VendorRisk | null;
+  monitoring?: { contractReviewDate: string | null; reviewDue: boolean; activeReassessments: number; overdueReassessments: number; expiredAcceptances: number };
 };
 
 async function getVendors() {
@@ -62,10 +63,13 @@ export default async function VendorInventoryPage() {
   if (data === null) {
     redirect("/login");
   }
+  const sessionCookie = cookies().get("vg_session");
+  const monitoringResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/vendor-monitoring`, { cache: "no-store", headers: sessionCookie ? { Cookie: `vg_session=${sessionCookie.value}` } : {} });
+  const monitoring = monitoringResponse.ok ? (await monitoringResponse.json()).vendors as { id: string; contractReviewDate: string | null; reviewDue: boolean; activeReassessments: number; overdueReassessments: number; expiredAcceptances: number }[] : null;
   const vendorsWithScores: Vendor[] = await Promise.all(
     data.vendors.map(async (vendor: Vendor) => {
       const risk = await getRiskScore(vendor.id);
-      return { ...vendor, risk };
+      return { ...vendor, risk, monitoring: monitoring?.find(m => m.id === vendor.id) };
     })
   );
 
@@ -121,7 +125,9 @@ export default async function VendorInventoryPage() {
                   alignItems: "center",
                 }}
               >
-                <div style={{ fontWeight: 600 }}>{vendor.legalName}</div>
+                <div style={{ fontWeight: 600 }}>{vendor.legalName}
+                  <div style={{ fontWeight: 400, fontSize: 12 }}>{vendor.monitoring ? [vendor.monitoring.contractReviewDate ? (vendor.monitoring.reviewDue ? "Review due" : "Contract review scheduled") : "No contract review date recorded", `${vendor.monitoring.activeReassessments} reassessment(s) in progress`, vendor.monitoring.overdueReassessments ? "Reassessment overdue" : "", vendor.monitoring.expiredAcceptances ? "Acceptance review needed" : ""].filter(Boolean).join(" · ") : "Monitoring status unavailable"}</div>
+                </div>
                 <div style={{ color: "#8b96ac" }}>{vendor.serviceCategory}</div>
                 <div style={{ color: "#8b96ac" }}>{vendor.criticality || "Not set"}</div>
                 <div>
